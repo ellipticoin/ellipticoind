@@ -1,0 +1,25 @@
+[package]
+name = "ellipticoind"
+version = "0.1.0"
+authors = ["Mason Fischer <mason@kissr.co>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+vm = { path = "../vm" }
+serde = "1.0.102"
+mime = "0.3"
+bytes = "0.4.8"
+serde_cbor = "0.10.2"
+hyper = { version = "=0.13.0-alpha.4", features = ["unstable-stream"] }
+clap = { git = "https://github.com/clap-rs/clap.git" }
+rand = "*"
+warp = {path = "../../warp"}
+reqwest = {git = "https://github.com/seanmonstar/reqwest.git" }
+futures-preview = "0.3.0-alpha.19"
+futures-util-preview = "0.3.0-alpha.19"
+tokio = "0.2.0-alpha.6"
+tokio-executor = "=0.2.0-alpha.6"
+[dev-dependencies]
+tokio-test = "0.0.0"

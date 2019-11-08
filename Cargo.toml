@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "ellipticoind",
+    "hashfactor",
+    "transaction_processor",
+    "vm",
+]
