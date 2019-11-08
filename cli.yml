@@ -1,0 +1,13 @@
+args:
+    - port:
+        short: p
+        long: port
+        help: Port
+        default: 3030
+        takes_value: true
+    - bind_address:
+        short: b
+        long: bind
+        default: 127.0.0.1
+        help: Bind Address
+        takes_value: true
