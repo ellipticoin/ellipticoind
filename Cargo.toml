@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "ellipticoind",
+    "ellipticoin_system_contract",
     "hashfactor",
     "transaction_processor",
     "vm",

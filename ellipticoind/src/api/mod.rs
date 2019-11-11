@@ -10,16 +10,19 @@ use warp::ws::{Message, WebSocket};
 #[derive(Clone)]
 pub struct API {
     pub users: Arc<Mutex<HashMap<usize, mpsc::UnboundedSender<Result<Message, warp::Error>>>>>,
+    pub redis: vm::redis::Client,
 }
 pub mod blocks;
+pub mod memory;
 pub mod routes;
 pub mod transactions;
 static NEXT_USER_ID: AtomicUsize = AtomicUsize::new(1);
 
 impl API {
-    pub fn new() -> Self {
+    pub fn new(redis: vm::redis::Client) -> Self {
         Self {
             users: Arc::new(Mutex::new(HashMap::new())),
+            redis,
         }
     }
 
@@ -27,7 +30,7 @@ impl API {
         warp::serve(routes::routes(self)).run(socket).await;
     }
 
-    pub async fn broadcast<V: Clone + Into<Vec<u8>>>(&mut self, message: V) {
+    pub async fn _broadcast<V: Clone + Into<Vec<u8>>>(&mut self, message: V) {
         for (&_uid, tx) in self.users.lock().unwrap().iter_mut() {
             tx.try_send(Ok(Message::binary(message.clone()))).unwrap();
         }

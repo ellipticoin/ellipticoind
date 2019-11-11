@@ -10,23 +10,25 @@ impl<'a> VM<'a> {
             let arg_vec = to_vec(&arg).expect("no args");
             match self.write_pointer(arg_vec) {
                 Ok(Some(arg_pointer)) => runtime_values.push(arg_pointer),
-                Ok(None) => return (result::vm_panic(), self.gas),
-                Err(trap) => return (result::wasm_trap(trap), self.gas),
+                Ok(None) => {
+                    return (result::vm_panic(), self.gas)
+                },
+                Err(trap) => {
+                    return (result::wasm_trap(trap), self.gas)
+                },
             }
         }
         match self.instance.invoke_export(func, &runtime_values, self) {
             Ok(Some(RuntimeValue::I32(value))) => {
-                self.memory.commit();
-                self.storage.commit();
                 (result::from_bytes(self.read_pointer(value)), self.gas)
             }
             Err(metered_wasmi::Error::Trap(trap)) => {
-                self.memory.rollback();
-                self.storage.rollback();
                 (result::wasm_trap(trap), self.gas)
             }
             Err(error) => panic!(format!("{:?}", error)),
-            _ => panic!("vm error"),
+            _ => {
+                panic!("vm error")
+            },
         }
     }
 }

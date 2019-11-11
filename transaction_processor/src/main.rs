@@ -126,12 +126,6 @@ fn return_completed_transactions(
             })
             .collect(),
     );
-    println!(
-        "{} {} {}",
-        base64::encode(&to_vec(&completed_transactions).unwrap()),
-        base64::encode(&to_vec(&memory_changeset_bytes).unwrap()),
-        base64::encode(&to_vec(&storage_changeset_bytes).unwrap()),
-    );
 }
 
 fn sleep_1_milli() {

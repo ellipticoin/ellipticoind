@@ -1,34 +1,34 @@
 #![feature(async_closure)]
 extern crate bytes;
+extern crate hex;
 extern crate mime;
-extern crate rand;
+extern crate rocksdb;
 extern crate serde_cbor;
 extern crate tokio;
 
-use crate::rand::Rng;
-use std::net::SocketAddr;
-use std::sync::atomic::Ordering;
-use std::time::Duration;
 mod api;
+mod miner;
+mod system_contracts;
 
-pub async fn run(socket: SocketAddr) {
-    let api = api::API::new();
+use api::API;
+use std::net::SocketAddr;
+use vm::rocksdb::ops::Open;
+
+pub const ROCKSDB_PATH: &str = "./db";
+
+pub async fn run(socket: SocketAddr, redis_url: &str, system_contract: Vec<u8>) {
+    let redis = vm::redis::Client::open::<&str>(redis_url.into()).unwrap();
+    let redis2 = vm::redis::Client::open::<&str>(redis_url.into()).unwrap();
+    let api = API::new(redis);
     let mut api2 = api.clone();
+    let rocksdb = vm::rocksdb::DB::open_default(ROCKSDB_PATH).unwrap();
+    let mut vm_state = vm::State::new(
+        redis2.get_connection().unwrap(),
+        rocksdb,
+        system_contract.to_vec(),
+    );
     tokio::spawn(async move {
-        mine(&mut api2).await;
+        miner::mine(&mut api2, &mut vm_state).await;
     });
     api.serve(socket).await;
-}
-
-async fn mine(mut api: &mut api::API) {
-    loop {
-        mine_next_block(&mut api).await;
-    }
-}
-async fn mine_next_block(api: &mut api::API) {
-    api::blocks::NEXT_BLOCK_NUMBER.fetch_add(1, Ordering::Relaxed);
-    let block_winner = rand::thread_rng().gen::<[u8; 32]>();
-    api.broadcast(block_winner.to_vec()).await;
-    let random = rand::thread_rng().gen_range(0, 5000);
-    tokio::timer::delay_for(Duration::from_millis(random)).await;
 }
