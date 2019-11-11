@@ -44,7 +44,6 @@ pub fn create_contract(
             vec![0],
             transaction.sender.clone(),
         ].concat());
-        println!("debug: {:?}", balance);
         storage.set(right_pad_vec([&transaction.sender, contract_name.as_bytes()].concat(), 64, 0), code.to_vec());
         storage.commit();
         run_constuctor(transaction, memory, storage, env, contract_name, arguments)

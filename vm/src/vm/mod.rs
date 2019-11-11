@@ -1,10 +1,10 @@
 extern crate hex;
 extern crate serialize;
 use env::Env;
-use memory::Memory;
 use metered_wasmi::{ImportsBuilder, Module, ModuleInstance, ModuleRef, NopExternals};
-use storage::Storage;
 use transaction::Transaction;
+use state::State;
+
 mod call;
 mod externals;
 mod gas;
@@ -13,9 +13,8 @@ mod memory;
 
 pub struct VM<'a> {
     pub instance: &'a ModuleRef,
-    pub memory: &'a mut Memory,
-    pub storage: &'a mut Storage,
     pub transaction: &'a Transaction,
+    pub state: &'a mut State,
     pub gas: Option<u32>,
     pub env: &'a Env,
 }

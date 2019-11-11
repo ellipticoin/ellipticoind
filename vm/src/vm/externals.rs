@@ -50,7 +50,10 @@ impl<'a> VM<'a> {
 
     pub fn get_memory(&mut self, key_pointer: i32) -> Result<Vec<u8>, metered_wasmi::TrapKind> {
         let key = self.read_pointer(key_pointer);
-        let value = self.memory.get(&self.namespaced_key(key.clone()));
+        let value = self.state.get_memory(
+            &self.transaction.contract_address,
+            &key
+        );
 
         self.use_gas(value.len() as u32 * gas_costs::GET_BYTE_MEMORY)?;
         Ok(value)
@@ -63,14 +66,18 @@ impl<'a> VM<'a> {
     ) -> Result<Option<RuntimeValue>, metered_wasmi::Trap> {
         let key = self.read_pointer(key_pointer);
         let value = self.read_pointer(value_pointer);
+        self.state.set_memory(
+            &self.transaction.contract_address,
+            &key,
+            &value
+        );
         self.use_gas(value.len() as u32 * gas_costs::SET_BYTE_MEMORY)?;
-        self.memory.set(self.namespaced_key(key), value);
         Ok(None)
     }
 
     pub fn get_storage(&mut self, key_pointer: i32) -> Result<Vec<u8>, metered_wasmi::TrapKind> {
-        let key = self.read_pointer(key_pointer);
-        let value = self.storage.get(&self.namespaced_key(key));
+        let _key = self.read_pointer(key_pointer);
+        let value = vec![];
 
         self.use_gas(value.len() as u32 * gas_costs::GET_BYTE_STORAGE)?;
         Ok(value)
@@ -81,10 +88,9 @@ impl<'a> VM<'a> {
         key_pointer: i32,
         value_pointer: i32,
     ) -> Result<Option<RuntimeValue>, metered_wasmi::Trap> {
-        let key = self.read_pointer(key_pointer);
+        let _key = self.read_pointer(key_pointer);
         let value = self.read_pointer(value_pointer);
         self.use_gas(value.len() as u32 * gas_costs::SET_BYTE_STORAGE)?;
-        self.storage.set(self.namespaced_key(key), value);
         Ok(None)
     }
 
@@ -98,7 +104,7 @@ impl<'a> VM<'a> {
         let function_name_bytes = self.read_pointer(function_name_pointer);
         let function_name = str::from_utf8(&function_name_bytes).unwrap();
         let arguments = from_slice(&self.read_pointer(arguments_pointer)).unwrap();
-        let code = self.storage.get(&right_pad_vec(contract_address.clone(), 64, 0));
+        let code = vec![];
         if code.len() == 0 {
             return Ok(to_vec(&(
                 result::contract_not_found(self.transaction),
@@ -114,9 +120,8 @@ impl<'a> VM<'a> {
         env.caller = Some(serde_bytes::ByteBuf::from(self.transaction.contract_address.clone()));
         let mut vm = VM {
             instance: &module_instance,
-            memory: &mut self.memory,
-            storage: &mut self.storage,
             env: &env,
+            state: &mut self.state,
             transaction: &transaction,
             gas: self.gas,
         };

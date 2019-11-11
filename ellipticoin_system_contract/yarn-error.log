@@ -1,0 +1,60 @@
+Arguments: 
+  /Users/masonf/.nvm/versions/node/v9.8.0/bin/node /Users/masonf/.yarn/bin/yarn.js
+
+PATH: 
+  /usr/local/opt/llvm/bin:/Users/masonf/.yarn/bin:/Users/masonf/.config/yarn/global/node_modules/.bin:/Users/masonf/.nvm/versions/node/v9.8.0/bin:/Users/masonf/.rbenv/shims:./bin:.git/safe/../../bin:/Users/masonf/.bin:/usr/local/sbin:/Developer/NVIDIA/CUDA-10.0/bin:/Users/masonf/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/texbin:/usr/local/MacGPG2/bin:/opt/X11/bin:/Users/masonf/src/kotlin-native/dist/bin:/Users/masonf/.mix/escripts:/usr/local/Cellar/node/7.4.0/bin:/usr/local/opt/go/libexec/bin:/path/to/elixir/bin
+
+Yarn version: 
+  1.13.0
+
+Node version: 
+  9.8.0
+
+Platform: 
+  darwin x64
+
+Trace: 
+  SyntaxError: /Users/masonf/src/ellipticoin-base-contracts/base_token/package.json: Unexpected string in JSON at position 482
+      at JSON.parse (<anonymous>)
+      at /Users/masonf/.yarn/lib/cli.js:1625:59
+      at Generator.next (<anonymous>)
+      at step (/Users/masonf/.yarn/lib/cli.js:304:30)
+      at /Users/masonf/.yarn/lib/cli.js:315:13
+      at <anonymous>
+
+npm manifest: 
+  {
+    "name": "elipticoin-base-contracts",
+    "version": "1.0.0",
+    "main": "index.js",
+    "directories": {
+      "test": "test"
+    },
+    "scripts": {
+      "test": "cargo +nightly build --target wasm32-unknown-unknown && mocha test",
+      "generate-protobufs": "pbjs -t static-module -w commonjs protos/*.proto > test/support/base_token.pb.js"
+    },
+    "author": "Mason Fischer",
+    "license": "MIT",
+    "devDependencies": {
+      "simple-wasm": "file:../simple-wasm",
+      "wasm-rpc": "^0.2.1"
+      "long": "^4.0.0"
+    },
+    "dependencies": {
+      "@webassemblyjs/wasm-edit": "^1.8.1",
+      "cryptojs": "^2.5.3",
+      "node-forge": "^0.7.5",
+      "npm": "^5.7.1",
+      "protobufjs": "^6.8.4",
+      "to": "^0.2.9",
+      "update": "^0.7.4"
+    },
+    "description": ""
+  }
+
+yarn manifest: 
+  No manifest
+
+Lockfile: 
+  No lockfile

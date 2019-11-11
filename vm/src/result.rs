@@ -22,6 +22,7 @@ pub fn to_bytes(result: Result) -> Vec<u8> {
 }
 pub fn from_bytes(bytes: Vec<u8>) -> Result {
     if bytes.len() == 0 {
+        println!("panic in from_bytes");
         vm_panic()
     } else {
         let bytes_clone = bytes.clone();

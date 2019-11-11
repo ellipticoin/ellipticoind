@@ -1,16 +1,14 @@
 extern crate base64;
-use changeset::Changeset;
+use state::{Changeset};
 use env::Env;
-use memory::Memory;
 pub use metered_wasmi::{
     isa, FunctionContext, ImportsBuilder, Module, ModuleInstance, NopExternals, RuntimeValue,
 };
 use result::{self, Result};
 use serde::{Deserialize, Serialize};
 use serde_cbor::Value;
-use storage::Storage;
 use vm::{new_module_instance, VM};
-use helpers::right_pad_vec;
+use std::collections::HashMap;
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct Transaction {
@@ -38,18 +36,22 @@ pub struct CompletedTransaction {
     pub return_code: u32,
 }
 
+pub struct _State {
+    pub memory_changeset: crate::state::Changeset,
+    pub storage_changeset: crate::state::Changeset,
+}
+
 impl Transaction {
     pub fn run(
         &self,
-        mut memory: Memory,
-        mut storage: Storage,
-        env: Env,
+        env: &Env,
+        mut state: &mut crate::State,
     ) -> (Changeset, Changeset, (Result, Option<u32>)) {
-        let code = storage.get(&right_pad_vec(self.contract_address.clone(), 64, 0));
+        let code = state.get_code(&self.contract_address);
         if code.len() == 0 {
             return (
-                memory.changeset,
-                storage.changeset,
+                HashMap::new(),
+                HashMap::new(),
                 (
                     result::contract_not_found(self),
                     Some(self.gas_limit as u32),
@@ -59,14 +61,13 @@ impl Transaction {
         let instance = new_module_instance(code);
         let mut vm = VM {
             instance: &instance,
-            memory: &mut memory,
-            storage: &mut storage,
-            env: &env,
+            env: env,
+            state: &mut state,
             transaction: self,
             gas: Some(self.gas_limit as u32),
         };
         let result = vm.call(&self.function, self.arguments.clone());
-        (memory.changeset, storage.changeset, result)
+        (HashMap::new(), HashMap::new(), result)
     }
 
     pub fn complete(&self, result: Result) -> CompletedTransaction {
