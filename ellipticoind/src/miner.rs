@@ -4,42 +4,72 @@ extern crate serde_cbor;
 extern crate vm;
 
 use crate::api;
+use crate::models::*;
+use crate::schema::blocks::dsl::blocks;
 use crate::system_contracts;
 use crate::tokio::future::FutureExt;
+use diesel::dsl::*;
+use diesel::pg::PgConnection;
+use diesel::prelude::*;
+use rand::Rng;
 use serde_cbor::{from_slice, to_vec};
 use std::time::Duration;
-use vm::{CompletedTransaction, Env, Transaction};
+use vm::{CompletedTransaction, Transaction};
 
 const TRANSACTION_PROCESSING_TIME: u64 = 1000;
 
-pub async fn mine(mut api: &mut api::API, mut vm_state: &mut vm::State) {
+pub fn get_best_block(db: &PgConnection) -> Option<Block> {
+    blocks
+        .order(crate::schema::blocks::dsl::number.desc())
+        .first(db)
+        .optional()
+        .unwrap()
+}
+
+pub fn next_block(best_block: &Option<Block>) -> Block {
+    best_block.as_ref().map_or(
+        Block {
+            hash: rand::thread_rng().gen::<[u8; 32]>().to_vec(),
+            number: 1,
+            ..Default::default()
+        },
+        |Block { number, hash, .. }| Block {
+            hash: rand::thread_rng().gen::<[u8; 32]>().to_vec(),
+            parent_hash: Some(hash.to_vec()),
+            number: number + 1,
+            ..Default::default()
+        },
+    )
+}
+
+pub async fn mine(db: PgConnection, mut api: &mut api::API, mut vm_state: &mut vm::State) {
+    let mut best_block = get_best_block(&db);
     loop {
-        mine_next_block(&mut api, &mut vm_state).await;
+        let next_block = mine_next_block(&mut api, &mut vm_state, best_block).await;
+        insert_into(blocks)
+            .values(&next_block)
+            .execute(&db)
+            .unwrap();
+        println!("Displaying block -> {}", serde_cbor::to_vec(&BlockWithoutHash::from(&next_block)).unwrap().len());
+        best_block = Some(next_block);
     }
 }
 
-async fn mine_next_block(api: &mut api::API, vm_state: &mut vm::State) {
+async fn mine_next_block(
+    api: &mut api::API,
+    vm_state: &mut vm::State,
+    best_block: Option<Block>,
+) -> Block {
+    let block = next_block(&best_block);
     let env = vm::Env {
-        caller: None,
-        block_winner: vec![],
-        block_hash: vec![],
-        block_number: 0,
+        block_number: block.number as u64,
+        ..Default::default()
     };
     run_transactions(api, vm_state, &env)
         .timeout(Duration::from_millis(TRANSACTION_PROCESSING_TIME))
         .await
         .unwrap_err();
-}
-
-async fn get_next_transaction(conn: &mut vm::Connection) -> Transaction {
-    let transaction_bytes: Vec<u8> = vm::redis::cmd("BRPOPLPUSH")
-        .arg("transactions::pending")
-        .arg("transactions::processing")
-        .arg::<u32>(0)
-        .query_async(conn)
-        .await
-        .unwrap();
-    from_slice::<Transaction>(&transaction_bytes).unwrap()
+    block
 }
 
 async fn run_transactions(api: &mut api::API, mut vm_state: &mut vm::State, env: &vm::Env) {
@@ -84,6 +114,17 @@ fn run_transaction(
             (gas_memory_changeset, storage_changeset, result)
         };
     transaction.complete(result)
+}
+
+async fn get_next_transaction(conn: &mut vm::Connection) -> Transaction {
+    let transaction_bytes: Vec<u8> = vm::redis::cmd("BRPOPLPUSH")
+        .arg("transactions::pending")
+        .arg("transactions::processing")
+        .arg::<u32>(0)
+        .query_async(conn)
+        .await
+        .unwrap();
+    from_slice::<Transaction>(&transaction_bytes).unwrap()
 }
 
 async fn remove_from_processing(redis: &mut vm::Connection, transaction: &Transaction) {

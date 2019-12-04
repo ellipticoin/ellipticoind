@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, Default)]
 pub struct Env {
     pub block_number: u64,
     #[serde(with = "serde_bytes")]
