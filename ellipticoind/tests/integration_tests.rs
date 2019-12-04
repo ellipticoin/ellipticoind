@@ -8,7 +8,7 @@ use vm::Transaction;
 mod helpers;
 use core::time::Duration;
 use helpers::{get_balance, set_balance, ALICE, BOB};
-use helpers::{post, setup, REDIS_URL, SOCKET};
+use helpers::{post, setup, DATABASE_URL, REDIS_URL, SOCKET};
 use tokio::timer::delay_for;
 
 #[tokio::test]
@@ -18,6 +18,7 @@ async fn integration_tests() {
     let system_contract = include_bytes!("../src/wasm/ellipticoin_system_contract.wasm");
     tokio::spawn(ellipticoind::run(
         SOCKET.parse().unwrap(),
+        &DATABASE_URL,
         REDIS_URL,
         system_contract.to_vec(),
     ));

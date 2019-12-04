@@ -4,19 +4,34 @@ extern crate hex;
 extern crate mime;
 extern crate rocksdb;
 extern crate serde_cbor;
+extern crate serde;
 extern crate tokio;
+#[macro_use]
+extern crate diesel;
 
 mod api;
 mod miner;
+pub mod models;
+pub mod schema;
 mod system_contracts;
 
 use api::API;
+use diesel::pg::PgConnection;
+use diesel::prelude::*;
 use std::net::SocketAddr;
 use vm::rocksdb::ops::Open;
 
 pub const ROCKSDB_PATH: &str = "./db";
 
-pub async fn run(socket: SocketAddr, redis_url: &str, system_contract: Vec<u8>) {
+pub async fn run(
+    socket: SocketAddr,
+    database_url: &str,
+    redis_url: &str,
+    system_contract: Vec<u8>,
+) {
+    let db = PgConnection::establish(&database_url)
+        .expect(&format!("Error connecting to {}", database_url));
+
     let redis = vm::redis::Client::open::<&str>(redis_url.into()).unwrap();
     let redis2 = vm::redis::Client::open::<&str>(redis_url.into()).unwrap();
     let api = API::new(redis);
@@ -28,7 +43,7 @@ pub async fn run(socket: SocketAddr, redis_url: &str, system_contract: Vec<u8>) 
         system_contract.to_vec(),
     );
     tokio::spawn(async move {
-        miner::mine(&mut api2, &mut vm_state).await;
+        miner::mine(db, &mut api2, &mut vm_state).await;
     });
     api.serve(socket).await;
 }
