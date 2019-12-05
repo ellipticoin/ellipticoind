@@ -1,15 +1,20 @@
 #![feature(async_closure)]
 extern crate bytes;
+extern crate hashfactor;
 extern crate hex;
 extern crate mime;
 extern crate rocksdb;
-extern crate serde_cbor;
 extern crate serde;
+extern crate serde_cbor;
+extern crate sha2;
 extern crate tokio;
+#[macro_use]
+extern crate lazy_static;
 #[macro_use]
 extern crate diesel;
 
 mod api;
+mod helpers;
 mod miner;
 pub mod models;
 pub mod schema;
