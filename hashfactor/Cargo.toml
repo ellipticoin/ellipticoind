@@ -3,9 +3,6 @@ name = "hashfactor"
 version = "0.1.0"
 authors = ["Mason Fischer <mason@kissr.co>"]
 
-[[bin]]
-name = "hashfactor"
-
 [dependencies]
 base64 = "0.10.1"
 rand = "0.6.5"
