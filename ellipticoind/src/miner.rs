@@ -14,9 +14,19 @@ use rand::Rng;
 use serde_cbor::{from_slice, to_vec};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
+use dotenv::dotenv;
+use std::env;
 
 lazy_static! {
     static ref TRANSACTION_PROCESSING_TIME: Duration = std::time::Duration::from_secs(1);
+}
+
+lazy_static! {
+    static ref PUBLIC_KEY: Vec<u8> = {
+        dotenv().ok();
+        let private_key = base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap();
+        private_key[0..32].to_vec()
+    };
 }
 const HASHFACTOR_TARGET: u64 = 1;
 
@@ -55,6 +65,7 @@ pub async fn mine(db: PgConnection, mut api: &mut api::API, mut vm_state: &mut v
             .values(&transactions)
             .execute(&db)
             .unwrap();
+        api.broadcast_block(api::Block::from((&next_block, &transactions))).await;
         best_block = Some(next_block);
     }
 }
@@ -65,6 +76,7 @@ async fn mine_next_block(
     best_block: Option<Block>,
 ) -> (Block, Vec<Transaction>) {
     let mut block = next_block(&best_block);
+    block.winner = PUBLIC_KEY.to_vec();
     let env = vm::Env {
         block_number: block.number as u64,
         ..Default::default()

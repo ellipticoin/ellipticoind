@@ -7,7 +7,7 @@ use std::net::IpAddr;
 
 #[derive(Clap, Debug)]
 struct Opts {
-    #[clap(short = "p", long = "port", default_value = "3030")]
+    #[clap(short = "p", long = "port", default_value = "4460")]
     port: u16,
     #[clap(short = "b", long = "bind", default_value = "127.0.0.1")]
     bind_address: String,
