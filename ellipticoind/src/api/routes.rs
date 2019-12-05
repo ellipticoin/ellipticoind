@@ -8,7 +8,7 @@ pub fn routes(api: API) -> warp::filters::BoxedFilter<(impl warp::Reply,)> {
     let mut headers = HeaderMap::new();
     headers.insert("Content-Type", HeaderValue::from_static("application/cbor"));
 
-    let blocks = warp::path("blocks")
+    let blocks = warp::path("websocket")
         .and(warp::ws())
         .and(warp::any().map(move || api.clone()))
         .map(|ws: warp::ws::Ws, mut api: API| {
@@ -25,10 +25,15 @@ pub fn routes(api: API) -> warp::filters::BoxedFilter<(impl warp::Reply,)> {
         .and(warp::body::cbor())
         .map(|api, transaction| super::transactions::create(api, transaction));
 
+    let cors = warp::cors()
+        .allow_any_origin()
+        .allow_methods(&[warp::http::Method::GET]);
+
     memory
         .or(transactions)
         .or(block_number)
         .or(blocks)
+        .with(cors)
         .with(warp::reply::with::headers(headers))
         .boxed()
 }
