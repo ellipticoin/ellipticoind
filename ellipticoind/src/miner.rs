@@ -10,12 +10,12 @@ use crate::system_contracts;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use hashfactor::hashfactor;
-use rand::Rng;
 use serde_cbor::{from_slice, to_vec};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use dotenv::dotenv;
 use std::env;
+use crate::constants::SYSTEM_CONTRACT;
 
 lazy_static! {
     static ref TRANSACTION_PROCESSING_TIME: Duration = std::time::Duration::from_secs(1);
@@ -79,12 +79,14 @@ async fn mine_next_block(
     block.winner = PUBLIC_KEY.to_vec();
     let env = vm::Env {
         block_number: block.number as u64,
+        block_winner: PUBLIC_KEY.to_vec(),
         ..Default::default()
     };
     let mut transactions = run_transactions(api, vm_state, &env).await;
-    let mut rng = rand::thread_rng();
-    let random = rng.gen_range(0, 5000);
-    std::thread::sleep(std::time::Duration::from_millis(random));
+    // let mut rng = rand::thread_rng();
+    // let random = rng.gen_range(0, 5000);
+    // std::thread::sleep(std::time::Duration::from_millis(random));
+    std::thread::sleep(std::time::Duration::from_secs(3));
     let encoded_block = serde_cbor::to_vec(&UnminedBlock::from(&block)).unwrap();
     block.proof_of_work_value = hashfactor(encoded_block, HASHFACTOR_TARGET) as i64;
     block.set_hash();
@@ -101,7 +103,15 @@ async fn run_transactions(
     env: &vm::Env,
 ) -> Vec<Transaction> {
     let now = Instant::now();
-    let mut completed_transactions: Vec<Transaction> = Default::default();
+    let mint_transaction = vm::Transaction {
+        contract_address: SYSTEM_CONTRACT.to_vec(),
+        sender: PUBLIC_KEY.to_vec(),
+        nonce: 0,
+        function: "mint".to_string(),
+        arguments: vec![],
+        gas_limit: 10000000,
+    };
+    let mut completed_transactions: Vec<Transaction> = vec![run_transaction(&mut vm_state, &mint_transaction, env)];
     let mut con = vm::redis::Client::get_async_connection(&api.redis)
         .await
         .unwrap();
@@ -132,8 +142,7 @@ fn run_transaction(
 
             let env = vm::Env {
                 caller: None,
-                block_winner: vec![],
-                block_hash: vec![],
+                block_winner: PUBLIC_KEY.to_vec(),
                 block_number: 0,
             };
             let (gas_memory_changeset, _, _) = system_contracts::transfer(

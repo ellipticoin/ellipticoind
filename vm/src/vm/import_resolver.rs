@@ -19,10 +19,6 @@ impl<'a> ModuleImportResolver for ImportResolver {
                 Signature::new(&[][..], Some(ValueType::I32)),
                 SENDER_FUNC_INDEX,
             ),
-            "__block_hash" => FuncInstance::alloc_host(
-                Signature::new(&[][..], Some(ValueType::I32)),
-                BLOCK_HASH_FUNC_INDEX,
-            ),
             "__block_number" => FuncInstance::alloc_host(
                 Signature::new(&[][..], Some(ValueType::I32)),
                 BLOCK_NUMBER_FUNC_INDEX,

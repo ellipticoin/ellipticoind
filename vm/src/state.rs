@@ -39,6 +39,7 @@ impl State {
     }
 
     pub fn set_memory(&mut self, contract_address: &[u8], key: &[u8], value: &[u8]) {
+        // println!("{:?} => {:?}", namespaced_key(contract_address, key), &value);
         self
             .redis
             .set(namespaced_key(contract_address, key), value)
