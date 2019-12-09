@@ -8,11 +8,14 @@ use std::sync::{
 use tokio::sync::mpsc;
 use warp::ws::{Message, WebSocket};
 use serde::Serialize;
+use diesel::PgConnection;
+use diesel::r2d2::{ConnectionManager, Pool};
 
 #[derive(Clone)]
 pub struct API {
     pub users: Arc<Mutex<HashMap<usize, mpsc::UnboundedSender<Result<Message, warp::Error>>>>>,
     pub redis: vm::redis::Client,
+    pub db: Pool<ConnectionManager<PgConnection>>,
 }
 pub mod blocks;
 pub mod memory;
@@ -33,7 +36,23 @@ pub struct Block {
     #[serde(with = "serde_bytes")]
     pub storage_changeset_hash: Vec<u8>,
     pub proof_of_work_value: i64,
-    pub transactions: Vec<String>,
+    pub transactions: Vec<Transaction>,
+}
+
+#[derive(Serialize)]
+pub struct Transaction {
+    pub arguments: Vec<serde_cbor::Value>,
+    #[serde(with = "serde_bytes")]
+    pub block_hash: Vec<u8>,
+    #[serde(with = "serde_bytes")]
+    pub contract_address: Vec<u8>,
+    pub function: String,
+    pub gas_limit: u64,
+    pub nonce: u64,
+    return_code: u64,
+    return_value: serde_cbor::Value,
+    #[serde(with = "serde_bytes")]
+    pub sender: Vec<u8>,
 }
 
 impl From<(&crate::models::Block, &Vec<crate::models::Transaction>)> for Block {
@@ -46,16 +65,38 @@ impl From<(&crate::models::Block, &Vec<crate::models::Transaction>)> for Block {
             memory_changeset_hash: block.0.memory_changeset_hash.clone(),
             storage_changeset_hash: block.0.storage_changeset_hash.clone(),
             proof_of_work_value: block.0.proof_of_work_value.clone(),
-            transactions: vec![],
+            transactions: block
+                .1
+                .into_iter()
+                .map(Transaction::from)
+                .collect::<Vec<Transaction>>(),
+        }
+    }
+}
+
+impl From<&crate::models::Transaction> for Transaction {
+    fn from(transaction: &crate::models::Transaction) -> Self {
+        Self {
+            contract_address: transaction.contract_address.clone(),
+            block_hash: transaction.block_hash.clone(),
+            sender: transaction.sender.clone(),
+            nonce: transaction.nonce as u64,
+            gas_limit: transaction.gas_limit as u64,
+            function: transaction.function.clone(),
+            arguments: serde_cbor::from_slice(&transaction.arguments).unwrap(),
+            return_value: serde_cbor::from_slice(&transaction.return_value).unwrap(),
+            return_code: transaction.return_code as u64,
+
         }
     }
 }
 
 impl API {
-    pub fn new(redis: vm::redis::Client) -> Self {
+    pub fn new(redis: vm::redis::Client, db: Pool<ConnectionManager<PgConnection>>) -> Self {
         Self {
             users: Arc::new(Mutex::new(HashMap::new())),
             redis,
+            db,
         }
     }
 

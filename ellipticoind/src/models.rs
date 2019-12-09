@@ -92,29 +92,32 @@ impl Block {
 
 #[derive(Insertable, Queryable, Clone, Debug, Serialize)]
 pub struct Transaction {
-    pub hash: Vec<u8>,
     pub block_hash: Vec<u8>,
-    contract_address: Vec<u8>,
-    sender: Vec<u8>,
-    gas_limit: i64,
-    nonce: i64,
-    function: String,
-    arguments: Vec<u8>,
-    return_code: i64,
-    return_value: Vec<u8>,
+    pub hash: Vec<u8>,
+    pub contract_address: Vec<u8>,
+    pub sender: Vec<u8>,
+    pub gas_limit: i64,
+    pub nonce: i64,
+    pub function: String,
+    pub arguments: Vec<u8>,
+    pub return_code: i64,
+    pub return_value: Vec<u8>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct TransactionWithoutHash {
+    arguments: Vec<serde_cbor::Value>,
+    #[serde(with = "serde_bytes")]
     pub block_hash: Vec<u8>,
+    #[serde(with = "serde_bytes")]
     contract_address: Vec<u8>,
-    sender: Vec<u8>,
-    gas_limit: i64,
-    nonce: i64,
     function: String,
-    arguments: Vec<u8>,
-    return_code: i64,
-    return_value: Vec<u8>,
+    gas_limit: u64,
+    nonce: u64,
+    return_code: u64,
+    return_value: serde_cbor::Value,
+    #[serde(with = "serde_bytes")]
+    sender: Vec<u8>,
 }
 
 impl From<Transaction> for TransactionWithoutHash {
@@ -123,18 +126,37 @@ impl From<Transaction> for TransactionWithoutHash {
             block_hash: transaction.block_hash,
             contract_address: transaction.contract_address,
             sender: transaction.sender,
-            gas_limit: transaction.gas_limit,
-            nonce: transaction.nonce,
+            gas_limit: transaction.gas_limit as u64,
+            nonce: transaction.nonce as u64,
             function: transaction.function,
-            arguments: transaction.arguments,
-            return_code: transaction.return_code,
-            return_value: transaction.return_value,
+            arguments: serde_cbor::from_slice(&transaction.arguments).unwrap(),
+            return_code: transaction.return_code as u64,
+            return_value: serde_cbor::from_slice(&transaction.return_value).unwrap(),
         }
     }
 }
 
+
 impl Transaction {
     pub fn set_hash(&mut self) {
         self.hash = sha256(serde_cbor::to_vec(&TransactionWithoutHash::from(self.clone())).unwrap());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add() {
+        let thing1 = Thing1 {
+            aa: vec![1, 2, 3],
+            b: vec![1, 2, 3],
+        };
+        let thing2 = Thing1 {
+            b: vec![1, 2, 3],
+            aa: vec![1, 2, 3],
+        };
+        assert_eq!(serde_cbor::to_vec(&thing1).unwrap(), serde_cbor::to_vec(&thing2).unwrap());
     }
 }

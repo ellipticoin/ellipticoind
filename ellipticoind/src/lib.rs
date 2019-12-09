@@ -16,6 +16,7 @@ extern crate diesel;
 mod api;
 mod helpers;
 mod miner;
+mod constants;
 pub mod models;
 pub mod schema;
 mod system_contracts;
@@ -25,6 +26,7 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use std::net::SocketAddr;
 use vm::rocksdb::ops::Open;
+use diesel::r2d2::{ConnectionManager, Pool};
 
 pub const ROCKSDB_PATH: &str = "./db";
 
@@ -36,10 +38,12 @@ pub async fn run(
 ) {
     let db = PgConnection::establish(&database_url)
         .expect(&format!("Error connecting to {}", database_url));
+    let manager = ConnectionManager::<PgConnection>::new(database_url);
+    let pg_pool = Pool::new(manager).expect("Postgres connection pool could not be created");
 
     let redis = vm::redis::Client::open::<&str>(redis_url.into()).unwrap();
     let redis2 = vm::redis::Client::open::<&str>(redis_url.into()).unwrap();
-    let api = API::new(redis);
+    let api = API::new(redis, pg_pool);
     let mut api2 = api.clone();
     let rocksdb = vm::rocksdb::DB::open_default(ROCKSDB_PATH).unwrap();
     let mut vm_state = vm::State::new(

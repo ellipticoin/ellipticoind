@@ -1,5 +1,5 @@
 use ellipticoin::{
-    block_number, block_winner, export, get_memory, sender, set_memory, Value,
+    block_number, block_winner, export, get_memory, sender, set_memory, Value
 };
 pub use wasm_rpc::{Bytes, Dereferenceable, Referenceable, FromBytes, ToBytes};
 
@@ -14,7 +14,7 @@ enum Namespace {
 }
 
 #[export]
-mod base_token {
+mod system {
     pub fn constructor(initial_supply: u64) {
         set(Namespace::Balances, sender(), initial_supply)
     }
