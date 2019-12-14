@@ -494,7 +494,7 @@ dependencies = [
  "tokio-executor 0.2.0-alpha.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-test 0.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "vm 0.1.0",
- "warp 0.1.20",
+ "warp 0.2.0-alpha.0",
 ]
 
 [[package]]
@@ -1020,6 +1020,18 @@ version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "mime"
+version = "0.4.0-a.0"
+dependencies = [
+ "mime-parse 0.0.0",
+ "quoted-string 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "mime-parse"
+version = "0.0.0"
+
+[[package]]
 name = "mime_guess"
 version = "1.8.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1387,6 +1399,14 @@ version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "proc-macro2 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "quoted-string"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "quick-error 1.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2478,7 +2498,7 @@ dependencies = [
 
 [[package]]
 name = "warp"
-version = "0.1.20"
+version = "0.2.0-alpha.0"
 dependencies = [
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-preview 0.3.0-alpha.19 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2487,7 +2507,7 @@ dependencies = [
  "http 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.13.0-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "mime 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mime 0.4.0-a.0",
  "mime_guess 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "multipart 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "pin-project 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2902,6 +2922,7 @@ dependencies = [
 "checksum quick-error 1.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "9274b940887ce9addde99c4eee6b5c44cc494b182b97e73dc8ffdcb3397fd3f0"
 "checksum quote 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)" = "6ce23b6b870e8f94f81fb0a363d65d86675884b34a09043c81e5562f11c1f8e1"
 "checksum quote 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "053a8c8bcc71fcce321828dc897a98ab9760bef03a4fc36693c231e5b3216cfe"
+"checksum quoted-string 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "9586f8867f39941d8e796c18340a9cb5221a018df021169dc3e61c87d9f5f567"
 "checksum r2d2 0.8.7 (registry+https://github.com/rust-lang/crates.io-index)" = "22b5c5fc5fba064373f03887337b412e0e1562d63023393db77251146cb75553"
 "checksum rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)" = "552840b97013b1a26992c11eac34bdd778e464601a4c2054b5f0bff7c6761293"
 "checksum rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)" = "6d71dacdc3c88c1fde3885a3be3fbab9f35724e6ce99467f7d9c5026132184ca"

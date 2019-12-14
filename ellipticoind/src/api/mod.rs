@@ -1,4 +1,7 @@
+use diesel::r2d2::{ConnectionManager, Pool};
+use diesel::PgConnection;
 use futures::{FutureExt, StreamExt};
+use serde::Serialize;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{
@@ -7,9 +10,6 @@ use std::sync::{
 };
 use tokio::sync::mpsc;
 use warp::ws::{Message, WebSocket};
-use serde::Serialize;
-use diesel::PgConnection;
-use diesel::r2d2::{ConnectionManager, Pool};
 
 #[derive(Clone)]
 pub struct API {
@@ -17,6 +17,7 @@ pub struct API {
     pub redis: vm::redis::Client,
     pub db: Pool<ConnectionManager<PgConnection>>,
 }
+pub mod addresses;
 pub mod blocks;
 pub mod memory;
 pub mod routes;
@@ -86,7 +87,6 @@ impl From<&crate::models::Transaction> for Transaction {
             arguments: serde_cbor::from_slice(&transaction.arguments).unwrap(),
             return_value: serde_cbor::from_slice(&transaction.return_value).unwrap(),
             return_code: transaction.return_code as u64,
-
         }
     }
 }
