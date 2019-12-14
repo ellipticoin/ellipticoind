@@ -6,6 +6,7 @@ pub fn routes(api: API) -> warp::filters::BoxedFilter<(impl warp::Reply,)> {
     let api2 = api.clone();
     let api3 = api.clone();
     let api4 = api.clone();
+    let api5 = api.clone();
     let mut headers = HeaderMap::new();
     headers.insert("Content-Type", HeaderValue::from_static("application/cbor"));
 
@@ -30,11 +31,17 @@ pub fn routes(api: API) -> warp::filters::BoxedFilter<(impl warp::Reply,)> {
         .and(warp::body::cbor())
         .map(|api, transaction| super::transactions::create(api, transaction));
 
+    let addresses_show = warp::path("addresses")
+        .and(warp::any().map(move || api5.clone()))
+        .and(warp::path::param())
+        .map(super::addresses::show);
+
     let cors = warp::cors()
         .allow_any_origin()
         .allow_methods(&[warp::http::Method::GET]);
 
-    memory
+    addresses_show
+        .or(memory)
         .or(transactions)
         .or(transactions_show)
         .or(block_number)

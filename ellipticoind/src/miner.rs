@@ -4,18 +4,18 @@ extern crate serde_cbor;
 extern crate vm;
 
 use crate::api;
+use crate::constants::SYSTEM_CONTRACT;
 use crate::models::*;
 use crate::schema::blocks::dsl::blocks;
 use crate::system_contracts;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use dotenv::dotenv;
 use hashfactor::hashfactor;
 use serde_cbor::{from_slice, to_vec};
+use std::env;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
-use dotenv::dotenv;
-use std::env;
-use crate::constants::SYSTEM_CONTRACT;
 
 lazy_static! {
     static ref TRANSACTION_PROCESSING_TIME: Duration = std::time::Duration::from_secs(1);
@@ -25,7 +25,7 @@ lazy_static! {
     static ref PUBLIC_KEY: Vec<u8> = {
         dotenv().ok();
         let private_key = base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap();
-        private_key[0..32].to_vec()
+        private_key[32..64].to_vec()
     };
 }
 const HASHFACTOR_TARGET: u64 = 1;
@@ -65,7 +65,8 @@ pub async fn mine(db: PgConnection, mut api: &mut api::API, mut vm_state: &mut v
             .values(&transactions)
             .execute(&db)
             .unwrap();
-        api.broadcast_block(api::Block::from((&next_block, &transactions))).await;
+        api.broadcast_block(api::Block::from((&next_block, &transactions)))
+            .await;
         best_block = Some(next_block);
     }
 }
@@ -91,8 +92,8 @@ async fn mine_next_block(
     block.proof_of_work_value = hashfactor(encoded_block, HASHFACTOR_TARGET) as i64;
     block.set_hash();
     transactions.iter_mut().for_each(|transaction| {
-      transaction.block_hash = block.hash.clone();
-      transaction.set_hash();
+        transaction.set_hash();
+        transaction.block_hash = block.hash.clone();
     });
     (block, transactions)
 }
@@ -103,20 +104,16 @@ async fn run_transactions(
     env: &vm::Env,
 ) -> Vec<Transaction> {
     let now = Instant::now();
-    let mint_transaction = vm::Transaction {
-        contract_address: SYSTEM_CONTRACT.to_vec(),
-        sender: PUBLIC_KEY.to_vec(),
-        nonce: 0,
-        function: "mint".to_string(),
-        arguments: vec![],
-        gas_limit: 10000000,
-    };
-    let mut completed_transactions: Vec<Transaction> = vec![run_transaction(&mut vm_state, &mint_transaction, env)];
+    let mut completed_transactions: Vec<Transaction> = Default::default();
     let mut con = vm::redis::Client::get_async_connection(&api.redis)
         .await
         .unwrap();
+    let mut block_winner_tx_count = 0;
     while now.elapsed() < *TRANSACTION_PROCESSING_TIME {
         if let Some(transaction) = get_next_transaction(&mut con).await {
+            if transaction.sender == PUBLIC_KEY.to_vec() {
+                block_winner_tx_count += 1;
+            }
             let completed_transaction = run_transaction(&mut vm_state, &transaction, env);
             remove_from_processing(&mut con, &transaction).await;
             completed_transactions.push(completed_transaction);
@@ -124,6 +121,17 @@ async fn run_transactions(
             sleep(Duration::from_millis(1));
         }
     }
+    let db = api.db.get().unwrap();
+    let sender_nonce = next_nonce(&db, PUBLIC_KEY.to_vec()) + block_winner_tx_count;
+    let mint_transaction = vm::Transaction {
+        contract_address: SYSTEM_CONTRACT.to_vec(),
+        sender: PUBLIC_KEY.to_vec(),
+        nonce: sender_nonce,
+        function: "mint".to_string(),
+        arguments: vec![],
+        gas_limit: 10000000,
+    };
+    completed_transactions.push(run_transaction(&mut vm_state, &mint_transaction, env));
     completed_transactions
 }
 

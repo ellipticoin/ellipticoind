@@ -48,9 +48,13 @@ mod system {
 
     pub fn mint() -> Result<Value, Error> {
         if !block_minted(block_number()) {
-            credit(block_winner(), block_reward(block_number()));
-            mark_block_as_minted(block_number());
-            Ok(Value::Null)
+            if sender() == block_winner() {
+                credit(block_winner(), block_reward(block_number()));
+                mark_block_as_minted(block_number());
+                Ok(Value::Null)
+            } else {
+                Err(errors::NOT_BLOCK_WINNER)
+            }
         } else {
             Err(errors::BLOCK_ALREADY_MINTED)
         }

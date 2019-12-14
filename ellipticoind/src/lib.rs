@@ -14,9 +14,9 @@ extern crate lazy_static;
 extern crate diesel;
 
 mod api;
+mod constants;
 mod helpers;
 mod miner;
-mod constants;
 pub mod models;
 pub mod schema;
 mod system_contracts;
@@ -24,9 +24,9 @@ mod system_contracts;
 use api::API;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
+use diesel::r2d2::{ConnectionManager, Pool};
 use std::net::SocketAddr;
 use vm::rocksdb::ops::Open;
-use diesel::r2d2::{ConnectionManager, Pool};
 
 pub const ROCKSDB_PATH: &str = "./db";
 

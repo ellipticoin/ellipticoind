@@ -1,8 +1,11 @@
+use crate::diesel::ExpressionMethods;
 use crate::diesel::RunQueryDsl;
 use crate::helpers::sha256;
 use crate::schema::blocks;
 use crate::schema::transactions;
-use diesel::PgConnection;
+use crate::schema::transactions::columns::{nonce, sender};
+use diesel::r2d2::{ConnectionManager, PooledConnection};
+use diesel::{OptionalExtension, PgConnection, QueryDsl};
 use serde::Serialize;
 
 #[derive(Queryable, Insertable, Default, Clone, Debug, Serialize)]
@@ -106,57 +109,51 @@ pub struct Transaction {
 
 #[derive(Serialize, Debug)]
 pub struct TransactionWithoutHash {
-    arguments: Vec<serde_cbor::Value>,
-    #[serde(with = "serde_bytes")]
-    pub block_hash: Vec<u8>,
-    #[serde(with = "serde_bytes")]
-    contract_address: Vec<u8>,
-    function: String,
-    gas_limit: u64,
     nonce: u64,
-    return_code: u64,
-    return_value: serde_cbor::Value,
     #[serde(with = "serde_bytes")]
     sender: Vec<u8>,
+    function: String,
+    arguments: Vec<serde_cbor::Value>,
+    gas_limit: u64,
+    #[serde(with = "serde_bytes")]
+    contract_address: Vec<u8>,
 }
 
 impl From<Transaction> for TransactionWithoutHash {
     fn from(transaction: Transaction) -> Self {
         Self {
-            block_hash: transaction.block_hash,
             contract_address: transaction.contract_address,
             sender: transaction.sender,
             gas_limit: transaction.gas_limit as u64,
             nonce: transaction.nonce as u64,
             function: transaction.function,
             arguments: serde_cbor::from_slice(&transaction.arguments).unwrap(),
-            return_code: transaction.return_code as u64,
-            return_value: serde_cbor::from_slice(&transaction.return_value).unwrap(),
         }
     }
 }
 
-
 impl Transaction {
     pub fn set_hash(&mut self) {
-        self.hash = sha256(serde_cbor::to_vec(&TransactionWithoutHash::from(self.clone())).unwrap());
+        self.hash =
+            sha256(serde_cbor::to_vec(&TransactionWithoutHash::from(self.clone())).unwrap());
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_add() {
-        let thing1 = Thing1 {
-            aa: vec![1, 2, 3],
-            b: vec![1, 2, 3],
-        };
-        let thing2 = Thing1 {
-            b: vec![1, 2, 3],
-            aa: vec![1, 2, 3],
-        };
-        assert_eq!(serde_cbor::to_vec(&thing1).unwrap(), serde_cbor::to_vec(&thing2).unwrap());
-    }
+pub fn next_nonce(
+    con: &PooledConnection<ConnectionManager<PgConnection>>,
+    address: Vec<u8>,
+) -> u64 {
+    (highest_nonce(&con, address).unwrap_or(-1) + 1) as u64
+}
+pub fn highest_nonce(
+    con: &PooledConnection<ConnectionManager<PgConnection>>,
+    address: Vec<u8>,
+) -> Option<i64> {
+    crate::schema::transactions::dsl::transactions
+        .order(nonce.desc())
+        .filter(sender.eq(address))
+        .select(nonce)
+        .first(con)
+        .optional()
+        .unwrap()
 }
