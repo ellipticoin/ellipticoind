@@ -8,7 +8,8 @@ use diesel::r2d2::{ConnectionManager, PooledConnection};
 use diesel::{OptionalExtension, PgConnection, QueryDsl};
 use serde::Serialize;
 
-#[derive(Queryable, Insertable, Default, Clone, Debug, Serialize)]
+#[derive(Queryable, Identifiable, Insertable, Default, Clone, Debug, Serialize)]
+#[primary_key(hash)]
 pub struct Block {
     pub hash: Vec<u8>,
     pub parent_hash: Option<Vec<u8>>,
@@ -93,7 +94,9 @@ impl Block {
     }
 }
 
-#[derive(Insertable, Queryable, Clone, Debug, Serialize)]
+#[derive(Queryable, Identifiable, Insertable, Associations, PartialEq, Clone, Debug)]
+#[primary_key(hash)]
+#[belongs_to(Block, foreign_key = "block_hash")]
 pub struct Transaction {
     pub block_hash: Vec<u8>,
     pub hash: Vec<u8>,
