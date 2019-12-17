@@ -52,14 +52,19 @@ class BaseContractClient extends WasmRPC {
   }
 
   getMemory(key) {
-    // console.log(`${key} -> ${this.memory[key]}`)
     return this.memory[key]
   }
 
   setMemory(key, value) {
-    // console.log(key);
-    // console.log(`${key} = ${value}`)
     this.memory[key] = value;
+  }
+
+  setBalance(address, balance) {
+      this.setMemory(new Uint8Array([0, ...address]), new Uint8Array(Long.fromValue(balance).toBytesLE()))
+  }
+
+  getBalance(address, balance) {
+      return Long.fromBytesLE(this.getMemory(new Uint8Array([0, ...address])));
   }
 
   getLong(namespace, key) {
