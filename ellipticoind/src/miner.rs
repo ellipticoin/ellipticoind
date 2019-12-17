@@ -4,7 +4,7 @@ extern crate serde_cbor;
 extern crate vm;
 
 use crate::api;
-use crate::constants::SYSTEM_CONTRACT;
+use crate::constants::TOKEN_CONTRACT;
 use crate::models::*;
 use crate::schema::blocks::dsl::blocks;
 use crate::system_contracts;
@@ -124,7 +124,7 @@ async fn run_transactions(
     let db = api.db.get().unwrap();
     let sender_nonce = next_nonce(&db, PUBLIC_KEY.to_vec()) + block_winner_tx_count;
     let mint_transaction = vm::Transaction {
-        contract_address: SYSTEM_CONTRACT.to_vec(),
+        contract_address: TOKEN_CONTRACT.to_vec(),
         sender: PUBLIC_KEY.to_vec(),
         nonce: sender_nonce,
         function: "mint".to_string(),
@@ -140,28 +140,26 @@ fn run_transaction(
     transaction: &vm::Transaction,
     env: &vm::Env,
 ) -> Transaction {
-    let (_transaction_memory_changeset, _transaction_storage_changeset, result) =
-        if system_contracts::is_system_contract(&transaction) {
-            system_contracts::run(transaction, env)
-        } else {
-            let (memory_changeset, storage_changeset, (result, gas_left)) =
-                transaction.run(env, &mut state);
-            let gas_used = transaction.gas_limit - gas_left.expect("no gas left") as u64;
+    let result = if system_contracts::is_system_contract(&transaction) {
+        let result = system_contracts::run(transaction, &mut state, env);
+        result
+    } else {
+        let (result, gas_left) = transaction.run(&mut state, env);
+        let gas_used = transaction.gas_limit - gas_left.expect("no gas left") as u64;
 
-            let env = vm::Env {
-                caller: None,
-                block_winner: PUBLIC_KEY.to_vec(),
-                block_number: 0,
-            };
-            let (gas_memory_changeset, _, _) = system_contracts::transfer(
-                transaction,
-                memory_changeset,
-                gas_used as u32,
-                transaction.sender.clone(),
-                env.block_winner.clone(),
-            );
-            (gas_memory_changeset, storage_changeset, result)
+        let env = vm::Env {
+            caller: None,
+            block_winner: PUBLIC_KEY.to_vec(),
+            block_number: 0,
         };
+        system_contracts::transfer(
+            transaction,
+            gas_used as u32,
+            transaction.sender.clone(),
+            env.block_winner.clone(),
+        );
+        result
+    };
     Transaction::from(transaction.complete(result))
 }
 

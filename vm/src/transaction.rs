@@ -1,5 +1,4 @@
 extern crate base64;
-use state::{Changeset};
 use env::Env;
 pub use metered_wasmi::{
     isa, FunctionContext, ImportsBuilder, Module, ModuleInstance, NopExternals, RuntimeValue,
@@ -8,7 +7,6 @@ use result::{self, Result};
 use serde::{Deserialize, Serialize};
 use serde_cbor::Value;
 use vm::{new_module_instance, VM};
-use std::collections::HashMap;
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct Transaction {
@@ -44,30 +42,31 @@ pub struct _State {
 impl Transaction {
     pub fn run(
         &self,
-        env: &Env,
         mut state: &mut crate::State,
-    ) -> (Changeset, Changeset, (Result, Option<u32>)) {
+        env: &Env,
+    ) -> (Result, Option<u32>) {
         let code = state.get_code(&self.contract_address);
         if code.len() == 0 {
             return (
-                HashMap::new(),
-                HashMap::new(),
-                (
                     result::contract_not_found(self),
                     Some(self.gas_limit as u32),
-                ),
-            );
+                );
         }
-        let instance = new_module_instance(code);
-        let mut vm = VM {
-            instance: &instance,
-            env: env,
-            state: &mut state,
-            transaction: self,
-            gas: Some(self.gas_limit as u32),
-        };
-        let result = vm.call(&self.function, self.arguments.clone());
-        (HashMap::new(), HashMap::new(), result)
+        if let Ok(instance) = new_module_instance(code) {
+            let mut vm = VM {
+                instance: &instance,
+                env: env,
+                state: &mut state,
+                transaction: self,
+                gas: Some(self.gas_limit as u32),
+            };
+            vm.call(&self.function, self.arguments.clone())
+        } else {
+            return (
+                    result::invalid_wasm(),
+                    Some(self.gas_limit as u32),
+                );
+        }
     }
 
     pub fn complete(&self, result: Result) -> CompletedTransaction {

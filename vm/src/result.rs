@@ -16,13 +16,16 @@ pub fn contract_not_found(_transaction: &Transaction) -> Result {
     (2, "Contract not found".to_string().into())
 }
 
+pub fn invalid_wasm() -> Result {
+    (3, "Invalid WebAssembly Code".to_string().into())
+}
+
 pub fn to_bytes(result: Result) -> Vec<u8> {
     let return_bytes = serde_cbor::to_vec(&result.1).unwrap();
     [helpers::u32_to_vec(result.0), return_bytes].concat()
 }
 pub fn from_bytes(bytes: Vec<u8>) -> Result {
     if bytes.len() == 0 {
-        println!("panic in from_bytes");
         vm_panic()
     } else {
         let bytes_clone = bytes.clone();

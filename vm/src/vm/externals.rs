@@ -99,7 +99,7 @@ impl<'a> VM<'a> {
         let function_name_bytes = self.read_pointer(function_name_pointer);
         let function_name = str::from_utf8(&function_name_bytes).unwrap();
         let arguments = from_slice(&self.read_pointer(arguments_pointer)).unwrap();
-        let code = vec![];
+        let code = self.state.get_code(&contract_address);
         if code.len() == 0 {
             return Ok(to_vec(&(
                 result::contract_not_found(self.transaction),
@@ -107,7 +107,7 @@ impl<'a> VM<'a> {
             ))
             .unwrap());
         }
-        let module_instance = new_module_instance(code);
+        let module_instance = new_module_instance(code).unwrap();
         let mut transaction: Transaction = (*self.transaction).clone();
         transaction.contract_address = contract_address;
         transaction.function = function_name.to_string();
@@ -120,6 +120,7 @@ impl<'a> VM<'a> {
             transaction: &transaction,
             gas: self.gas,
         };
+        println!("before call: {}", function_name);
         let (result, gas_left) = vm.call(function_name, arguments);
         let gas_used = self.gas.unwrap() - gas_left.expect("no gas left");
         self.use_gas(gas_used)?;

@@ -1,74 +1,58 @@
 use serde_cbor::Value;
-use std::collections::HashMap;
-use vm::Changeset;
-use vm::Env;
-use vm::Transaction;
+use vm::{Env, State, Transaction};
 
 pub fn is_system_contract(transaction: &Transaction) -> bool {
-    transaction.contract_address == [[0; 32].to_vec(), "system".as_bytes().to_vec()].concat()
+    transaction.contract_address == [[0; 32].to_vec(), "System".as_bytes().to_vec()].concat()
 }
 
-pub fn run(transaction: &Transaction, env: &Env) -> (Changeset, Changeset, (u32, Value)) {
+pub fn run(transaction: &Transaction, state: &mut State, env: &Env) -> (u32, Value) {
     match transaction.function.as_str() {
-        "create_contract" => create_contract(transaction, env),
-        _ => (HashMap::new(), HashMap::new(), (0, Value::Null)),
+        "create_contract" => create_contract(transaction, state, env),
+        _ => (0, Value::Null),
     }
 }
 
-pub fn create_contract(
-    transaction: &Transaction,
-    env: &Env,
-) -> (Changeset, Changeset, (u32, Value)) {
-    if let [Value::Text(contract_name), serde_cbor::Value::Bytes(_code), serde_cbor::Value::Array(arguments)] =
+pub fn create_contract(transaction: &Transaction, state: &mut State, env: &Env) -> (u32, Value) {
+    if let [Value::Text(contract_name), serde_cbor::Value::Bytes(code), serde_cbor::Value::Array(arguments)] =
         &transaction.arguments[..]
     {
-        // let balance = memory.get(&[
-        //     right_pad_vec([
-        //         &[0; 32].to_vec(),
-        //         "BaseToken".as_bytes(),
-        //     ].concat(), 64, 0),
-        //     vec![0],
-        //     transaction.sender.clone(),
-        // ].concat());
-        run_constuctor(transaction, env, contract_name, arguments)
+        let contract_address = [&transaction.sender, contract_name.as_bytes()].concat();
+        state.set_code(&contract_address, code);
+        let result = run_constuctor(transaction, state, env, contract_name, arguments);
+        result
     } else {
-        (HashMap::new(), HashMap::new(), (0, Value::Null))
+        (0, Value::Null)
     }
 }
 fn run_constuctor(
     transaction: &Transaction,
-    _env: &Env,
-    _contract_name: &str,
-    _arguments: &Vec<Value>,
-) -> (Changeset, Changeset, (u32, Value)) {
-    // let (memory_changeset, storage_changeset, (result, _gas_left)) = Transaction {
-    //     function: "constructor".to_string(),
-    //     arguments: arguments.to_vec(),
-    //     sender: transaction.sender.clone(),
-    //     nonce: transaction.nonce,
-    //     gas_limit: transaction.gas_limit,
-    //     contract_address: [
-    //         transaction.sender.clone(),
-    //         contract_name.as_bytes().to_vec(),
-    //     ]
-    //     .concat(),
-    // }
-    // .run(env);
-    // (memory_changeset, storage_changeset, result)
-    (
-        HashMap::new(),
-        HashMap::new(),
-        vm::result::contract_not_found(&transaction),
-    )
+    state: &mut State,
+    env: &Env,
+    contract_name: &str,
+    arguments: &Vec<Value>,
+) -> (u32, Value) {
+    let (result, _gas_left) = Transaction {
+        function: "constructor".to_string(),
+        arguments: arguments.to_vec(),
+        sender: transaction.sender.clone(),
+        nonce: transaction.nonce,
+        gas_limit: transaction.gas_limit,
+        contract_address: [
+            transaction.sender.clone(),
+            contract_name.as_bytes().to_vec(),
+        ]
+        .concat(),
+    }
+    .run(state, env);
+    result
 }
 
 pub fn transfer(
     transaction: &Transaction,
-    _memory_changeset: Changeset,
     amount: u32,
     from: Vec<u8>,
     to: Vec<u8>,
-) -> (Changeset, Changeset, (u32, Value)) {
+) -> (u32, Value) {
     let arguments = vec![Value::Bytes(to), Value::Integer(amount as i128)];
     let transaction = Transaction {
         function: "transfer".to_string(),
@@ -79,9 +63,5 @@ pub fn transfer(
         arguments: arguments.clone(),
     };
 
-    (
-        HashMap::new(),
-        HashMap::new(),
-        vm::result::contract_not_found(&transaction),
-    )
+    vm::result::contract_not_found(&transaction)
 }

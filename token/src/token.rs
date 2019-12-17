@@ -1,10 +1,8 @@
-use ellipticoin::{
-    block_number, block_winner, export, get_memory, sender, set_memory, Value
-};
-pub use wasm_rpc::{Bytes, Dereferenceable, Referenceable, FromBytes, ToBytes};
+use ellipticoin::{block_number, block_winner, export, sender, Value};
+pub use wasm_rpc::{Bytes, Dereferenceable, FromBytes, Referenceable, ToBytes};
 
-use issuance;
 use errors;
+use issuance;
 use wasm_rpc::error::Error;
 
 enum Namespace {
@@ -16,15 +14,15 @@ enum Namespace {
 #[export]
 mod system {
     pub fn constructor(initial_supply: u64) {
-        set(Namespace::Balances, sender(), initial_supply)
+        set_memory(Namespace::Balances, sender(), initial_supply)
     }
 
     pub fn approve(spender: Vec<u8>, amount: u64) {
-        set(Namespace::Allowences, [sender(), spender].concat(), amount);
+        set_memory(Namespace::Allowences, [sender(), spender].concat(), amount);
     }
 
     pub fn transfer_from(from: Vec<u8>, to: Vec<u8>, amount: u64) -> Result<Value, Error> {
-        let allowance: u64 = get(Namespace::Allowences, [from.clone(), sender()].concat());
+        let allowance: u64 = get_memory(Namespace::Allowences, [from.clone(), sender()].concat());
 
         if allowance >= amount {
             debit_allowance(from.clone(), sender(), amount);
@@ -32,17 +30,17 @@ mod system {
             credit(to, amount);
             Ok(Value::Null)
         } else {
-            Err(errors::INSUFFICIENT_FUNDS)
+            Err(errors::INSUFFICIENT_FUNDS.clone())
         }
     }
 
     pub fn transfer(to: Vec<u8>, amount: u64) -> Result<Value, Error> {
-        if get::<_, u64>(Namespace::Balances, sender()) >= amount {
+        if get_memory::<_, u64>(Namespace::Balances, sender()) >= amount {
             debit(sender(), amount);
             credit(to, amount);
             Ok(Value::Null)
         } else {
-            Err(errors::INSUFFICIENT_FUNDS)
+            Err(errors::INSUFFICIENT_FUNDS.clone())
         }
     }
 
@@ -53,15 +51,15 @@ mod system {
                 mark_block_as_minted(block_number());
                 Ok(Value::Null)
             } else {
-                Err(errors::NOT_BLOCK_WINNER)
+                Err(errors::NOT_BLOCK_WINNER.clone())
             }
         } else {
-            Err(errors::BLOCK_ALREADY_MINTED)
+            Err(errors::BLOCK_ALREADY_MINTED.clone())
         }
     }
 
     fn block_minted(block_number: u64) -> bool {
-        get(Namespace::Mintings, block_number)
+        get_memory(Namespace::Mintings, block_number)
     }
 
     fn block_reward(block_number: u64) -> u64 {
@@ -69,30 +67,34 @@ mod system {
     }
 
     fn debit_allowance(from: Vec<u8>, to: Vec<u8>, amount: u64) {
-        let allowance: u64 = get(Namespace::Allowences, [from.clone(), to.clone()].concat());
-        set(Namespace::Allowences, [from, to].concat(), allowance - amount);
+        let allowance: u64 = get_memory(Namespace::Allowences, [from.clone(), to.clone()].concat());
+        set_memory(
+            Namespace::Allowences,
+            [from, to].concat(),
+            allowance - amount,
+        );
     }
 
     fn mark_block_as_minted(block_number: u64) {
-        set(Namespace::Mintings, block_number, true);
+        set_memory(Namespace::Mintings, block_number, true);
     }
 
     fn credit(address: Vec<u8>, amount: u64) {
-        let balance: u64 = get(Namespace::Balances, address.clone());
-        set(Namespace::Balances, address, balance + amount);
+        let balance: u64 = get_memory(Namespace::Balances, address.clone());
+        set_memory(Namespace::Balances, address, balance + amount);
     }
 
     fn debit(address: Vec<u8>, amount: u64) {
-        let balance: u64 = get(Namespace::Balances, address.clone());
-        set(Namespace::Balances, address, balance - amount);
+        let balance: u64 = get_memory(Namespace::Balances, address.clone());
+        set_memory(Namespace::Balances, address, balance - amount);
     }
 
-    fn set<K: ToBytes, V: ToBytes>(namespace: Namespace, key: K, value: V) {
-        set_memory([vec![namespace as u8], key.to_bytes()].concat(), value);
+    fn set_memory<K: ToBytes, V: ToBytes>(namespace: Namespace, key: K, value: V) {
+        ellipticoin::set_memory([vec![namespace as u8], key.to_bytes()].concat(), value);
     }
 
-    fn get<K: ToBytes, V: FromBytes>(namespace: Namespace, key: K) -> V {
-        get_memory([vec![namespace as u8], key.to_bytes()].concat())
+    fn get_memory<K: ToBytes, V: FromBytes>(namespace: Namespace, key: K) -> V {
+        ellipticoin::get_memory([vec![namespace as u8], key.to_bytes()].concat())
     }
 }
 
@@ -102,10 +104,11 @@ mod tests {
     use ellipticoin::{set_block_winner, set_sender};
     use ellipticoin_test_framework::{ALICE, BOB, CAROL};
 
+
     #[test]
     fn test_transfer() {
         set_sender(ALICE.to_vec());
-        constructor(100);
+        set_balance(ALICE.to_vec(), 100);
         transfer(BOB.to_vec(), 20).unwrap();
         let alices_balance = balance_of(ALICE.to_vec());
         assert_eq!(alices_balance, 80);
@@ -116,14 +119,14 @@ mod tests {
     #[test]
     fn test_transfer_insufficient_funds() {
         set_sender(ALICE.to_vec());
-        constructor(100);
+        set_balance(ALICE.to_vec(), 100);
         assert!(transfer(BOB.to_vec(), 120).is_err());
     }
 
     #[test]
     fn test_transfer_from() {
         set_sender(ALICE.to_vec());
-        constructor(100);
+        set_balance(ALICE.to_vec(), 100);
         approve(BOB.to_vec(), 50);
         set_sender(BOB.to_vec());
         transfer_from(ALICE.to_vec(), CAROL.to_vec(), 20).unwrap();
@@ -154,11 +157,14 @@ mod tests {
         assert!(mint().is_err());
     }
 
+    pub fn set_balance(address: Vec<u8>, balance: u64) {
+        set_memory(Namespace::Balances, address, balance);
+    }
     pub fn balance_of(address: Vec<u8>) -> u64 {
-        get(Namespace::Balances, address)
+        get_memory(Namespace::Balances, address)
     }
 
     pub fn allowance(owner: Vec<u8>, spender: Vec<u8>) -> u64 {
-        get(Namespace::Allowences, [owner, spender].concat())
+        get_memory(Namespace::Allowences, [owner, spender].concat())
     }
 }

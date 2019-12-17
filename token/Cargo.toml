@@ -1,5 +1,5 @@
 [package]
-name = "ellipticoin_system_contract"
+name = "token"
 version = "0.1.0"
 authors = ["Mason Fischer <mason@kissr.co>"]
 

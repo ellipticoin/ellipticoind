@@ -26,7 +26,6 @@ pub fn blocks_index(api: API, query: BlocksQuery) -> Response {
         .load::<models::Transaction>(&con)
         .unwrap()
         .grouped_by(&blocks);
-
     let blocks_response = blocks
         .into_iter()
         .zip(transactions)
