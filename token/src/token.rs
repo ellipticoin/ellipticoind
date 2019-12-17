@@ -12,7 +12,7 @@ enum Namespace {
 }
 
 #[export]
-mod system {
+mod token {
     pub fn constructor(initial_supply: u64) {
         set_memory(Namespace::Balances, sender(), initial_supply)
     }
