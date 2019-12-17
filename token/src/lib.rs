@@ -15,10 +15,10 @@ extern crate wasm_rpc_macros;
 extern crate lazy_static;
 
 #[cfg(test)]
-extern crate ellipticoin_test_framework;
-#[cfg(test)]
 extern crate ellipticoin_mock_api as ellipticoin;
+#[cfg(test)]
+extern crate ellipticoin_test_framework;
 
-pub mod system;
-mod issuance;
 mod errors;
+mod issuance;
+pub mod token;

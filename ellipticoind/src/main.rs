@@ -21,7 +21,7 @@ async fn main() {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let opts: Opts = Opts::parse();
     let socket = (opts.bind_address.parse::<IpAddr>().unwrap(), opts.port).into();
-    let system_contract = include_bytes!("wasm/ellipticoin_system_contract.wasm");
+    let system_contract = include_bytes!("wasm/token.wasm");
 
     ellipticoind::run(
         socket,

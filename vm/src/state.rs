@@ -23,13 +23,19 @@ impl State {
             memory_changeset: Changeset::new(),
             storage_changeset: Changeset::new(),
         };
-        vm_state.set_code(&[[0 as u8;32].to_vec(), b"System".to_vec()].concat(), &system_contract.to_vec());
+        let token_address = &[[0 as u8;32].to_vec(), b"Ellipticoin".to_vec()].concat();
+        vm_state.set_code(token_address, &system_contract.to_vec());
         vm_state
     }
 
     pub fn get_code(&self, contract_address: &[u8]) -> Vec<u8> {
         self.get_storage(contract_address, &vec![])
     }
+
+    pub fn set_code(&self, contract_address: &[u8], value: &[u8])  {
+        self.set_storage(contract_address, &vec![], value)
+    }
+
 
     pub fn get_memory(&mut self, contract_address: &[u8], key: &[u8]) -> Vec<u8> {
         self
@@ -39,7 +45,6 @@ impl State {
     }
 
     pub fn set_memory(&mut self, contract_address: &[u8], key: &[u8], value: &[u8]) {
-        // println!("{:?} => {:?}", namespaced_key(contract_address, key), &value);
         self
             .redis
             .set(namespaced_key(contract_address, key), value)
@@ -52,10 +57,6 @@ impl State {
             .get(namespaced_key(contract_address, key))
             .unwrap().and_then(|value| Some(value.to_vec()))
             .unwrap_or(vec![])
-    }
-
-    pub fn set_code(&self, contract_address: &[u8], value: &[u8])  {
-        self.set_storage(contract_address, &vec![], value)
     }
 
     pub fn set_storage(&self, contract_address: &[u8], key: &[u8], value: &[u8])  {

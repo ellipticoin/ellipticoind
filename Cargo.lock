@@ -454,19 +454,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ellipticoin_system_contract"
-version = "0.1.0"
-dependencies = [
- "ellipticoin 0.1.0",
- "ellipticoin-mock-api 0.1.1",
- "ellipticoin-test-framework 0.1.2",
- "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "wasm-rpc 0.2.12",
- "wasm-rpc-macros 0.2.12",
- "wee_alloc 0.4.5 (git+https://github.com/rustwasm/wee_alloc)",
-]
-
-[[package]]
 name = "ellipticoind"
 version = "0.1.0"
 dependencies = [
@@ -2113,6 +2100,19 @@ dependencies = [
  "libc 0.2.65 (registry+https://github.com/rust-lang/crates.io-index)",
  "redox_syscall 0.1.56 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "token"
+version = "0.1.0"
+dependencies = [
+ "ellipticoin 0.1.0",
+ "ellipticoin-mock-api 0.1.1",
+ "ellipticoin-test-framework 0.1.2",
+ "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wasm-rpc 0.2.12",
+ "wasm-rpc-macros 0.2.12",
+ "wee_alloc 0.4.5 (git+https://github.com/rustwasm/wee_alloc)",
 ]
 
 [[package]]

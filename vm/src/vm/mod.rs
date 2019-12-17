@@ -19,13 +19,13 @@ pub struct VM<'a> {
     pub env: &'a Env,
 }
 
-pub fn new_module_instance(code: Vec<u8>) -> ModuleRef {
-    let module = Module::from_buffer(code).unwrap();
+pub fn new_module_instance(code: Vec<u8>) -> Result<ModuleRef, metered_wasmi::Error> {
+    let module = Module::from_buffer(code)?;
 
     let mut imports = ImportsBuilder::new();
     imports.push_resolver("env", &import_resolver::ImportResolver);
-    ModuleInstance::new(&module, &imports)
+    Ok(ModuleInstance::new(&module, &imports)
         .expect("Failed to instantiate module")
         .run_start(&mut NopExternals)
-        .expect("Failed to run start function in module")
+        .expect("Failed to run start function in module"))
 }
