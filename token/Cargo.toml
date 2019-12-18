@@ -17,12 +17,11 @@ panic = 'abort'
 incremental = false
 
 [dev-dependencies]
-ellipticoin-test-framework = {"path" = "../../rust-ellipticoin-test-framework"}
-ellipticoin-mock-api = {"path" = "../../rust-ellipticoin-mock-api"}
+ellipticoin-test-framework = "0.1.3"
 
 [dependencies]
 lazy_static = "1.3.0"
-ellipticoin = {"path" = "../../rust-ellipticoin"}
+ellipticoin = "0.1.6"
 wee_alloc = { git = "https://github.com/rustwasm/wee_alloc" }
-wasm-rpc = {"path" = "../../rust-wasm-rpc/wasm-rpc"}
-wasm-rpc-macros = {"path" = "../../rust-wasm-rpc/wasm-rpc-macros"}
+wasm-rpc = "0.2.14"
+wasm-rpc-macros = "0.2.14"
