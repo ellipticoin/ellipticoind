@@ -25,7 +25,7 @@ serde_cbor = { git = "https://github.com/pyfisch/cbor" }
 hyper = { version = "=0.13.0-alpha.4", features = ["unstable-stream"] }
 clap = { git = "https://github.com/clap-rs/clap.git" }
 rand = "*"
-warp = {path = "../../warp"}
+warp = {git = "https://github.com/masonforest/warp.git", branch = "add-cbor-mime-type"}
 reqwest = {git = "https://github.com/seanmonstar/reqwest.git" }
 futures-preview = "0.3.0-alpha.19"
 futures-util-preview = "0.3.0-alpha.19"

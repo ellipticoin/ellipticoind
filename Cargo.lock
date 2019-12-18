@@ -481,7 +481,7 @@ dependencies = [
  "tokio-executor 0.2.0-alpha.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-test 0.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "vm 0.1.0",
- "warp 0.2.0-alpha.0",
+ "warp 0.2.0-alpha.0 (git+https://github.com/masonforest/warp.git?branch=add-cbor-mime-type)",
 ]
 
 [[package]]
@@ -1009,14 +1009,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "mime"
 version = "0.4.0-a.0"
+source = "git+https://github.com/masonforest/mime.git?branch=add-cbor-mime-type#68a12f3547bc1c37f0f77b35cdf98426c6384c2b"
 dependencies = [
- "mime-parse 0.0.0",
+ "mime-parse 0.0.0 (git+https://github.com/masonforest/mime.git?branch=add-cbor-mime-type)",
  "quoted-string 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "mime-parse"
 version = "0.0.0"
+source = "git+https://github.com/masonforest/mime.git?branch=add-cbor-mime-type#68a12f3547bc1c37f0f77b35cdf98426c6384c2b"
 
 [[package]]
 name = "mime_guess"
@@ -2499,6 +2501,7 @@ dependencies = [
 [[package]]
 name = "warp"
 version = "0.2.0-alpha.0"
+source = "git+https://github.com/masonforest/warp.git?branch=add-cbor-mime-type#074ecc6220d954f7575311894ecf10644c27f196"
 dependencies = [
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-preview 0.3.0-alpha.19 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2507,7 +2510,7 @@ dependencies = [
  "http 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.13.0-alpha.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "mime 0.4.0-a.0",
+ "mime 0.4.0-a.0 (git+https://github.com/masonforest/mime.git?branch=add-cbor-mime-type)",
  "mime_guess 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "multipart 0.16.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "pin-project 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2882,6 +2885,8 @@ dependencies = [
 "checksum metered_wasmi 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)" = "3fd0eb6c376c39ee617931d55293c6f05475aa4d801c2cff53680e44df48593a"
 "checksum mime 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "ba626b8a6de5da682e1caa06bdb42a335aee5a84db8e5046a3e8ab17ba0a3ae0"
 "checksum mime 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)" = "dd1d63acd1b78403cc0c325605908475dd9b9a3acbf65ed8bcab97e27014afcf"
+"checksum mime 0.4.0-a.0 (git+https://github.com/masonforest/mime.git?branch=add-cbor-mime-type)" = "<none>"
+"checksum mime-parse 0.0.0 (git+https://github.com/masonforest/mime.git?branch=add-cbor-mime-type)" = "<none>"
 "checksum mime_guess 1.8.7 (registry+https://github.com/rust-lang/crates.io-index)" = "0d977de9ee851a0b16e932979515c0f3da82403183879811bc97d50bd9cc50f7"
 "checksum mime_guess 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "1a0ed03949aef72dbdf3116a383d7b38b4768e6f960528cd6a6044aa9ed68599"
 "checksum mio 0.6.19 (registry+https://github.com/rust-lang/crates.io-index)" = "83f51996a3ed004ef184e16818edc51fadffe8e7ca68be67f9dee67d84d0ff23"
@@ -3039,6 +3044,7 @@ dependencies = [
 "checksum version_check 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)" = "914b1a6776c4c929a602fafd8bc742e06365d4bcbe48c30f9cca5824f70dc9dd"
 "checksum void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 "checksum want 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1ce8a968cb1cd110d136ff8b819a556d6fb6d919363c61534f6860c7eb172ba0"
+"checksum warp 0.2.0-alpha.0 (git+https://github.com/masonforest/warp.git?branch=add-cbor-mime-type)" = "<none>"
 "checksum wasi 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b89c3ce4ce14bdc6fb6beaf9ec7928ca331de5df7e5ea278375642a2f478570d"
 "checksum wasm-bindgen 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)" = "4c29d57d5c3b3bc53bbe35c5a4f4a0df994d870b7d3cb0ad1c2065e21822ae41"
 "checksum wasm-bindgen-backend 0.2.53 (registry+https://github.com/rust-lang/crates.io-index)" = "aa2868fa93e5bf36a9364d1277a0f97392748a8217d9aa0ec3f1cdbdf7ad1a60"
