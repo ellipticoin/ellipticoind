@@ -7,5 +7,5 @@ pub fn get_memory(mut api: API, path: String) -> Response {
         .redis
         .get::<Vec<u8>, Vec<u8>>(base64::decode_config(&path, base64::URL_SAFE).unwrap())
         .unwrap();
-    Response::new(value.into())
+    Response::new(serde_cbor::to_vec(&value).unwrap().into())
 }

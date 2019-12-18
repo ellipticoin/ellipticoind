@@ -23,7 +23,7 @@ pub fn setup() {
 
 pub fn set_balance(redis_url: &str, address: Vec<u8>, balance: u64) {
     let mut redis = redis::Client::open::<&str>(redis_url.into()).unwrap();
-    let contract_address = [SYSTEM_ADDRESS.to_vec(), "System".as_bytes().to_vec()].concat();
+    let contract_address = [SYSTEM_ADDRESS.to_vec(), "Ellipticoin".as_bytes().to_vec()].concat();
     let key = [[0; 1].to_vec(), address.clone()].concat();
     let balance_bytes = unsafe { std::mem::transmute::<u64, [u8; 8]>(balance).to_vec() };
     redis

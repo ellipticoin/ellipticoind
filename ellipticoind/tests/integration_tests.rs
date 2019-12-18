@@ -26,7 +26,7 @@ async fn integration_tests() {
     post(
         "/transactions",
         Transaction {
-            contract_address: [vec![0; 32].to_vec(), b"System".to_vec()].concat(),
+            contract_address: [vec![0; 32].to_vec(), b"Ellipticoin".to_vec()].concat(),
             sender: ALICE.to_vec(),
             nonce: 2,
             gas_limit: 100000000000000,
@@ -35,6 +35,6 @@ async fn integration_tests() {
         },
     )
     .await;
-    delay_for(Duration::from_secs(1)).await;
+    delay_for(Duration::from_secs(6)).await;
     assert_eq!(get_balance(&BOB.to_vec()).await, 50);
 }
