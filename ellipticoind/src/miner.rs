@@ -87,7 +87,7 @@ async fn mine_next_block(
     // let mut rng = rand::thread_rng();
     // let random = rng.gen_range(0, 5000);
     // std::thread::sleep(std::time::Duration::from_millis(random));
-    std::thread::sleep(std::time::Duration::from_secs(3));
+    tokio_timer::delay_for(std::time::Duration::from_secs(3)).await;
     let encoded_block = serde_cbor::to_vec(&UnminedBlock::from(&block)).unwrap();
     block.proof_of_work_value = hashfactor(encoded_block, HASHFACTOR_TARGET) as i64;
     block.set_hash();

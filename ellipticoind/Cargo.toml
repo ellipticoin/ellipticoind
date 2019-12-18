@@ -31,5 +31,6 @@ futures-preview = "0.3.0-alpha.19"
 futures-util-preview = "0.3.0-alpha.19"
 tokio = "0.2.0-alpha.6"
 tokio-executor = "=0.2.0-alpha.6"
+tokio-timer = "=0.3.0-alpha.6"
 [dev-dependencies]
 tokio-test = "0.0.0"
