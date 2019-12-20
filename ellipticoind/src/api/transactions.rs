@@ -1,43 +1,43 @@
-use super::API;
+use super::State;
+use super::views::Transaction;
 use crate::diesel::OptionalExtension;
+use crate::models;
 use crate::schema::transactions::dsl::transactions;
 use diesel::QueryDsl;
 use diesel::RunQueryDsl;
+use http_service::Body;
+use tide::Response;
 use vm::redis::Commands;
-use vm::Transaction;
-use warp::http::StatusCode;
-use warp::reply::Reply;
-use warp::reply::Response;
+use serde_cbor::from_slice;
+use crate::network::Message;
 
-pub fn show(api: API, transaction_hash: String) -> impl Reply {
-    let con = api.db.get().unwrap();
+pub async fn show(req: tide::Request<State>) -> Response {
+    let con = req.state().db.get().unwrap();
+    let transaction_hash: String = req.param("transaction_hash").unwrap();
     let transaction = transactions
         .find(base64::decode_config(&transaction_hash, base64::URL_SAFE).unwrap())
-        .first::<crate::models::Transaction>(&con)
+        .first::<models::Transaction>(&con)
         .optional()
         .unwrap();
 
     if let Some(transaction) = transaction {
-        Response::new(
-            serde_cbor::to_vec(&crate::api::Transaction::from(&transaction))
-                .unwrap()
-                .into(),
-        )
+        Response::new(200).body(Body::from(
+            serde_cbor::to_vec(&Transaction::from(&transaction)).unwrap(),
+        ))
     } else {
-        warp::http::Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(vec![].into())
-            .unwrap()
+        Response::new(404)
     }
 }
-pub fn create(api: API, transaction: Transaction) -> impl Reply {
-    let mut redis = api.redis.get_connection().unwrap();
+pub async fn create(mut req: tide::Request<State>) -> Response {
+    // println!("{}", req.body_bytes().await.unwrap().len());
+    let transaction_bytes = req.body_bytes().await.unwrap();
+    let transaction: vm::Transaction = from_slice(&transaction_bytes).unwrap();
+    let mut state = req.state().clone();
+    state.broadcast(Message::Transaction(transaction)).await;
+    let mut redis = req.state().redis.get_connection().unwrap();
     redis
-        .rpush::<&str, Vec<u8>, ()>(
-            "transactions::pending",
-            serde_cbor::to_vec(&transaction).unwrap(),
-        )
+        .rpush::<&str, Vec<u8>, ()>("transactions::pending", transaction_bytes)
         .unwrap();
 
-    StatusCode::CREATED
+    Response::new(201)
 }

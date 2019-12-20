@@ -3,7 +3,6 @@ extern crate heck;
 extern crate metered_wasmi;
 pub extern crate redis;
 pub extern crate rocksdb;
-extern crate rustler;
 extern crate serde;
 extern crate serde_cbor;
 extern crate serialize;
@@ -17,6 +16,8 @@ pub mod result;
 mod transaction;
 mod vm;
 pub mod state;
+mod backend;
+pub use backend::Backend;
 
 pub use state::{State, Changeset};
 pub use env::Env;
@@ -28,10 +29,7 @@ pub use result::*;
 
 pub use metered_wasmi::{ImportsBuilder, Module, ModuleInstance, NopExternals};
 pub use redis::{pipe, Client, Commands, ControlFlow, PubSubCommands};
-pub use redis::aio::{Connection, ConnectionLike};
+pub use redis::{Connection, ConnectionLike};
 
 pub use rocksdb::ops::Open;
 pub use rocksdb::{ReadOnlyDB, DB};
-pub use rustler::resource::ResourceArc;
-pub use rustler::types::atom::Atom;
-pub use rustler::{Decoder, Encoder, NifResult, Term};

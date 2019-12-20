@@ -1,11 +1,13 @@
-use crate::api::API;
+use super::State;
+use http_service::Body;
+use tide::Response;
 use vm::redis::Commands;
-use warp::reply::Response;
 
-pub fn get_memory(mut api: API, path: String) -> Response {
-    let value = api
-        .redis
-        .get::<Vec<u8>, Vec<u8>>(base64::decode_config(&path, base64::URL_SAFE).unwrap())
+pub async fn show(req: tide::Request<State>) -> Response {
+    let key: String = req.param("key").unwrap();
+    let mut redis = req.state().redis.get_connection().unwrap();
+    let value = redis
+        .get::<Vec<u8>, Vec<u8>>(base64::decode_config(&key, base64::URL_SAFE).unwrap())
         .unwrap();
-    Response::new(serde_cbor::to_vec(&value).unwrap().into())
+    Response::new(200).body(Body::from(serde_cbor::to_vec(&value).unwrap()))
 }
