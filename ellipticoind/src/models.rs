@@ -4,11 +4,13 @@ use crate::helpers::sha256;
 use crate::schema::blocks;
 use crate::schema::transactions;
 use crate::schema::transactions::columns::{nonce, sender};
+use diesel::dsl::insert_into;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use diesel::{OptionalExtension, PgConnection, QueryDsl};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use serde_cbor::{from_slice, to_vec};
 
-#[derive(Queryable, Identifiable, Insertable, Default, Clone, Debug, Serialize)]
+#[derive(Queryable, Identifiable, Insertable, Default, Clone, Debug, Serialize, Deserialize)]
 #[primary_key(hash)]
 pub struct Block {
     pub hash: Vec<u8>,
@@ -39,6 +41,27 @@ pub struct UnminedBlock {
     pub storage_changeset_hash: Vec<u8>,
 }
 
+pub fn is_next_block(best_block: &Option<Block>, block: &Block) -> bool {
+    if let Some(best_block) = best_block {
+        block.number > best_block.number
+    } else {
+        true
+    }
+}
+
+impl From<Transaction> for vm::Transaction {
+    fn from(transaction: Transaction) -> vm::Transaction {
+        vm::Transaction {
+            sender: transaction.sender,
+            arguments: from_slice(&transaction.arguments).unwrap(),
+            contract_address: transaction.contract_address,
+            function: transaction.function,
+            gas_limit: transaction.gas_limit as u64,
+            nonce: transaction.nonce as u64,
+        }
+    }
+}
+
 impl From<vm::CompletedTransaction> for Transaction {
     fn from(transaction: vm::CompletedTransaction) -> Self {
         Self {
@@ -49,9 +72,9 @@ impl From<vm::CompletedTransaction> for Transaction {
             gas_limit: transaction.gas_limit as i64,
             nonce: transaction.nonce as i64,
             function: transaction.function,
-            arguments: serde_cbor::to_vec(&transaction.arguments).unwrap(),
+            arguments: to_vec(&transaction.arguments).unwrap(),
             return_code: transaction.return_code as i64,
-            return_value: serde_cbor::to_vec(&transaction.return_value).unwrap(),
+            return_value: to_vec(&transaction.return_value).unwrap(),
         }
     }
 }
@@ -83,18 +106,41 @@ impl From<Block> for BlockWithoutHash {
 
 impl Block {
     pub fn set_hash(&mut self) {
-        self.hash = sha256(serde_cbor::to_vec(&BlockWithoutHash::from(self.clone())).unwrap());
+        self.hash = sha256(to_vec(&BlockWithoutHash::from(self.clone())).unwrap());
     }
 
-    pub fn insert(&self, db: &PgConnection) {
-        diesel::dsl::insert_into(crate::schema::blocks::dsl::blocks)
-            .values(self)
+    pub fn insert(self, db: &PgConnection, transactions: Vec<Transaction>) {
+        // println!("inserting {} transction hash wth hash: {} \nand block hash{}",
+        //          transactions.len(),
+        //          base64::encode(&transactions[0].hash),
+        //          base64::encode(&transactions[0].block_hash),
+        //          );
+
+        insert_into(blocks::dsl::blocks)
+            .values(&self)
             .execute(db)
             .unwrap();
+        insert_into(transactions::dsl::transactions)
+            .values(&transactions)
+            .execute(db)
+            .expect(&format!(
+                "failed to insert hash: {}",
+                base64::encode(&transactions[0].hash)
+            ));
     }
 }
 
-#[derive(Queryable, Identifiable, Insertable, Associations, PartialEq, Clone, Debug)]
+#[derive(
+    Queryable,
+    Identifiable,
+    Insertable,
+    Associations,
+    PartialEq,
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
 #[primary_key(hash)]
 #[belongs_to(Block, foreign_key = "block_hash")]
 pub struct Transaction {
@@ -130,15 +176,14 @@ impl From<Transaction> for TransactionWithoutHash {
             gas_limit: transaction.gas_limit as u64,
             nonce: transaction.nonce as u64,
             function: transaction.function,
-            arguments: serde_cbor::from_slice(&transaction.arguments).unwrap(),
+            arguments: from_slice(&transaction.arguments).unwrap(),
         }
     }
 }
 
 impl Transaction {
     pub fn set_hash(&mut self) {
-        self.hash =
-            sha256(serde_cbor::to_vec(&TransactionWithoutHash::from(self.clone())).unwrap());
+        self.hash = sha256(to_vec(&TransactionWithoutHash::from(self.clone())).unwrap());
     }
 }
 
@@ -152,7 +197,7 @@ pub fn highest_nonce(
     con: &PooledConnection<ConnectionManager<PgConnection>>,
     address: Vec<u8>,
 ) -> Option<i64> {
-    crate::schema::transactions::dsl::transactions
+    transactions::dsl::transactions
         .order(nonce.desc())
         .filter(sender.eq(address))
         .select(nonce)
