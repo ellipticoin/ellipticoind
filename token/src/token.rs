@@ -2,13 +2,17 @@ use ellipticoin::{block_number, block_winner, export, sender, Value};
 pub use wasm_rpc::{Bytes, Dereferenceable, FromBytes, Referenceable, ToBytes};
 
 use errors;
+use ethereum;
 use issuance;
+use std::convert::TryInto;
+use tiny_keccak::Hasher;
 use wasm_rpc::error::Error;
 
 enum Namespace {
     Balances,
     Allowences,
     Mintings,
+    SpoonedBalances,
 }
 
 #[export]
@@ -79,6 +83,16 @@ mod token {
         set_memory(Namespace::Mintings, block_number, true);
     }
 
+    fn unlock(unlock_signature: Vec<u8>) {
+        let message = "unlock_ellipticoin";
+        let address = ethereum::ecrecover_address(message.as_bytes(), &unlock_signature);
+        let balance = get_memory(Namespace::SpoonedBalances, address);
+        credit(sender(), balance);
+        // println!("{:?}", hex::encode(&address));
+        // println!("{:?}", plain_message.len());
+        // println!("{:?}", hex::encode(&message_hash2[12..31]));
+    }
+
     fn credit(address: Vec<u8>, amount: u64) {
         let balance: u64 = get_memory(Namespace::Balances, address.clone());
         set_memory(Namespace::Balances, address, balance + amount);
@@ -103,7 +117,6 @@ mod tests {
     use super::*;
     use ellipticoin::{set_block_winner, set_sender};
     use ellipticoin_test_framework::{ALICE, BOB, CAROL};
-
 
     #[test]
     fn test_transfer() {
@@ -166,5 +179,19 @@ mod tests {
 
     pub fn allowance(owner: Vec<u8>, spender: Vec<u8>) -> u64 {
         get_memory(Namespace::Allowences, [owner, spender].concat())
+    }
+
+    #[test]
+    fn test_unlock_coins() {
+        let ethereum_address = "43c01ab76d50c59e3893858ace624df81a14a596";
+        set_sender(ALICE.to_vec());
+        set_memory(
+            Namespace::SpoonedBalances,
+            hex::decode(ethereum_address).unwrap(),
+            1000 as u64,
+        );
+        unlock(hex::decode(&"4171741d3dbe24e2b4220b0be8be36b1f2dbc84be581137c43901fdb424ca8d22e325f518de61170706dac9dcd40eb9202f6623f234b22edd27cf4cdbd0eb7161c").unwrap());
+        let alices_balance = balance_of(ALICE.to_vec());
+        assert_eq!(alices_balance, 1000);
     }
 }
