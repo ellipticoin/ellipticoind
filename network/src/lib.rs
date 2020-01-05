@@ -72,7 +72,6 @@ impl<TSubstream: AsyncRead + AsyncWrite> NetworkBehaviourEventProcess<FloodsubEv
     fn inject_event(&mut self, message: FloodsubEvent) {
         if let FloodsubEvent::Message(message) = message {
             task::block_on(async {
-                Delay::new(Duration::from_millis(100)).await;
                 let mut outgoing = OUTGOING_SENDER.lock().await;
                 let tx = outgoing.get_mut(&self.floodsub.local_peer_id).unwrap();
                 tx.send(message.data.clone()).await.unwrap();
@@ -140,7 +139,6 @@ impl<T: Clone + Into<Vec<u8>> + std::marker::Send + 'static> Server<T> {
                     Poll::Ready(Some(event)) => println!("{:?}", event),
                     Poll::Ready(None) => return Poll::Ready(Ok(())),
                     Poll::Pending => {
-                        // println!("pending");
                         if !listening {
                             if let Some(a) = Swarm::listeners(&swarm).next() {
                                 println!("Listening on {:?}", a);
@@ -207,15 +205,17 @@ mod tests {
         )
         .await
         .unwrap();
-        let mut bob = Server::new(
-            bobs_key,
-            SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 1235).into(),
-            vec![SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 1234).into()],
-        )
-        .await
-        .unwrap();
+        task::spawn(async {
+            let mut bob = Server::new(
+                bobs_key,
+                SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 1235).into(),
+                vec![SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 1234).into()],
+            )
+            .await
+            .unwrap();
+            let actual_message = bob.next().await.unwrap();
+            assert_eq!(actual_message, vec![1,2,3]);
+        });
         alice.send(message.clone()).await.unwrap();
-        let actual_message = bob.next().await.unwrap();
-        assert_eq!(actual_message, message);
     }
 }
