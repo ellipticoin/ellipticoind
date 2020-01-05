@@ -2,8 +2,9 @@
 #[macro_use]
 extern crate lazy_static;
 use async_std::task;
+use async_std::sync::channel;
+pub use async_std::sync::{Sender, Receiver};
 pub use futures::{
-    channel::mpsc::{self, Receiver, SendError, Sender},
     future,
     sink::SinkExt,
     stream::StreamExt,
@@ -74,7 +75,7 @@ impl<TSubstream: AsyncRead + AsyncWrite> NetworkBehaviourEventProcess<FloodsubEv
             task::block_on(async {
                 let mut outgoing = OUTGOING_SENDER.lock().await;
                 let tx = outgoing.get_mut(&self.floodsub.local_peer_id).unwrap();
-                tx.send(message.data.clone()).await.unwrap();
+                tx.send(message.data.clone()).await;
             });
         }
     }
@@ -111,9 +112,9 @@ impl<T: Clone + Into<Vec<u8>> + std::marker::Send + 'static> Server<T> {
         }
         Swarm::listen_on(&mut swarm, to_multiaddr(address))?;
 
-        let (sender, mut incomming_receiver): (Sender<T>, Receiver<T>) = mpsc::channel(1);
+        let (sender, mut incomming_receiver): (Sender<T>, Receiver<T>) = channel(1);
         let (outgoing_sender, outgoing_receiver): (Sender<Vec<u8>>, Receiver<Vec<u8>>) =
-            mpsc::channel(1);
+            channel(1);
         OUTGOING_SENDER
             .lock()
             .await
@@ -122,7 +123,7 @@ impl<T: Clone + Into<Vec<u8>> + std::marker::Send + 'static> Server<T> {
             .lock()
             .await
             .insert(peer_id.clone(), outgoing_receiver);
-        let (mut listening_sender, mut listening_receiver) = mpsc::channel::<()>(1);
+        let (mut listening_sender, mut listening_receiver) = channel::<()>(1);
         let mut listening = false;
         task::spawn::<_, Result<(), ()>>(future::poll_fn(move |cx: &mut Context| {
             loop {
@@ -144,7 +145,7 @@ impl<T: Clone + Into<Vec<u8>> + std::marker::Send + 'static> Server<T> {
                                 println!("Listening on {:?}", a);
                                 listening = true;
                                 task::block_on(async {
-                                    listening_sender.send(()).await.unwrap();
+                                    listening_sender.send(()).await;
                                 });
                             }
                         }
@@ -157,24 +158,31 @@ impl<T: Clone + Into<Vec<u8>> + std::marker::Send + 'static> Server<T> {
         listening_receiver.next().await;
         Ok(Self { sender, peer_id })
     }
+
+    pub async fn send(
+        self,
+        item: T,
+    ) {
+        self.sender.send(item).await;
+    }
 }
 
-impl<T> Sink<T> for Server<T> {
-    type Error = SendError;
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        self.sender.poll_ready(cx)
-    }
-    fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-        self.sender.start_send(item)
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-}
+// impl<T> Sink<T> for Server<T> {
+//     type Error = std::io::Error;
+//     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+//         Ok(())
+//     }
+//     fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
+//         self.sender.send(item)
+//     }
+//
+//     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+//         Poll::Ready(Ok(()))
+//     }
+//     fn poll_close(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+//         Poll::Ready(Ok(()))
+//     }
+// }
 
 impl Stream for Server<Vec<u8>> {
     type Item = Vec<u8>;
@@ -216,6 +224,6 @@ mod tests {
             let actual_message = bob.next().await.unwrap();
             assert_eq!(actual_message, vec![1,2,3]);
         });
-        alice.send(message.clone()).await.unwrap();
+        alice.send(message.clone()).await;
     }
 }

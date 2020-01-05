@@ -2,7 +2,7 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
 use futures::channel::mpsc::UnboundedSender;
 use futures::sink::SinkExt;
-use network::mpsc::Sender;
+use network::Sender;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -44,8 +44,7 @@ impl State {
     pub async fn broadcast<M: Clone + Serialize>(&mut self, message: M) {
         self.network_sender
             .send(serde_cbor::to_vec(&message).unwrap())
-            .await
-            .unwrap();
+            .await;
     }
 
     pub fn vm_state(&self) -> vm::State {
