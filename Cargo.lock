@@ -786,14 +786,6 @@ checksum = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
 [[package]]
 name = "ellipticoin"
 version = "0.1.6"
-dependencies = [
- "wasm-rpc",
- "wasm-rpc-macros",
-]
-
-[[package]]
-name = "ellipticoin"
-version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff7a5cbf7f6c564d00a4bda4623fafcc62beeaee600eee0adb588781d64c7ea2"
 dependencies = [
@@ -822,18 +814,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ellipticoin-test-framework"
-version = "0.1.3"
-dependencies = [
- "ellipticoin 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "hex 0.3.2",
- "lazy_static",
- "rand 0.4.6",
- "secp256k1",
- "wasm-rpc",
-]
-
-[[package]]
 name = "ellipticoind"
 version = "0.1.0"
 dependencies = [
@@ -850,7 +830,7 @@ dependencies = [
  "futures-timer",
  "futures-util",
  "hashfactor",
- "hex 0.4.0",
+ "hex",
  "http-service",
  "lazy_static",
  "mime 0.3.14",
@@ -1322,12 +1302,6 @@ checksum = "f629dc602392d3ec14bfc8a09b5e644d7ffd725102b48b81e59f90f2633621d7"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "hex"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
 
 [[package]]
 name = "hex"
@@ -3149,25 +3123,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "secp256k1"
-version = "0.17.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94caa8148c403b862eb1da1d2e3fc9ea9c38f76491202058779dc9ff36cf4d8d"
-dependencies = [
- "rand 0.6.5",
- "secp256k1-sys",
-]
-
-[[package]]
-name = "secp256k1-sys"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8438091ed5420083ccf4ed23090c1663ad6863881366471d3aeeb3d21853cbb"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "security-framework"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3598,6 +3553,7 @@ dependencies = [
 [[package]]
 name = "tide"
 version = "0.5.1"
+source = "git+https://github.com/masonforest/tide#ba06fa6e29b26f1b29559c10499f869e584a0d51"
 dependencies = [
  "async-std",
  "futures 0.3.1",
@@ -3643,9 +3599,8 @@ dependencies = [
 name = "token"
 version = "0.1.0"
 dependencies = [
- "ellipticoin 0.1.6",
- "ellipticoin-test-framework",
- "hex 0.4.0",
+ "ellipticoin",
+ "hex",
  "lazy_static",
  "libsecp256k1",
  "mock_ellipticoin",
@@ -4081,7 +4036,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.10.1",
  "heck",
- "hex 0.4.0",
+ "hex",
  "metered_wasmi",
  "redis",
  "rocksdb",
