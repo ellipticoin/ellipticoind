@@ -83,7 +83,6 @@ impl<T: Clone + Into<Vec<u8>> + std::marker::Send + 'static> Server<T> {
 
             behaviour.floodsub.subscribe(floodsub_topic.clone());
             for public_key in public_keys {
-                println!("pkl: {}", public_key.len());
                 behaviour.floodsub.add_node_to_partial_view(libp2p::identity::PublicKey::Ed25519(ed25519::PublicKey::decode(&public_key).unwrap()).into());
             }
             Swarm::new(transport, behaviour, peer_id.clone())
@@ -105,7 +104,6 @@ impl<T: Clone + Into<Vec<u8>> + std::marker::Send + 'static> Server<T> {
             .lock()
             .await
             .insert(peer_id.clone(), outgoing_receiver);
-        let (mut listening_sender, mut listening_receiver) = channel::<()>(1);
         let mut listening = false;
         task::spawn::<_, Result<(), ()>>(future::poll_fn(move |cx: &mut Context| {
             loop {
@@ -126,9 +124,6 @@ impl<T: Clone + Into<Vec<u8>> + std::marker::Send + 'static> Server<T> {
                             if let Some(a) = Swarm::listeners(&swarm).next() {
                                 println!("Listening on {:?}", a);
                                 listening = true;
-                                task::block_on(async {
-                                    listening_sender.send(()).await;
-                                });
                             }
                         }
                         break;
@@ -137,7 +132,6 @@ impl<T: Clone + Into<Vec<u8>> + std::marker::Send + 'static> Server<T> {
             }
             Poll::Pending
         }));
-        listening_receiver.next().await;
         Ok(Self { sender, peer_id })
     }
 
