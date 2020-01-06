@@ -60,16 +60,8 @@ async fn main() {
         })
         .collect::<Vec<(SocketAddr, Vec<u8>)>>();
     let private_key = base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap();
-    println!("{}", base64::encode(&private_key[32..]));
     let socket = (opts.bind_address.parse::<IpAddr>().unwrap(), opts.port).into();
     let network = Server::new(private_key, socket, bootnodes).await.unwrap();
-    // loop {
-    // use network::{Sink, Stream, StreamExt};
-    // network.send(vec![1,2,3]).await.unwrap();
-    // let message: &Vec<u8> = &network.next().await.unwrap();
-    // println!("message: {:?}", message);
-    // }
-
     ellipticoind::run(
         api_socket,
         websocket_socket,
