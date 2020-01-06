@@ -2,7 +2,7 @@
 #[macro_use]
 extern crate clap;
 use dotenv::dotenv;
-use network::{Keypair, Server};
+use network::Server;
 use std::env;
 use std::include_bytes;
 use std::net::{IpAddr, SocketAddr, SocketAddrV4};
@@ -47,18 +47,22 @@ async fn main() {
         .database_url
         .unwrap_or(env::var("DATABASE_URL").expect("DATABASE_URL must be set"));
     let system_contract = include_bytes!("wasm/token.wasm");
-    let mut bootnodes_txt = String::from(include_str!("bootnodes.txt"));
+    let mut bootnodes_txt = String::from(include_str!("bootnodes-local.txt"));
     bootnodes_txt.pop();
     let bootnodes = bootnodes_txt
         .split("\n")
         .map(|bootnode| {
-            println!("{}", bootnode);
-            bootnode.parse::<SocketAddrV4>().unwrap().into()
+            let mut parts = bootnode.splitn(2, "/");
+            (
+                parts.next().unwrap().parse::<SocketAddrV4>().unwrap().into(),
+                base64::decode(&parts.next().unwrap()).unwrap()
+            )
         })
-        .collect::<Vec<SocketAddr>>();
-    let key = Keypair::generate_ed25519();
+        .collect::<Vec<(SocketAddr, Vec<u8>)>>();
+    let private_key = base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap();
+    println!("{}", base64::encode(&private_key[32..]));
     let socket = (opts.bind_address.parse::<IpAddr>().unwrap(), opts.port).into();
-    let network = Server::new(key, socket, bootnodes).await.unwrap();
+    let network = Server::new(private_key, socket, bootnodes).await.unwrap();
     // loop {
     // use network::{Sink, Stream, StreamExt};
     // network.send(vec![1,2,3]).await.unwrap();

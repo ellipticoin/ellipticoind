@@ -1,8 +1,8 @@
-#![feature(async_closure)]
 #[macro_use]
 extern crate lazy_static;
 use async_std::task;
 use async_std::sync::channel;
+use libp2p::identity::ed25519;
 pub use async_std::sync::{Sender, Receiver};
 pub use futures::{
     future,
@@ -15,7 +15,6 @@ use futures_timer::Delay;
 pub use libp2p::identity::Keypair;
 use libp2p::{
     floodsub::{self, Floodsub, FloodsubEvent},
-    mdns::{Mdns, MdnsEvent},
     swarm::NetworkBehaviourEventProcess,
     Multiaddr, NetworkBehaviour, PeerId, Swarm,
 };
@@ -43,29 +42,8 @@ pub struct Server<T> {
 #[derive(NetworkBehaviour)]
 struct Network<TSubstream: AsyncRead + AsyncWrite> {
     floodsub: Floodsub<TSubstream>,
-    mdns: Mdns<TSubstream>,
 }
 
-impl<TSubstream: AsyncRead + AsyncWrite> NetworkBehaviourEventProcess<MdnsEvent>
-    for Network<TSubstream>
-{
-    fn inject_event(&mut self, event: MdnsEvent) {
-        match event {
-            MdnsEvent::Discovered(list) => {
-                for (peer, _) in list {
-                    self.floodsub.add_node_to_partial_view(peer);
-                }
-            }
-            MdnsEvent::Expired(list) => {
-                for (peer, _) in list {
-                    if !self.mdns.has_node(&peer) {
-                        self.floodsub.remove_node_from_partial_view(&peer);
-                    }
-                }
-            }
-        }
-    }
-}
 
 impl<TSubstream: AsyncRead + AsyncWrite> NetworkBehaviourEventProcess<FloodsubEvent>
     for Network<TSubstream>
@@ -88,27 +66,31 @@ fn to_multiaddr(address: SocketAddr) -> Multiaddr {
 
 impl<T: Clone + Into<Vec<u8>> + std::marker::Send + 'static> Server<T> {
     pub async fn new(
-        keypair: Keypair,
+        private_key: Vec<u8>,
         address: SocketAddr,
-        peers: Vec<SocketAddr>,
+        peers: Vec<(SocketAddr, Vec<u8>)>,
     ) -> Result<Self, Box<dyn Error>> {
+        let keypair = libp2p::identity::Keypair::Ed25519(ed25519::Keypair::decode(&mut private_key.clone()).unwrap());
+        let (sockets, public_keys): (Vec<_>, Vec<_>) = peers.iter().cloned().unzip();
         let peer_id = PeerId::from(keypair.public());
         let transport = libp2p::build_development_transport(keypair)?;
         let floodsub_topic = floodsub::TopicBuilder::new("chat").build();
 
         let mut swarm = {
-            let mdns = task::block_on(Mdns::new())?;
             let mut behaviour = Network {
                 floodsub: Floodsub::new(peer_id.clone()),
-                mdns,
             };
 
             behaviour.floodsub.subscribe(floodsub_topic.clone());
+            for public_key in public_keys {
+                println!("pkl: {}", public_key.len());
+                behaviour.floodsub.add_node_to_partial_view(libp2p::identity::PublicKey::Ed25519(ed25519::PublicKey::decode(&public_key).unwrap()).into());
+            }
             Swarm::new(transport, behaviour, peer_id.clone())
         };
-        for peer in peers {
-            println!("Connecting to {:?}", to_multiaddr(peer));
-            Swarm::dial_addr(&mut swarm, to_multiaddr(peer)).unwrap();
+        for socket in sockets {
+            println!("Connecting to {:?}", to_multiaddr(socket));
+            Swarm::dial_addr(&mut swarm, to_multiaddr(socket)).unwrap();
         }
         Swarm::listen_on(&mut swarm, to_multiaddr(address))?;
 
@@ -167,23 +149,6 @@ impl<T: Clone + Into<Vec<u8>> + std::marker::Send + 'static> Server<T> {
     }
 }
 
-// impl<T> Sink<T> for Server<T> {
-//     type Error = std::io::Error;
-//     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-//         Ok(())
-//     }
-//     fn start_send(mut self: Pin<&mut Self>, item: T) -> Result<(), Self::Error> {
-//         self.sender.send(item)
-//     }
-//
-//     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-//         Poll::Ready(Ok(()))
-//     }
-//     fn poll_close(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-//         Poll::Ready(Ok(()))
-//     }
-// }
-
 impl Stream for Server<Vec<u8>> {
     type Item = Vec<u8>;
     fn poll_next(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Option<Self::Item>> {
@@ -204,20 +169,21 @@ mod tests {
     #[async_std::test]
     async fn it_works() {
         let message = vec![1, 2, 3];
-        let alices_key = Keypair::generate_ed25519();
+        let alices_key = ed25519::Keypair::generate();
         let bobs_key = Keypair::generate_ed25519();
         let mut alice = Server::new(
-            alices_key,
+            libp2p::identity::Keypair::Ed25519(alices_key.clone()),
             SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 1234).into(),
             vec![],
         )
         .await
         .unwrap();
-        task::spawn(async {
+        let alice_public_key = alices_key.public().encode().to_vec();
+        task::spawn(async move {
             let mut bob = Server::new(
                 bobs_key,
                 SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 1235).into(),
-                vec![SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 1234).into()],
+                vec![(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 1234).into(), alice_public_key)],
             )
             .await
             .unwrap();
