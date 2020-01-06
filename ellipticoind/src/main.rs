@@ -47,7 +47,7 @@ async fn main() {
         .database_url
         .unwrap_or(env::var("DATABASE_URL").expect("DATABASE_URL must be set"));
     let system_contract = include_bytes!("wasm/token.wasm");
-    let mut bootnodes_txt = String::from(include_str!("bootnodes-local.txt"));
+    let mut bootnodes_txt = String::from(include_str!("bootnodes.txt"));
     bootnodes_txt.pop();
     let bootnodes = bootnodes_txt
         .split("\n")
