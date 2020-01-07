@@ -47,28 +47,34 @@ async fn main() {
         .database_url
         .unwrap_or(env::var("DATABASE_URL").expect("DATABASE_URL must be set"));
     let system_contract = include_bytes!("wasm/token.wasm");
-    let mut bootnodes_txt = String::from(include_str!("bootnodes.txt"));
+    let mut bootnodes_txt = String::from(include_str!("bootnodes-local.txt"));
     bootnodes_txt.pop();
     let bootnodes = bootnodes_txt
         .split("\n")
         .map(|bootnode| {
             let mut parts = bootnode.splitn(2, "/");
             (
-                parts.next().unwrap().parse::<SocketAddrV4>().unwrap().into(),
-                base64::decode(&parts.next().unwrap()).unwrap()
+                parts
+                    .next()
+                    .unwrap()
+                    .parse::<SocketAddrV4>()
+                    .unwrap()
+                    .into(),
+                base64::decode(&parts.next().unwrap()).unwrap(),
             )
         })
         .collect::<Vec<(SocketAddr, Vec<u8>)>>();
     let private_key = base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap();
     let socket = (opts.bind_address.parse::<IpAddr>().unwrap(), opts.port).into();
-    let network = Server::new(private_key, socket, bootnodes).await.unwrap();
     ellipticoind::run(
         api_socket,
         websocket_socket,
         &database_url,
         &opts.rocksdb_path,
         &opts.redis_url,
-        network,
+        socket,
+        private_key,
+        bootnodes,
         system_contract.to_vec(),
     )
     .await

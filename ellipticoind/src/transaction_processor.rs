@@ -26,7 +26,6 @@ pub fn apply_block(mut vm_state: &mut vm::State, block: Block, transactions: Vec
     transactions.into_iter().for_each(|transaction| {
         run_transaction(&mut vm_state, &transaction.into(), &env);
     });
-    println!("Applied block #{}", &block.clone().number);
 }
 
 pub async fn run_transactions(

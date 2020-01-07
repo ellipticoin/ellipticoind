@@ -4,6 +4,5 @@ members = [
     "token",
     "hashfactor",
     "network",
-    "transaction_processor",
     "vm",
 ]

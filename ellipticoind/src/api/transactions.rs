@@ -1,15 +1,15 @@
-use super::State;
 use super::views::Transaction;
+use super::State;
 use crate::diesel::OptionalExtension;
 use crate::models;
+use crate::network::Message;
 use crate::schema::transactions::dsl::transactions;
 use diesel::QueryDsl;
 use diesel::RunQueryDsl;
 use http_service::Body;
+use serde_cbor::from_slice;
 use tide::Response;
 use vm::redis::Commands;
-use serde_cbor::from_slice;
-use crate::network::Message;
 
 pub async fn show(req: tide::Request<State>) -> Response {
     let con = req.state().db.get().unwrap();
