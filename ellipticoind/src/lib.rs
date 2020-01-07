@@ -71,7 +71,7 @@ pub async fn run(
     let mut api_state = api::State::new(redis, rocksdb.clone(), pg_pool, network_sender);
     let mut vm_state = vm::State::new(redis2.get_connection().unwrap(), rocksdb.clone());
     vm_state.set_code(&TOKEN_CONTRACT.to_vec(), &system_contract.to_vec());
-    let (new_block_sender, new_block_receiver) = channel(1);
+    let (new_block_sender, mut new_block_receiver) = channel(1);
     diesel::sql_query("TRUNCATE blocks CASCADE")
         .execute(&db)
         .unwrap();
@@ -88,18 +88,19 @@ pub async fn run(
         loop {
             let mut mined = false;
             use futures::{future::FutureExt, pin_mut, select};
-            let network_receiver_fused = new_block_receiver.recv().fuse();
+            use futures::stream::StreamExt;
+            let network_receiver_fused = new_block_receiver.next().map(Option::unwrap).fuse();
             let mine_next_block_fused =
                 mine_next_block(&mut api_state, &mut vm_state, best_block.clone()).fuse();
             pin_mut!(network_receiver_fused, mine_next_block_fused);
             if let Some((memory_changeset, storage_changeset, new_block, transactions)) = select! {
                 result = mine_next_block_fused => {
                     mined = true;
-                    result
+                    Some(result)
                 },
                 result = network_receiver_fused => {
                     mined = false;
-                    result
+                    Some(result)
                 },
                 complete => break,
             } {
