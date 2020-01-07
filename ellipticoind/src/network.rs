@@ -1,7 +1,7 @@
 use crate::api;
 use crate::models::{Block, Transaction};
 use crate::transaction_processor;
-use async_std::sync::Sender;
+use async_std::sync::{Receiver, Sender};
 use network::{Server, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_cbor::from_slice;
@@ -16,12 +16,12 @@ pub enum Message {
 
 pub async fn handle_messages(
     state: api::State,
-    mut network: Server<Vec<u8>>,
+    mut network_receiver: Receiver<Vec<u8>>,
     block_sender: Sender<(Changeset, Changeset, Block, Vec<Transaction>)>,
 ) {
     loop {
         let mut vm_state = state.vm_state();
-        match from_slice(&network.next().await.unwrap()) {
+        match from_slice(&network_receiver.next().await.unwrap()) {
             Ok(Message::Block((block, transactions))) => {
                 transaction_processor::apply_block(
                     &mut vm_state,

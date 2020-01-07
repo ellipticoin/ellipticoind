@@ -1,29 +1,27 @@
 #[macro_use]
 extern crate lazy_static;
-use async_std::{
-    task,
-    sync::channel,
-};
 pub use async_std::sync::{Receiver, Sender};
-use libp2p::identity::ed25519;
+use async_std::{sync::channel, task};
 pub use futures::{
-    pin_mut,
-    select,
     future,
     future::FutureExt,
+    pin_mut, select,
     sink::SinkExt,
     stream::StreamExt,
     task::{Context, Poll},
     AsyncRead, AsyncWrite, Sink, Stream,
 };
+use futures_timer::Delay;
+use libp2p::identity::ed25519;
 pub use libp2p::identity::Keypair;
 use libp2p::{
     floodsub::{self, Floodsub, FloodsubEvent},
     swarm::NetworkBehaviourEventProcess,
     Multiaddr, NetworkBehaviour, PeerId, Swarm,
 };
-use std::net::SocketAddr;
 use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::time::Duration;
 
 lazy_static! {
     static ref OUTGOING_SENDER: futures::lock::Mutex<HashMap<PeerId, Sender<Vec<u8>>>> = {
@@ -79,6 +77,7 @@ impl Server {
             ed25519::Keypair::decode(&mut private_key.clone()).unwrap(),
         );
         let peer_id = PeerId::from(keypair.public());
+        println!("{:?}", peer_id);
 
         Self {
             peer_id,
@@ -118,6 +117,34 @@ impl Server {
         }
         println!("Listening on {}", self.address);
         Swarm::listen_on(&mut swarm, to_multiaddr(self.address)).unwrap();
+        let mut listening = false;
+    //     task::block_on::<_, Result<(), ()>>(future::poll_fn(move |cx: &mut Context| {
+    //         loop {
+    //             if let Poll::Ready(Some(message)) = &receiver.poll_next_unpin(cx) {
+    //                 swarm
+    //                     .floodsub
+    //                     .publish(&floodsub_topic, message.to_vec());
+    //             } else {
+    //                 break;
+    // }
+    //         }
+    //         loop {
+    //             match swarm.poll_next_unpin(cx) {
+    //                 Poll::Ready(Some(event)) => println!("{:?}", event),
+    //                 Poll::Ready(None) => break,
+    //                 Poll::Pending => {
+    //                     if !listening {
+    //                         if let Some(a) = Swarm::listeners(&swarm).next() {
+    //                             println!("Listening on {:?}", a);
+    //                             listening = true;
+    //                         }
+    //                     }
+    //                     break
+    //                 }
+    //             }
+    //         }
+    //         Poll::Pending
+    //     }));
 
         loop {
             let receiver_fused = receiver.next().fuse();
@@ -142,16 +169,14 @@ impl Server {
             .insert(self.peer_id.clone(), sender);
         receiver
     }
-
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
     use futures_timer::Delay;
     use std::net::{Ipv4Addr, SocketAddrV4};
+    use std::time::Duration;
 
     #[async_std::test]
     async fn it_works() {

@@ -59,7 +59,6 @@ pub async fn mine_next_block(
     });
     api.broadcast(&Message::Block((block.clone(), transactions.clone())))
         .await;
-    println!("Minded block #{}", &block.number);
     Some((
         vm_state.memory_changeset.clone(),
         vm_state.storage_changeset.clone(),
@@ -71,5 +70,5 @@ pub async fn mine_next_block(
 fn random() -> u64 {
     use rand::Rng;
     let mut rng = rand::thread_rng();
-    rng.gen_range(5000, 10000)
+    rng.gen_range(1000, 2000)
 }
