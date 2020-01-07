@@ -124,8 +124,8 @@ impl Block {
             .values(&transactions)
             .execute(db)
             .expect(&format!(
-                "failed to insert hash: {}",
-                base64::encode(&transactions[0].hash)
+                "failed to insert transaction: {}",
+                base64::encode(&to_vec(&transactions).unwrap())
             ));
     }
 }

@@ -30,7 +30,6 @@ use crate::constants::TOKEN_CONTRACT;
 use crate::miner::{get_best_block, mine_next_block};
 use ::network::Server;
 use api::app::app as api;
-use async_std::prelude::FutureExt;
 use async_std::sync::channel;
 use async_std::sync::{Receiver, Sender};
 use diesel::pg::PgConnection;
@@ -86,42 +85,34 @@ pub async fn run(
     async_std::task::spawn(async move {
         let mut best_block = get_best_block(&db);
         loop {
-            let mut mined = false;
             use futures::{future::FutureExt, pin_mut, select};
             use futures::stream::StreamExt;
             let network_receiver_fused = new_block_receiver.next().map(Option::unwrap).fuse();
             let mine_next_block_fused =
                 mine_next_block(&mut api_state, &mut vm_state, best_block.clone()).fuse();
             pin_mut!(network_receiver_fused, mine_next_block_fused);
-            if let Some((memory_changeset, storage_changeset, new_block, transactions)) = select! {
-                result = mine_next_block_fused => {
-                    mined = true;
-                    Some(result)
-                },
-                result = network_receiver_fused => {
-                    mined = false;
-                    Some(result)
-                },
+            let (mined, (memory_changeset, storage_changeset, new_block, transactions)) = select! {
+                result = mine_next_block_fused => (true, result),
+                result = network_receiver_fused => (false, result),
                 complete => break,
-            } {
-                if is_next_block(&best_block, &new_block) {
-                    new_block.clone().insert(&db, transactions.clone());
-                    websocket
-                        .send::<api::Block>((&new_block, &transactions).into())
-                        .await;
-                    redis2.apply(memory_changeset);
-                    rocksdb.apply(storage_changeset);
-                    if mined {
-                        println!("Mined block #{}", &new_block.number);
-                    } else {
-                        println!("Applied block #{}", &new_block.number);
-                    }
-                    best_block = Some(new_block);
+            };
+            if is_next_block(&best_block, &new_block) {
+                new_block.clone().insert(&db, transactions.clone());
+                websocket
+                    .send::<api::Block>((&new_block, &transactions).into())
+                    .await;
+                redis2.apply(memory_changeset);
+                rocksdb.apply(storage_changeset);
+                if mined {
+                    println!("Mined block #{}", &new_block.number);
                 } else {
-                    best_block = best_block.clone();
+                    println!("Applied block #{}", &new_block.number);
                 }
+                best_block = Some(new_block);
+            } else {
+                best_block = best_block.clone();
             }
-        }
+        };
     });
 
     network.listen(network_receiver).await;

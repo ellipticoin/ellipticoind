@@ -2,7 +2,7 @@ use crate::api;
 use crate::models::{Block, Transaction};
 use crate::transaction_processor;
 use async_std::sync::{Receiver, Sender};
-use network::{Server, StreamExt};
+use network::{StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_cbor::from_slice;
 use vm::Changeset;

@@ -11,7 +11,6 @@ pub use futures::{
     task::{Context, Poll},
     AsyncRead, AsyncWrite, Sink, Stream,
 };
-use futures_timer::Delay;
 use libp2p::identity::ed25519;
 pub use libp2p::identity::Keypair;
 use libp2p::{
@@ -21,7 +20,6 @@ use libp2p::{
 };
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::time::Duration;
 
 lazy_static! {
     static ref OUTGOING_SENDER: futures::lock::Mutex<HashMap<PeerId, Sender<Vec<u8>>>> = {
@@ -117,34 +115,6 @@ impl Server {
         }
         println!("Listening on {}", self.address);
         Swarm::listen_on(&mut swarm, to_multiaddr(self.address)).unwrap();
-        let mut listening = false;
-    //     task::block_on::<_, Result<(), ()>>(future::poll_fn(move |cx: &mut Context| {
-    //         loop {
-    //             if let Poll::Ready(Some(message)) = &receiver.poll_next_unpin(cx) {
-    //                 swarm
-    //                     .floodsub
-    //                     .publish(&floodsub_topic, message.to_vec());
-    //             } else {
-    //                 break;
-    // }
-    //         }
-    //         loop {
-    //             match swarm.poll_next_unpin(cx) {
-    //                 Poll::Ready(Some(event)) => println!("{:?}", event),
-    //                 Poll::Ready(None) => break,
-    //                 Poll::Pending => {
-    //                     if !listening {
-    //                         if let Some(a) = Swarm::listeners(&swarm).next() {
-    //                             println!("Listening on {:?}", a);
-    //                             listening = true;
-    //                         }
-    //                     }
-    //                     break
-    //                 }
-    //             }
-    //         }
-    //         Poll::Pending
-    //     }));
 
         loop {
             let receiver_fused = receiver.next().fuse();
