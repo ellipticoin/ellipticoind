@@ -43,7 +43,7 @@ pub async fn mine_next_block(
     api: &mut api::State,
     vm_state: &mut vm::State,
     best_block: Option<Block>,
-) -> Option<(Changeset, Changeset, Block, Vec<Transaction>)> {
+) -> (Changeset, Changeset, Block, Vec<Transaction>) {
     let mut block = next_block(&best_block);
     block.winner = PUBLIC_KEY.to_vec();
     let mut transactions = run_transactions(api, vm_state, &block).await;
@@ -59,12 +59,12 @@ pub async fn mine_next_block(
     });
     api.broadcast(&Message::Block((block.clone(), transactions.clone())))
         .await;
-    Some((
+    (
         vm_state.memory_changeset.clone(),
         vm_state.storage_changeset.clone(),
         block,
         transactions,
-    ))
+    )
 }
 
 fn random() -> u64 {
