@@ -70,5 +70,5 @@ pub async fn mine_next_block(
 fn random() -> u64 {
     use rand::Rng;
     let mut rng = rand::thread_rng();
-    rng.gen_range(1000, 2000)
+    rng.gen_range(3000, 5000)
 }

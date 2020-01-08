@@ -116,19 +116,23 @@ impl Server {
         println!("Listening on {}", self.address);
         Swarm::listen_on(&mut swarm, to_multiaddr(self.address)).unwrap();
 
+    future::poll_fn(move |cx: &mut Context| -> std::task::Poll<Result<(), std::io::Error>> {
         loop {
-            let receiver_fused = receiver.next().fuse();
-            let swarm_fused = swarm.next().fuse();
-            pin_mut!(receiver_fused, swarm_fused);
-            select! {
-                maybe_message = receiver_fused => {
-                    if let Some(message) = maybe_message {
-                        swarm.floodsub.publish(&floodsub_topic, message);
-                    }
-                },
-                _ = swarm_fused => (),
-            };
+            match receiver.poll_next_unpin(cx) {
+                Poll::Ready(Some(line)) => swarm.floodsub.publish(&floodsub_topic, line),
+                Poll::Ready(None) => panic!("Stdin closed"),
+                Poll::Pending => break
+            }
         }
+        loop {
+            match swarm.poll_next_unpin(cx) {
+                Poll::Ready(Some(event)) => println!("{:?}", event),
+                Poll::Ready(None) => return Poll::Ready(Ok(())),
+                Poll::Pending => break,
+            }
+        }
+        Poll::Pending
+    }).await.unwrap()
     }
 
     pub async fn receiver(&self) -> Receiver<Vec<u8>> {
