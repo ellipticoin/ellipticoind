@@ -1,6 +1,6 @@
 use crate::api;
 use crate::constants::TOKEN_CONTRACT;
-use crate::models::{next_nonce, Block, Transaction};
+use crate::models::{Block, Transaction};
 use crate::system_contracts;
 use dotenv::dotenv;
 use serde_cbor::{from_slice, to_vec};
@@ -51,7 +51,8 @@ pub async fn run_transactions(
         }
     }
     let db = api.db.get().unwrap();
-    let sender_nonce = next_nonce(&db, PUBLIC_KEY.to_vec()) + block_winner_tx_count;
+    //let sender_nonce = next_nonce(&db, PUBLIC_KEY.to_vec()) + block_winner_tx_count;
+    let sender_nonce = random();
     let mint_transaction = vm::Transaction {
         contract_address: TOKEN_CONTRACT.to_vec(),
         sender: PUBLIC_KEY.to_vec(),
@@ -62,6 +63,12 @@ pub async fn run_transactions(
     };
     completed_transactions.push(run_transaction(&mut vm_state, &mint_transaction, &env));
     completed_transactions
+}
+
+fn random() -> u64 {
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    rng.gen_range(0, u32::max_value() as u64)
 }
 
 fn run_transaction(

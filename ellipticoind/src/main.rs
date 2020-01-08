@@ -10,7 +10,7 @@ use std::net::{IpAddr, SocketAddr, SocketAddrV4};
 struct Opts {
     #[clap(short = "p", long = "port", default_value = "4460")]
     port: u16,
-    #[clap(short = "a", long = "bind-addres", default_value = "127.0.0.1")]
+    #[clap(short = "a", long = "bind-addres", default_value = "0.0.0.0")]
     bind_address: String,
     #[clap(long = "api-port", default_value = "4461")]
     api_port: u16,

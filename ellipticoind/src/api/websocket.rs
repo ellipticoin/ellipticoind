@@ -22,10 +22,9 @@ impl Websocket {
 
     pub async fn send<M: Clone + Serialize>(&mut self, message: M) {
         for sender in self.senders.lock().await.iter_mut() {
-            sender
+            let _ = sender
                 .send(Message::binary(serde_cbor::to_vec(&message).unwrap()))
-                .await
-                .unwrap();
+                .await;
         }
     }
     pub async fn bind(self, socket: SocketAddr) {
