@@ -97,6 +97,7 @@ pub async fn run(
                 complete => break,
             };
             if is_next_block(&best_block, &new_block) {
+                println!("Inserting block hash {}", base64::encode(&new_block.hash)[0..4])
                 new_block.clone().insert(&db, transactions.clone());
                 websocket
                     .send::<api::Block>((&new_block, &transactions).into())
