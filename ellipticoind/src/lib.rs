@@ -40,6 +40,17 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use vm::rocksdb::ops::Open;
 use vm::Backend;
+use rand::rngs::OsRng;
+use ed25519_dalek::{SecretKey, PublicKey, ExpandedSecretKey};
+
+pub fn generate_keypair() {
+    let mut csprng = OsRng{};
+    let secret_key = SecretKey::generate(&mut csprng);
+    let expanded_secret_key: ExpandedSecretKey = (&secret_key).into();
+    let public_key: PublicKey = (&secret_key).into();
+    println!("Public Key (Address): {}", base64::encode(&public_key));
+    println!("Private Key: {}", base64::encode(&expanded_secret_key.to_bytes().to_vec()));
+}
 
 pub async fn run(
     api_socket: SocketAddr,
@@ -97,7 +108,6 @@ pub async fn run(
                 complete => break,
             };
             if is_next_block(&best_block, &new_block) {
-                println!("Inserting block hash {}", base64::encode(&new_block.hash));
                 new_block.clone().insert(&db, transactions.clone());
                 websocket
                     .send::<api::Block>((&new_block, &transactions).into())

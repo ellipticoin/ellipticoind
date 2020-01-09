@@ -183,7 +183,6 @@ impl From<Transaction> for TransactionWithoutHash {
 
 impl Transaction {
     pub fn set_hash(&mut self) {
-        println!("{:?}", TransactionWithoutHash::from(self.clone()));
         self.hash = sha256(to_vec(&TransactionWithoutHash::from(self.clone())).unwrap());
     }
 }
