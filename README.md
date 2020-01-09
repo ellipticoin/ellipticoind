@@ -8,7 +8,7 @@ Installation (on Ubuntu 18 or similar):
 1. Download ellipticoind
 
 ```
-$ wget http://davenport.ellipticoin.org/ellipticoind
+$ wget -O ellipticoind https://github.com/ellipticoin/ellipticoind/releases/download/v0.0.1/ellipticoind-ubuntu-x64
 ```
 
 2. Create an `ellipticoin` directory
