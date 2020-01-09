@@ -29,6 +29,7 @@ rand = "*"
 warp = {git = "https://github.com/masonforest/warp.git", branch = "add-cbor-mime-type"}
 diesel_migrations = "1.4.0"
 futures-core-preview = "0.3.0-alpha.19"
+ed25519-dalek = "1.0.0-pre.3"
 futures = "0.3.1"
 url = "*"
 http-service = "*"

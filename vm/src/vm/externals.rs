@@ -71,8 +71,11 @@ impl<'a> VM<'a> {
     }
 
     pub fn get_storage(&mut self, key_pointer: i32) -> Result<Vec<u8>, metered_wasmi::TrapKind> {
-        let _key = self.read_pointer(key_pointer);
-        let value = vec![];
+        let key = self.read_pointer(key_pointer);
+        let value = self.state.get_storage(
+            &self.transaction.contract_address,
+            &key
+        );
 
         self.use_gas(value.len() as u32 * gas_costs::GET_BYTE_STORAGE)?;
         Ok(value)
@@ -83,9 +86,14 @@ impl<'a> VM<'a> {
         key_pointer: i32,
         value_pointer: i32,
     ) -> Result<Option<RuntimeValue>, metered_wasmi::Trap> {
-        let _key = self.read_pointer(key_pointer);
+        let key = self.read_pointer(key_pointer);
         let value = self.read_pointer(value_pointer);
         self.use_gas(value.len() as u32 * gas_costs::SET_BYTE_STORAGE)?;
+        self.state.set_storage(
+            &self.transaction.contract_address,
+            &key,
+            &value
+        );
         Ok(None)
     }
 

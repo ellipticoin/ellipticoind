@@ -26,6 +26,14 @@ struct Opts {
     redis_url: String,
     #[clap(short = "db", long = "database-url")]
     database_url: Option<String>,
+    #[clap(subcommand)]
+    subcmd: Option<SubCommand>,
+}
+
+#[derive(Clap, Debug)]
+enum SubCommand {
+    #[clap(name = "generate-keypair")]
+    GenerateKeypair,
 }
 
 #[async_std::main]
@@ -46,7 +54,7 @@ async fn main() {
         .database_url
         .unwrap_or(env::var("DATABASE_URL").expect("DATABASE_URL must be set"));
     let system_contract = include_bytes!("wasm/token.wasm");
-    let mut bootnodes_txt = String::from(include_str!("bootnodes.txt"));
+    let mut bootnodes_txt = String::from(include_str!("bootnodes-local.txt"));
     bootnodes_txt.pop();
     let bootnodes = bootnodes_txt
         .split("\n")
@@ -65,16 +73,19 @@ async fn main() {
         .collect::<Vec<(SocketAddr, Vec<u8>)>>();
     let private_key = base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap();
     let socket = (opts.bind_address.parse::<IpAddr>().unwrap(), opts.port).into();
-    ellipticoind::run(
-        api_socket,
-        websocket_socket,
-        &database_url,
-        &opts.rocksdb_path,
-        &opts.redis_url,
-        socket,
-        private_key,
-        bootnodes,
-        system_contract.to_vec(),
-    )
-    .await
+    
+    match opts.subcmd {
+        Some(SubCommand::GenerateKeypair) => ellipticoind::generate_keypair(),
+        None => ellipticoind::run(
+            api_socket,
+            websocket_socket,
+            &database_url,
+            &opts.rocksdb_path,
+            &opts.redis_url,
+            socket,
+            private_key,
+            bootnodes,
+            system_contract.to_vec(),
+        ).await
+    }
 }

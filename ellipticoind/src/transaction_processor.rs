@@ -119,7 +119,6 @@ async fn get_next_transaction(conn: &mut vm::Connection) -> Option<vm::Transacti
     if transaction_bytes.len() == 0 {
         None
     } else {
-        println!("got one!");
         Some(from_slice::<vm::Transaction>(&transaction_bytes).unwrap())
     }
 }
