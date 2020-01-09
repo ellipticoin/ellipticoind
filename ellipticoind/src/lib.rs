@@ -35,21 +35,24 @@ use async_std::sync::{Receiver, Sender};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
+use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 use models::is_next_block;
+use rand::rngs::OsRng;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use vm::rocksdb::ops::Open;
 use vm::Backend;
-use rand::rngs::OsRng;
-use ed25519_dalek::{SecretKey, PublicKey, ExpandedSecretKey};
 
 pub fn generate_keypair() {
-    let mut csprng = OsRng{};
+    let mut csprng = OsRng {};
     let secret_key = SecretKey::generate(&mut csprng);
     let expanded_secret_key: ExpandedSecretKey = (&secret_key).into();
     let public_key: PublicKey = (&secret_key).into();
     println!("Public Key (Address): {}", base64::encode(&public_key));
-    println!("Private Key: {}", base64::encode(&expanded_secret_key.to_bytes().to_vec()));
+    println!(
+        "Private Key: {}",
+        base64::encode(&expanded_secret_key.to_bytes().to_vec())
+    );
 }
 
 pub async fn run(
@@ -96,8 +99,8 @@ pub async fn run(
     async_std::task::spawn(async move {
         let mut best_block = get_best_block(&db);
         loop {
-            use futures::{future::FutureExt, pin_mut, select};
             use futures::stream::StreamExt;
+            use futures::{future::FutureExt, pin_mut, select};
             let network_receiver_fused = new_block_receiver.next().map(Option::unwrap).fuse();
             let mine_next_block_fused =
                 mine_next_block(&mut api_state, &mut vm_state, best_block.clone()).fuse();
@@ -123,7 +126,7 @@ pub async fn run(
             } else {
                 best_block = best_block.clone();
             }
-        };
+        }
     });
 
     network.listen(network_receiver).await;

@@ -1,11 +1,11 @@
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
 use futures::channel::mpsc::UnboundedSender;
+use network::Sender;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tungstenite::protocol::Message;
-use network::Sender;
 pub use views::Block;
 mod addresses;
 pub mod app;

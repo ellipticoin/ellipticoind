@@ -38,54 +38,57 @@ enum SubCommand {
 
 #[async_std::main]
 async fn main() {
-    dotenv().ok();
     let opts: Opts = Opts::parse();
-    let api_socket = (
-        opts.api_bind_address.parse::<IpAddr>().unwrap(),
-        opts.api_port,
-    )
-        .into();
-    let websocket_socket = (
-        opts.websocket_bind_address.parse::<IpAddr>().unwrap(),
-        opts.websocket_port,
-    )
-        .into();
-    let database_url = opts
-        .database_url
-        .unwrap_or(env::var("DATABASE_URL").expect("DATABASE_URL must be set"));
-    let system_contract = include_bytes!("wasm/token.wasm");
-    let mut bootnodes_txt = String::from(include_str!("bootnodes-local.txt"));
-    bootnodes_txt.pop();
-    let bootnodes = bootnodes_txt
-        .split("\n")
-        .map(|bootnode| {
-            let mut parts = bootnode.splitn(2, "/");
-            (
-                parts
-                    .next()
-                    .unwrap()
-                    .parse::<SocketAddrV4>()
-                    .unwrap()
-                    .into(),
-                base64::decode(&parts.next().unwrap()).unwrap(),
-            )
-        })
-        .collect::<Vec<(SocketAddr, Vec<u8>)>>();
-    let private_key = base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap();
-    let socket = (opts.bind_address.parse::<IpAddr>().unwrap(), opts.port).into();
-    
     match opts.subcmd {
         Some(SubCommand::GenerateKeypair) => ellipticoind::generate_keypair(),
-        None => ellipticoind::run(
-            api_socket,
-            websocket_socket,
-            &database_url,
-            &opts.rocksdb_path,
-            &opts.redis_url,
-            socket,
-            private_key,
-            bootnodes,
-            system_contract.to_vec(),
-        ).await
+        None => {
+            dotenv().ok();
+            let api_socket = (
+                opts.api_bind_address.parse::<IpAddr>().unwrap(),
+                opts.api_port,
+            )
+                .into();
+            let websocket_socket = (
+                opts.websocket_bind_address.parse::<IpAddr>().unwrap(),
+                opts.websocket_port,
+            )
+                .into();
+            let database_url = opts
+                .database_url
+                .unwrap_or(env::var("DATABASE_URL").expect("DATABASE_URL must be set"));
+            let system_contract = include_bytes!("wasm/token.wasm");
+            let mut bootnodes_txt = String::from(include_str!("bootnodes-local.txt"));
+            bootnodes_txt.pop();
+            let bootnodes = bootnodes_txt
+                .split("\n")
+                .map(|bootnode| {
+                    let mut parts = bootnode.splitn(2, "/");
+                    (
+                        parts
+                            .next()
+                            .unwrap()
+                            .parse::<SocketAddrV4>()
+                            .unwrap()
+                            .into(),
+                        base64::decode(&parts.next().unwrap()).unwrap(),
+                    )
+                })
+                .collect::<Vec<(SocketAddr, Vec<u8>)>>();
+            let private_key = base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap();
+            let socket = (opts.bind_address.parse::<IpAddr>().unwrap(), opts.port).into();
+
+            ellipticoind::run(
+                api_socket,
+                websocket_socket,
+                &database_url,
+                &opts.rocksdb_path,
+                &opts.redis_url,
+                socket,
+                private_key,
+                bootnodes,
+                system_contract.to_vec(),
+            )
+            .await
+        }
     }
 }

@@ -27,7 +27,4 @@ table! {
 
 joinable!(transactions -> blocks (block_hash));
 
-allow_tables_to_appear_in_same_query!(
-    blocks,
-    transactions,
-);
+allow_tables_to_appear_in_same_query!(blocks, transactions,);
