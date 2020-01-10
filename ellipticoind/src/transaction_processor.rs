@@ -37,12 +37,8 @@ pub async fn run_transactions(
     let now = Instant::now();
     let mut completed_transactions: Vec<Transaction> = Default::default();
     let mut con = vm::redis::Client::get_connection(&api.redis).unwrap();
-    let mut block_winner_tx_count = 0;
     while now.elapsed() < *TRANSACTION_PROCESSING_TIME {
         if let Some(transaction) = get_next_transaction(&mut con).await {
-            if transaction.sender == PUBLIC_KEY.to_vec() {
-                block_winner_tx_count += 1;
-            }
             let completed_transaction = run_transaction(&mut vm_state, &transaction, &env);
             remove_from_processing(&mut con, &transaction).await;
             completed_transactions.push(completed_transaction);
@@ -50,8 +46,6 @@ pub async fn run_transactions(
             sleep(Duration::from_millis(1));
         }
     }
-    let db = api.db.get().unwrap();
-    //let sender_nonce = next_nonce(&db, PUBLIC_KEY.to_vec()) + block_winner_tx_count;
     let sender_nonce = random();
     let mint_transaction = vm::Transaction {
         contract_address: TOKEN_CONTRACT.to_vec(),
