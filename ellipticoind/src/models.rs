@@ -4,6 +4,7 @@ use crate::helpers::sha256;
 use crate::schema::blocks;
 use crate::schema::transactions;
 use crate::schema::transactions::columns::{nonce, sender};
+use crate::BEST_BLOCK;
 use diesel::dsl::insert_into;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use diesel::{OptionalExtension, PgConnection, QueryDsl};
@@ -41,8 +42,8 @@ pub struct UnminedBlock {
     pub storage_changeset_hash: Vec<u8>,
 }
 
-pub fn is_next_block(best_block: &Option<Block>, block: &Block) -> bool {
-    if let Some(best_block) = best_block {
+pub async fn is_next_block(block: &Block) -> bool {
+    if let Some(best_block) = BEST_BLOCK.lock().await.clone() {
         block.number > best_block.number
     } else {
         true

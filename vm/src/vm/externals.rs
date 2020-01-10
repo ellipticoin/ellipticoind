@@ -128,7 +128,6 @@ impl<'a> VM<'a> {
             transaction: &transaction,
             gas: self.gas,
         };
-        println!("before call: {}", function_name);
         let (result, gas_left) = vm.call(function_name, arguments);
         let gas_used = self.gas.unwrap() - gas_left.expect("no gas left");
         self.use_gas(gas_used)?;

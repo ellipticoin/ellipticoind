@@ -1,11 +1,9 @@
 use crate::api;
 use crate::models::{Block, Transaction};
-use crate::transaction_processor;
 use async_std::sync::{Receiver, Sender};
 use network::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_cbor::from_slice;
-use vm::Changeset;
 use vm::Commands;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -17,25 +15,12 @@ pub enum Message {
 pub async fn handle_messages(
     state: api::State,
     mut network_receiver: Receiver<Vec<u8>>,
-    block_sender: Sender<(Changeset, Changeset, Block, Vec<Transaction>)>,
+    block_sender: Sender<(Block, Vec<Transaction>)>,
 ) {
     loop {
-        let mut vm_state = state.vm_state();
         match from_slice(&network_receiver.next().await.unwrap()) {
             Ok(Message::Block((block, transactions))) => {
-                transaction_processor::apply_block(
-                    &mut vm_state,
-                    block.clone(),
-                    transactions.clone(),
-                );
-                block_sender
-                    .send((
-                        vm_state.memory_changeset,
-                        vm_state.storage_changeset,
-                        block,
-                        transactions,
-                    ))
-                    .await;
+                block_sender.send((block, transactions)).await;
             }
             Ok(Message::Transaction(transaction)) => {
                 let mut redis = state.redis.get_connection().unwrap();
