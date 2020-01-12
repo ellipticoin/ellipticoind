@@ -1559,7 +1559,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p"
-version = "0.14.0-alpha.1"
+version = "0.13.2"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "bytes 0.5.3",
  "futures 0.3.1",
@@ -1592,7 +1593,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-core"
-version = "0.14.0-alpha.1"
+version = "0.13.2"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "asn1_der",
  "bs58",
@@ -1625,7 +1627,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-core-derive"
-version = "0.14.0-alpha.1"
+version = "0.13.0"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "quote 1.0.2",
  "syn 1.0.11",
@@ -1633,7 +1636,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-deflate"
-version = "0.6.0-alpha.1"
+version = "0.5.0"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "flate2",
  "futures 0.3.1",
@@ -1642,7 +1646,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-dns"
-version = "0.14.0-alpha.1"
+version = "0.13.0"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "futures 0.3.1",
  "libp2p-core",
@@ -1651,7 +1656,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-floodsub"
-version = "0.14.0-alpha.1"
+version = "0.13.1"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "bs58",
  "bytes 0.5.3",
@@ -1667,7 +1673,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-identify"
-version = "0.14.0-alpha.1"
+version = "0.13.2"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "bytes 0.5.3",
  "futures 0.3.1",
@@ -1684,7 +1691,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-kad"
-version = "0.14.0-alpha.1"
+version = "0.13.2"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "arrayvec",
  "bytes 0.5.3",
@@ -1709,7 +1717,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-mdns"
-version = "0.14.0-alpha.1"
+version = "0.13.1"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "async-std",
  "data-encoding",
@@ -1730,7 +1739,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-mplex"
-version = "0.14.0-alpha.1"
+version = "0.13.0"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "bytes 0.5.3",
  "fnv",
@@ -1744,7 +1754,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-noise"
-version = "0.12.0-alpha.1"
+version = "0.11.1"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "bytes 0.5.3",
  "curve25519-dalek 1.2.3",
@@ -1762,7 +1773,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-ping"
-version = "0.14.0-alpha.1"
+version = "0.13.1"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "bytes 0.5.3",
  "futures 0.3.1",
@@ -1777,7 +1789,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-plaintext"
-version = "0.14.0-alpha.1"
+version = "0.13.1"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "bytes 0.5.3",
  "futures 0.3.1",
@@ -1792,7 +1805,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-secio"
-version = "0.14.0-alpha.1"
+version = "0.13.1"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "aes-ctr",
  "ctr",
@@ -1819,7 +1833,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-swarm"
-version = "0.4.0-alpha.1"
+version = "0.3.0"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "futures 0.3.1",
  "libp2p-core",
@@ -1830,7 +1845,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-tcp"
-version = "0.14.0-alpha.1"
+version = "0.13.0"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "async-std",
  "bytes 0.5.3",
@@ -1844,7 +1860,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-uds"
-version = "0.14.0-alpha.1"
+version = "0.13.0"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "async-std",
  "futures 0.3.1",
@@ -1854,7 +1871,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-wasm-ext"
-version = "0.7.0-alpha.1"
+version = "0.6.0"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "futures 0.3.1",
  "js-sys",
@@ -1866,7 +1884,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-websocket"
-version = "0.14.0-alpha.1"
+version = "0.13.0"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "async-tls",
  "bytes 0.5.3",
@@ -1885,7 +1904,8 @@ dependencies = [
 
 [[package]]
 name = "libp2p-yamux"
-version = "0.14.0-alpha.1"
+version = "0.13.0"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "futures 0.3.1",
  "libp2p-core",
@@ -2151,7 +2171,8 @@ dependencies = [
 
 [[package]]
 name = "multistream-select"
-version = "0.7.0"
+version = "0.6.1"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "bytes 0.5.3",
  "futures 0.1.29",
@@ -2316,23 +2337,25 @@ dependencies = [
 
 [[package]]
 name = "parity-multiaddr"
-version = "0.7.0"
+version = "0.6.0"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "arrayref",
  "bs58",
  "byteorder 1.3.2",
+ "bytes 0.4.12",
  "data-encoding",
  "parity-multihash",
  "percent-encoding 2.1.0",
  "serde",
- "static_assertions",
  "unsigned-varint",
  "url",
 ]
 
 [[package]]
 name = "parity-multihash"
-version = "0.2.1"
+version = "0.2.0"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "blake2",
  "bytes 0.5.3",
@@ -2990,7 +3013,8 @@ dependencies = [
 
 [[package]]
 name = "rw-stream-sink"
-version = "0.2.0"
+version = "0.1.2"
+source = "git+https://github.com/masonforest/rust-libp2p.git#89c9fa00be73b24dd39e257f1f05a2c561aa845a"
 dependencies = [
  "futures 0.3.1",
  "static_assertions",

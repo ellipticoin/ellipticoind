@@ -27,14 +27,14 @@ $ sudo apt install postgresql libpq-dev redis-server
 4. Create the postgres user and database
 
 ```
-$ su postgres -c"createuser root"`
-$ createdb ellipticoind"
+$ su postgres -c"createuser root"
+$ createdb ellipticoind
 ```
 
 5. Generate a key pair:
 
 ```
-cargo run -- generate-keypair
+./ellipticoind generate-keypair
 Public Key (Address): cwZitLN90FXTaOovm0ygsGNJ+nDJgFXg0Angzz7Lsbw=
 Private Key: gNCgX1Jfs3gXHDEvd7ano6bflJR0oNscgBI1O4JEN2N06SFQL1isJysk3/ix35gkwG7MztBrGv2iO/q2Th7SnQ==
 ```
@@ -84,8 +84,8 @@ $ sudo apt install postgresql libpq-dev redis-server
 4. Create the postgres user and database
 
 ```
-$ su postgres -c"createuser root"`
-$ createdb ellipticoind"
+$ su postgres -c"createuser root"
+$ createdb ellipticoind
 ```
 
 5. Generate a key pair:
