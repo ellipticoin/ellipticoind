@@ -120,7 +120,7 @@ impl Server {
         loop {
             match receiver.poll_next_unpin(cx) {
                 Poll::Ready(Some(line)) => swarm.floodsub.publish(&floodsub_topic, line),
-                Poll::Ready(None) => panic!("Stdin closed"),
+                Poll::Ready(None) => break,
                 Poll::Pending => break
             }
         }
@@ -156,7 +156,8 @@ mod tests {
     async fn it_works() {
         let (alice_sender, alice_receiver): (Sender<Vec<u8>>, Receiver<Vec<u8>>) = channel(1);
         let (_bob_sender, bob_receiver): (Sender<Vec<u8>>, Receiver<Vec<u8>>) = channel(1);
-        let message = vec![1, 2, 3];
+        let message = vec![0u8; 1024];
+        let expected_message = message.clone();
         let alices_key = ed25519::Keypair::generate();
         let bobs_key = ed25519::Keypair::generate();
         let mut alice = Server::new(
@@ -184,10 +185,10 @@ mod tests {
         });
         Delay::new(Duration::from_millis(500)).await;
         task::spawn(async move {
-            alice_sender.send(vec![1, 2, 3]).await;
+            alice_sender.send(message).await;
         });
 
         let message_received = bob_incomming_receiver.next().await.unwrap();
-        assert_eq!(message_received, message);
+        assert_eq!(message_received, expected_message);
     }
 }
