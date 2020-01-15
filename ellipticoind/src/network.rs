@@ -1,9 +1,7 @@
-use crate::api;
 use crate::models::{Block, Transaction};
-use async_std::sync::{Receiver, Sender};
-use network::StreamExt;
+use async_std::sync;
+use network::Receiver;
 use serde::{Deserialize, Serialize};
-use serde_cbor::from_slice;
 use vm::Commands;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -13,17 +11,18 @@ pub enum Message {
 }
 
 pub async fn handle_messages(
-    state: api::State,
-    mut network_receiver: Receiver<Vec<u8>>,
-    block_sender: Sender<(Block, Vec<Transaction>)>,
+    mut redis: redis::Connection,
+    mut network_receiver: Receiver,
+    block_sender: sync::Sender<(Block, Vec<Transaction>)>,
 ) {
     loop {
-        match from_slice(&network_receiver.next().await.unwrap()) {
+        match &network_receiver.next().await {
             Ok(Message::Block((block, transactions))) => {
-                block_sender.send((block, transactions)).await;
+                block_sender
+                    .send((block.clone(), transactions.clone()))
+                    .await;
             }
             Ok(Message::Transaction(transaction)) => {
-                let mut redis = state.redis.get_connection().unwrap();
                 redis
                     .rpush::<&str, Vec<u8>, ()>(
                         "transactions::pending",

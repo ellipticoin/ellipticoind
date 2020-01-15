@@ -80,7 +80,7 @@ async fn main() {
             ellipticoind::run(
                 api_socket,
                 websocket_socket,
-                &database_url,
+                database_url,
                 &opts.rocksdb_path,
                 &opts.redis_url,
                 socket,

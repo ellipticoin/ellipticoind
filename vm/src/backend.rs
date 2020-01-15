@@ -1,11 +1,10 @@
 use state::Changeset;
-use rocksdb::ops::Put;
-use rocksdb::ops::Get;
+use rocksdb::ops::{Put, Get};
 
 pub trait Backend {
     fn set(&mut self, key: Vec<u8>, value: Vec<u8>);
     fn get(&mut self, key: Vec<u8>) -> Vec<u8>;
-    fn apply(&mut self, changeset: Changeset)  {
+    fn commit(&mut self, changeset: Changeset)  {
         changeset.iter().for_each(|(key, value)| {
             super::backend::Backend::set(self, key.to_vec(), value.to_vec())
         });
@@ -13,7 +12,7 @@ pub trait Backend {
 }
 
 
-impl Backend for redis::Client {
+impl Backend for redis::Connection {
     fn set(&mut self, key: Vec<u8>, value: Vec<u8>) {
         redis::Commands::set::<Vec<u8>, Vec<u8>, ()>(self, key.to_vec(), value).unwrap()
     }
@@ -29,6 +28,8 @@ impl Backend for std::sync::Arc<rocksdb::DB> {
     }
 
     fn get(&mut self, key: Vec<u8>) -> Vec<u8>{
-        rocksdb::DB::get(self, key.to_vec()).unwrap().unwrap().to_vec()
+        rocksdb::DB::get(self, key.to_vec())
+            .unwrap().and_then(|value| Some(value.to_vec()))
+            .unwrap_or(vec![])
     }
 }

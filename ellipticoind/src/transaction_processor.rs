@@ -1,4 +1,3 @@
-use crate::api;
 use crate::constants::TOKEN_CONTRACT;
 use crate::models::{Block, Transaction};
 use crate::system_contracts;
@@ -29,18 +28,17 @@ pub fn apply_block(mut vm_state: &mut vm::State, block: Block, transactions: Vec
 }
 
 pub async fn run_transactions(
-    api: &mut api::State,
+    con: &mut vm::Connection,
     mut vm_state: &mut vm::State,
     block: &Block,
 ) -> Vec<Transaction> {
     let env = env_from_block(block);
     let now = Instant::now();
     let mut completed_transactions: Vec<Transaction> = Default::default();
-    let mut con = vm::redis::Client::get_connection(&api.redis).unwrap();
     while now.elapsed() < *TRANSACTION_PROCESSING_TIME {
-        if let Some(transaction) = get_next_transaction(&mut con).await {
+        if let Some(transaction) = get_next_transaction(con).await {
             let completed_transaction = run_transaction(&mut vm_state, &transaction, &env);
-            remove_from_processing(&mut con, &transaction).await;
+            remove_from_processing(con, &transaction).await;
             completed_transactions.push(completed_transaction);
         } else {
             sleep(Duration::from_millis(1));

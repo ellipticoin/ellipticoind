@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate lazy_static;
-pub use async_std::sync::{Receiver, Sender};
+pub use async_std::sync;
 use async_std::{sync::channel, task};
 pub use futures::{
     future,
@@ -18,26 +18,62 @@ use libp2p::{
     swarm::NetworkBehaviourEventProcess,
     Multiaddr, NetworkBehaviour, PeerId, Swarm,
 };
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
 lazy_static! {
-    static ref OUTGOING_SENDER: futures::lock::Mutex<HashMap<PeerId, Sender<Vec<u8>>>> = {
+    static ref OUTGOING_SENDER: futures::lock::Mutex<HashMap<PeerId, sync::Sender<Vec<u8>>>> = {
         let m = HashMap::new();
         futures::lock::Mutex::new(m)
     };
-    static ref OUTGOING_RECIEIVER: futures::lock::Mutex<HashMap<PeerId, Receiver<Vec<u8>>>> = {
+    static ref OUTGOING_RECIEIVER: futures::lock::Mutex<HashMap<PeerId, sync::Receiver<Vec<u8>>>> = {
+        let m = HashMap::new();
+        futures::lock::Mutex::new(m)
+    };
+    static ref INCOMMING_SENDER: futures::lock::Mutex<HashMap<PeerId, sync::Sender<Vec<u8>>>> = {
+        let m = HashMap::new();
+        futures::lock::Mutex::new(m)
+    };
+    static ref INCOMMING_RECIEIVER: futures::lock::Mutex<HashMap<PeerId, sync::Receiver<Vec<u8>>>> = {
         let m = HashMap::new();
         futures::lock::Mutex::new(m)
     };
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
+pub struct Sender {
+    inner: sync::Sender<Vec<u8>>,
+}
+
+impl Sender {
+    pub async fn send<M: Clone + Serialize>(&mut self, message: M) {
+        self.inner
+            .send(serde_cbor::to_vec(&message.clone()).unwrap())
+            .await
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Receiver {
+    inner: sync::Receiver<Vec<u8>>,
+}
+
+impl Receiver {
+    pub async fn next<T: DeserializeOwned>(&mut self) -> Result<T, serde_cbor::error::Error> {
+        let bytes = self.inner.next().await.unwrap();
+        serde_cbor::from_slice(&bytes)
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct Server {
     peer_id: PeerId,
     pub private_key: Vec<u8>,
     pub address: SocketAddr,
     pub peers: Vec<(SocketAddr, Vec<u8>)>,
+    receiver: Option<sync::Receiver<Vec<u8>>>,
 }
 
 #[derive(NetworkBehaviour)]
@@ -75,17 +111,17 @@ impl Server {
             ed25519::Keypair::decode(&mut private_key.clone()).unwrap(),
         );
         let peer_id = PeerId::from(keypair.public());
-        println!("{:?}", peer_id);
 
         Self {
             peer_id,
             address,
             private_key,
             peers,
+            receiver: None,
         }
     }
 
-    pub async fn listen(&mut self, mut receiver: Receiver<Vec<u8>>) {
+    pub async fn listen(&mut self) {
         let keypair = libp2p::identity::Keypair::Ed25519(
             ed25519::Keypair::decode(&mut self.private_key.clone()).unwrap(),
         );
@@ -114,49 +150,71 @@ impl Server {
             Swarm::dial_addr(&mut swarm, to_multiaddr(socket)).expect("failed to dial");
         }
         println!("Listening on {}", self.address);
+        println!("Peer Id: {}", self.peer_id);
         Swarm::listen_on(&mut swarm, to_multiaddr(self.address)).unwrap();
 
-    future::poll_fn(move |cx: &mut Context| -> std::task::Poll<Result<(), std::io::Error>> {
-        loop {
-            match receiver.poll_next_unpin(cx) {
-                Poll::Ready(Some(line)) => swarm.floodsub.publish(&floodsub_topic, line),
-                Poll::Ready(None) => break,
-                Poll::Pending => break
-            }
-        }
-        loop {
-            match swarm.poll_next_unpin(cx) {
-                Poll::Ready(Some(event)) => println!("{:?}", event),
-                Poll::Ready(None) => return Poll::Ready(Ok(())),
-                Poll::Pending => break,
-            }
-        }
-        Poll::Pending
-    }).await.unwrap()
+        let mut receivers = INCOMMING_RECIEIVER.lock().await;
+        let receiver = receivers.get_mut(&self.peer_id).unwrap();
+        future::poll_fn(
+            move |cx: &mut Context| -> std::task::Poll<Result<(), std::io::Error>> {
+                loop {
+                    match receiver.poll_next_unpin(cx) {
+                        Poll::Ready(Some(line)) => swarm.floodsub.publish(&floodsub_topic, line),
+                        Poll::Ready(None) => break,
+                        Poll::Pending => break,
+                    }
+                }
+                loop {
+                    match swarm.poll_next_unpin(cx) {
+                        Poll::Ready(Some(event)) => println!("{:?}", event),
+                        Poll::Ready(None) => return Poll::Ready(Ok(())),
+                        Poll::Pending => break,
+                    }
+                }
+                Poll::Pending
+            },
+        )
+        .await
+        .unwrap()
     }
 
-    pub async fn receiver(&self) -> Receiver<Vec<u8>> {
-        let (sender, receiver): (Sender<Vec<u8>>, Receiver<Vec<u8>>) = channel(1);
+    pub async fn channel(&mut self) -> (Sender, Receiver) {
+        let (outgoing_sender, outgoing_receiver): (sync::Sender<Vec<u8>>, sync::Receiver<Vec<u8>>) =
+            channel(1);
+        let (incommming_sender, incommming_receiver): (
+            sync::Sender<Vec<u8>>,
+            sync::Receiver<Vec<u8>>,
+        ) = channel(1);
         OUTGOING_SENDER
             .lock()
             .await
-            .insert(self.peer_id.clone(), sender);
-        receiver
+            .insert(self.peer_id.clone(), outgoing_sender);
+        let mut receivers = INCOMMING_RECIEIVER.lock().await;
+        receivers.insert(self.peer_id.clone(), incommming_receiver);
+        (
+            Sender {
+                inner: incommming_sender,
+            },
+            Receiver {
+                inner: outgoing_receiver,
+            },
+        )
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_timer::Delay;
+    use serde::Deserialize;
     use std::net::{Ipv4Addr, SocketAddrV4};
-    use std::time::Duration;
 
+    #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
+    pub enum Message {
+        Content(String),
+    }
     #[async_std::test]
     async fn it_works() {
-        let (alice_sender, alice_receiver): (Sender<Vec<u8>>, Receiver<Vec<u8>>) = channel(1);
-        let (_bob_sender, bob_receiver): (Sender<Vec<u8>>, Receiver<Vec<u8>>) = channel(1);
-        let message = vec![0u8; 1024];
+        let message = Message::Content("test".to_string());
         let expected_message = message.clone();
         let alices_key = ed25519::Keypair::generate();
         let bobs_key = ed25519::Keypair::generate();
@@ -166,8 +224,9 @@ mod tests {
             vec![],
         )
         .await;
+        let (mut alice_sender, _alice_receiver) = alice.channel().await;
         task::spawn(async move {
-            alice.listen(alice_receiver).await;
+            alice.listen().await;
         });
         let mut bob: Server = Server::new(
             bobs_key.encode().clone().to_vec(),
@@ -178,17 +237,15 @@ mod tests {
             )],
         )
         .await;
-
-        let mut bob_incomming_receiver = bob.receiver().await;
+        let (_bob_sender, mut bob_receiver) = bob.channel().await;
         task::spawn(async move {
-            bob.listen(bob_receiver).await;
+            bob.listen().await;
         });
-        Delay::new(Duration::from_millis(500)).await;
         task::spawn(async move {
             alice_sender.send(message).await;
         });
 
-        let message_received = bob_incomming_receiver.next().await.unwrap();
+        let message_received = bob_receiver.next::<Message>().await.unwrap();
         assert_eq!(message_received, expected_message);
     }
 }
