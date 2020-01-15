@@ -1,8 +1,7 @@
 use helpers::right_pad_vec;
-use rocksdb::ops::Get;
-use redis::Commands;
 use std::collections::HashMap;
 use std::sync::Arc;
+use backend::Backend;
 
 pub type Changeset = HashMap<Vec<u8>, Vec<u8>>;
 pub struct State {
@@ -26,7 +25,7 @@ impl State {
         vm_state
     }
 
-    pub fn get_code(&self, contract_address: &[u8]) -> Vec<u8> {
+    pub fn get_code(&mut self, contract_address: &[u8]) -> Vec<u8> {
         self.get_storage(contract_address, &vec![])
     }
 
@@ -40,7 +39,6 @@ impl State {
         &self
             .redis
             .get(namespaced_key(contract_address, key))
-            .unwrap_or(vec![])
             ).to_vec()
     }
 
@@ -50,13 +48,11 @@ impl State {
             .insert(namespaced_key(contract_address, key), value.to_vec());
     }
 
-    pub fn get_storage(&self, contract_address: &[u8], key: &[u8]) -> Vec<u8> {
+    pub fn get_storage(&mut self, contract_address: &[u8], key: &[u8]) -> Vec<u8> {
         self.storage_changeset.get(&namespaced_key(contract_address, key)).unwrap_or(
         &self
             .rocksdb
             .get(namespaced_key(contract_address, key))
-            .unwrap().and_then(|value| Some(value.to_vec()))
-            .unwrap_or(vec![])
             ).to_vec()
     }
 
@@ -66,8 +62,9 @@ impl State {
             .insert(namespaced_key(contract_address, key), value.to_vec());
     }
 
-    pub fn commit(&self) {
-        //commit here
+    pub fn commit(&mut self) {
+        self.redis.commit(self.memory_changeset.clone());
+        self.rocksdb.commit(self.storage_changeset.clone());
     }
 }
 

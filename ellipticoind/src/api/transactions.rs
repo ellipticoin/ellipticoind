@@ -29,11 +29,12 @@ pub async fn show(req: tide::Request<State>) -> Response {
     }
 }
 pub async fn create(mut req: tide::Request<State>) -> Response {
-    // println!("{}", req.body_bytes().await.unwrap().len());
     let transaction_bytes = req.body_bytes().await.unwrap();
     let transaction: vm::Transaction = from_slice(&transaction_bytes).unwrap();
-    let mut state = req.state().clone();
-    state.broadcast(Message::Transaction(transaction)).await;
+    let mut network_sender = req.state().network_sender.clone();
+    network_sender
+        .send(&Message::Transaction(transaction))
+        .await;
     let mut redis = req.state().redis.get_connection().unwrap();
     redis
         .rpush::<&str, Vec<u8>, ()>("transactions::pending", transaction_bytes)

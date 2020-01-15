@@ -2220,6 +2220,8 @@ dependencies = [
  "futures-timer",
  "lazy_static",
  "libp2p",
+ "serde",
+ "serde_cbor 0.10.3",
 ]
 
 [[package]]

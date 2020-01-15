@@ -3,10 +3,7 @@ extern crate serde;
 extern crate serde_cbor;
 extern crate vm;
 
-use crate::api;
-use crate::miner::vm::Backend;
 use crate::models::*;
-use crate::network::Message;
 use crate::schema::blocks::dsl::blocks;
 use crate::transaction_processor::{run_transactions, PUBLIC_KEY};
 use crate::BEST_BLOCK;
@@ -41,12 +38,12 @@ pub async fn next_block_template() -> Block {
 }
 
 pub async fn mine_next_block(
-    api: &mut api::State,
-    vm_state: &mut vm::State,
-) -> (Block, Vec<Transaction>) {
+    con: &mut vm::Connection,
+    mut vm_state: vm::State,
+) -> ((Block, Vec<Transaction>), vm::State) {
     let mut block = next_block_template().await;
     block.winner = PUBLIC_KEY.to_vec();
-    let mut transactions = run_transactions(api, vm_state, &block).await;
+    let mut transactions = run_transactions(con, &mut vm_state, &block).await;
 
     let rand = random();
     sleep(Duration::from_millis(rand)).await;
@@ -57,13 +54,7 @@ pub async fn mine_next_block(
         transaction.set_hash();
         transaction.block_hash = block.hash.clone();
     });
-    api.broadcast(&Message::Block((block.clone(), transactions.clone())))
-        .await;
-    let mut redis = api.redis.clone();
-    let mut rocksdb = api.rocksdb.clone();
-    redis.apply(vm_state.memory_changeset.clone());
-    rocksdb.apply(vm_state.storage_changeset.clone());
-    (block, transactions)
+    ((block, transactions), vm_state)
 }
 
 fn random() -> u64 {
