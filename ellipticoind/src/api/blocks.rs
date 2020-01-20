@@ -7,6 +7,7 @@ use crate::diesel::QueryDsl;
 use crate::diesel::RunQueryDsl;
 use crate::models;
 use crate::schema::blocks;
+use crate::schema::blocks::columns::number;
 use diesel::BelongingToDsl;
 use http_service::Body;
 use serde::Deserialize;
@@ -41,15 +42,22 @@ pub async fn index(req: tide::Request<State>) -> Response {
 }
 
 pub async fn show(req: tide::Request<State>) -> Response {
-    let block_hash: String = req.param("block_hash").unwrap();
-    println!("requesting: {}", block_hash);
+    let block_param: String = req.param("block_hash").unwrap();
     let con = req.state().db.get().unwrap();
-    if let Some(block) = blocks::dsl::blocks
-        .find(base64::decode_config(&block_hash, base64::URL_SAFE).unwrap())
-        .first::<models::Block>(&con)
-        .optional()
-        .unwrap()
-    {
+    let block = match block_param.parse::<i64>() {
+        Ok(block_number) => blocks::dsl::blocks
+            .filter(number.eq(block_number))
+            .first::<models::Block>(&con)
+            .optional()
+            .unwrap(),
+        Err(_) => blocks::dsl::blocks
+            .find(base64::decode_config(&block_param, base64::URL_SAFE).unwrap())
+            .first::<models::Block>(&con)
+            .optional()
+            .unwrap(),
+    };
+
+    if let Some(block) = block {
         let transactions = models::Transaction::belonging_to(&block)
             .load::<models::Transaction>(&con)
             .unwrap();
