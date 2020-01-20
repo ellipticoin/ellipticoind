@@ -14,11 +14,11 @@ struct Opts {
     bind_address: String,
     #[clap(long = "api-port", default_value = "4461")]
     api_port: u16,
-    #[clap(long = "api-bind-address", default_value = "127.0.0.1")]
+    #[clap(long = "api-bind-address", default_value = "0.0.0.0")]
     api_bind_address: String,
     #[clap(long = "websocket-port", default_value = "4462")]
     websocket_port: u16,
-    #[clap(long = "websocket-bind-address", default_value = "127.0.0.1")]
+    #[clap(long = "websocket-bind-address", default_value = "0.0.0.0")]
     websocket_bind_address: String,
     #[clap(long = "rocksdb-path", default_value = "./db")]
     rocksdb_path: String,
