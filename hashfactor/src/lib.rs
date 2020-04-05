@@ -1,5 +1,3 @@
-#![feature(rustc_private)]
-extern crate serialize;
 extern crate num_bigint;
 extern crate num_traits;
 extern crate sha2;

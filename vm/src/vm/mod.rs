@@ -1,5 +1,4 @@
 extern crate hex;
-extern crate serialize;
 use env::Env;
 use metered_wasmi::{ImportsBuilder, Module, ModuleInstance, ModuleRef, NopExternals};
 use transaction::Transaction;

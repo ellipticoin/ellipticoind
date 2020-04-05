@@ -1,11 +1,9 @@
-#![feature(plugin, rustc_private)]
 extern crate heck;
 extern crate metered_wasmi;
 pub extern crate redis;
 pub extern crate rocksdb;
 extern crate serde;
 extern crate serde_cbor;
-extern crate serialize;
 extern crate sha3;
 extern crate time;
 

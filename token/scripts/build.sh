@@ -12,10 +12,9 @@ if ! command -v  wasm-gc > /dev/null; then
   cargo install wasm-gc
 fi
 cd $TARGET_PATH
-wasm-snip --snip-rust-fmt-code $wasmFilename -o $wasmFilename
-wasm-snip --snip-rust-panicking-code $wasmFilename -o $wasmFilename
-wasm-snip $wasmFilename -o $wasmFilename -p "BTreeMap"
+wasm-snip --snip-rust-fmt-code --snip-rust-panicking-code $wasmFilename -o $wasmFilename
 wasm-gc $wasmFilename
+wasm-opt -Oz --strip-debug --strip-producers  $wasmFilename -o  $wasmFilename
 
 mkdir -p $DIST_DIR
 cp -R $wasmFilename "$DIST_DIR/$wasmFilename"
