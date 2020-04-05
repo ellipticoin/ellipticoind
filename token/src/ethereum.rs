@@ -1,5 +1,5 @@
 use tiny_keccak::Hasher;
-use tiny_keccak::Keccak;
+// use tiny_keccak::Keccak;
 const SIGNING_PREFIX: &'static str = "\x19Ethereum Signed Message:\n";
 pub fn ecrecover_address(message: &[u8], signature: &[u8]) -> Vec<u8> {
     let mut message_hash = [0u8; 32];

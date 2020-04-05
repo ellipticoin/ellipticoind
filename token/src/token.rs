@@ -1,24 +1,31 @@
-use ellipticoin::{block_number, block_winner, export, sender, Value};
-pub use wasm_rpc::{Bytes, Dereferenceable, FromBytes, Referenceable, ToBytes};
-
+use ellipticoin::{
+    block_number,
+    error::Error,
+    export, sender,
+    value::{from_value, to_value},
+    FromBytes, ToBytes, Value,
+};
 use errors;
 use ethereum;
-use issuance;
-use std::convert::TryInto;
-use tiny_keccak::Hasher;
-use wasm_rpc::error::Error;
-
+use hashing::sha256;
+use std::collections::HashMap;
 enum Namespace {
     Balances,
     Allowences,
-    Mintings,
     SpoonedBalances,
+    CommitBets,
 }
 
 #[export]
 mod token {
-    pub fn constructor(initial_supply: u64) {
-        set_memory(Namespace::Balances, sender(), initial_supply)
+    pub fn constructor(block_commit_bets: HashMap<u64, HashMap<Vec<u8>, (u64, Vec<u8>)>>) {
+        for (block_number, commit_bets) in block_commit_bets {
+            set_memory(
+                Namespace::CommitBets,
+                block_number,
+                to_value(commit_bets.clone()).unwrap_or(Value::Null),
+            );
+        }
     }
 
     pub fn approve(spender: Vec<u8>, amount: u64) {
@@ -34,7 +41,7 @@ mod token {
             credit(to, amount);
             Ok(Value::Null)
         } else {
-            Err(errors::INSUFFICIENT_FUNDS.clone())
+            Err(errors::INSUFFICIENT_FUNDS)
         }
     }
 
@@ -44,30 +51,8 @@ mod token {
             credit(to, amount);
             Ok(Value::Null)
         } else {
-            Err(errors::INSUFFICIENT_FUNDS.clone())
+            Err(errors::INSUFFICIENT_FUNDS)
         }
-    }
-
-    pub fn mint() -> Result<Value, Error> {
-        if !block_minted(block_number()) {
-            if sender() == block_winner() {
-                credit(block_winner(), block_reward(block_number()));
-                mark_block_as_minted(block_number());
-                Ok(Value::Null)
-            } else {
-                Err(errors::NOT_BLOCK_WINNER.clone())
-            }
-        } else {
-            Err(errors::BLOCK_ALREADY_MINTED.clone())
-        }
-    }
-
-    fn block_minted(block_number: u64) -> bool {
-        get_memory(Namespace::Mintings, block_number)
-    }
-
-    fn block_reward(block_number: u64) -> u64 {
-        issuance::block_reward(block_number)
     }
 
     fn debit_allowance(from: Vec<u8>, to: Vec<u8>, amount: u64) {
@@ -79,18 +64,42 @@ mod token {
         );
     }
 
-    fn mark_block_as_minted(block_number: u64) {
-        set_memory(Namespace::Mintings, block_number, true);
-    }
-
-    fn unlock(unlock_signature: Vec<u8>) {
+    pub fn unlock(unlock_signature: Vec<u8>) {
         let message = "unlock_ellipticoin";
         let address = ethereum::ecrecover_address(message.as_bytes(), &unlock_signature);
         let balance = get_memory(Namespace::SpoonedBalances, address);
         credit(sender(), balance);
-        // println!("{:?}", hex::encode(&address));
-        // println!("{:?}", plain_message.len());
-        // println!("{:?}", hex::encode(&message_hash2[12..31]));
+    }
+
+    pub fn commit(block_number: u64, bet: u64, hash: Vec<u8>) -> Result<Value, Error> {
+        if block_number < ellipticoin::block_number() {
+            return Err(errors::BLOCK_ALREADY_MINTED);
+        };
+
+        let mut commit_bets =
+            from_value(get_memory(Namespace::CommitBets, block_number)).unwrap_or(HashMap::new());
+        commit_bets.insert(sender(), (bet, hash.clone()));
+        set_memory(
+            Namespace::CommitBets,
+            block_number,
+            to_value(commit_bets.clone()).unwrap_or(Value::Null),
+        );
+        Ok(Value::Null)
+    }
+
+    pub fn reveal(value: Vec<u8>) -> Result<Value, Error> {
+        let commit_bets: HashMap<Vec<u8>, (u64, Vec<u8>)> =
+            from_value(get_memory(Namespace::CommitBets, block_number() - 1))
+                .unwrap_or(HashMap::new());
+        if commit_bets
+            .get(&sender())
+            .map_or(false, |(_, hash)| hash.to_vec() == sha256(value))
+        {
+            credit(sender(), 1);
+            Ok(Value::Null)
+        } else {
+            Err(errors::INVALID_VALUE)
+        }
     }
 
     fn credit(address: Vec<u8>, amount: u64) {
@@ -115,8 +124,8 @@ mod token {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ellipticoin::{set_block_winner, set_sender};
-    use ellipticoin_test_framework::{ALICE, BOB, CAROL};
+    use ellipticoin::{set_block_number, set_sender};
+    use ellipticoin_test_framework::{random_bytes, sha256, ALICE, BOB, CAROL};
 
     #[test]
     fn test_transfer() {
@@ -151,28 +160,10 @@ mod tests {
         assert_eq!(carols_balance, 20);
     }
 
-    #[test]
-    fn test_mint() {
-        set_sender(ALICE.to_vec());
-        set_block_winner(ALICE.to_vec());
-        constructor(100);
-        mint().expect("failed to mint");
-        let alices_balance = balance_of(ALICE.to_vec());
-        assert_eq!(alices_balance, 640100);
-    }
-
-    #[test]
-    fn test_block_cannot_be_minted_twice() {
-        set_sender(ALICE.to_vec());
-        set_block_winner(ALICE.to_vec());
-        constructor(100);
-        mint().expect("failed to mint");
-        assert!(mint().is_err());
-    }
-
     pub fn set_balance(address: Vec<u8>, balance: u64) {
         set_memory(Namespace::Balances, address, balance);
     }
+
     pub fn balance_of(address: Vec<u8>) -> u64 {
         get_memory(Namespace::Balances, address)
     }
@@ -193,5 +184,61 @@ mod tests {
         unlock(hex::decode(&"4171741d3dbe24e2b4220b0be8be36b1f2dbc84be581137c43901fdb424ca8d22e325f518de61170706dac9dcd40eb9202f6623f234b22edd27cf4cdbd0eb7161c").unwrap());
         let alices_balance = balance_of(ALICE.to_vec());
         assert_eq!(alices_balance, 1000);
+    }
+
+    #[test]
+    fn test_commit_before_next_block() {
+        let value = random_bytes(32);
+        let hash = sha256(value.clone());
+        set_sender(ALICE.to_vec());
+        set_block_number(1);
+
+        assert!(commit(0, 1, hash).is_err());
+    }
+
+    #[test]
+    fn test_commit_and_reveal() {
+        let alices_value = [0; 32].to_vec();
+        let bobs_value = [1; 32].to_vec();
+        let alices_hash = sha256(alices_value.clone());
+        let bobs_hash = sha256(bobs_value.clone());
+        set_sender(ALICE.to_vec());
+        commit(0, 1, alices_hash.clone()).unwrap();
+        set_sender(BOB.to_vec());
+        commit(0, 1, bobs_hash.clone()).unwrap();
+
+        set_block_number(1);
+        set_sender(ALICE.to_vec());
+        assert!(reveal(alices_value).is_ok());
+    }
+
+    #[test]
+    fn test_commit_in_constructor_and_reveal() {
+        let alices_value = [0; 32].to_vec();
+        let bobs_value = [1; 32].to_vec();
+        let alices_hash = sha256(alices_value.clone());
+        let bobs_hash = sha256(bobs_value.clone());
+        let mut commit_bets = HashMap::new();
+        commit_bets.insert(ALICE.to_vec(), (1, alices_hash.clone()));
+        commit_bets.insert(BOB.to_vec(), (1, bobs_hash.clone()));
+        let mut block_commit_bets = HashMap::new();
+        block_commit_bets.insert(1, commit_bets);
+        constructor(block_commit_bets);
+
+        set_block_number(2);
+        set_sender(ALICE.to_vec());
+        assert!(reveal(alices_value).is_ok());
+    }
+
+    #[test]
+    fn test_commit_and_reveal_invalid() {
+        let value = random_bytes(32);
+        let hash = sha256(value.clone());
+        let invalid_value = random_bytes(32);
+        set_sender(ALICE.to_vec());
+
+        commit(0, 1, hash).unwrap();
+        set_block_number(1);
+        assert!(reveal(invalid_value).is_err());
     }
 }
