@@ -125,7 +125,7 @@ mod token {
 mod tests {
     use super::*;
     use ellipticoin::{set_block_number, set_sender};
-    use ellipticoin_test_framework::{random_bytes, sha256, ALICE, BOB, CAROL};
+    use ellipticoin_test_framework::{random_bytes, generate_hash_onion, sha256, ALICE, BOB, CAROL};
 
     #[test]
     fn test_transfer() {
@@ -198,18 +198,20 @@ mod tests {
 
     #[test]
     fn test_commit_and_reveal() {
-        let alices_value = [0; 32].to_vec();
-        let bobs_value = [1; 32].to_vec();
-        let alices_hash = sha256(alices_value.clone());
-        let bobs_hash = sha256(bobs_value.clone());
+        let alices_center = [0; 32].to_vec();
+        let bobs_center = [1; 32].to_vec();
+        let mut alices_onion = generate_hash_onion(3, alices_center.clone());
+        let mut bobs_onion = generate_hash_onion(3, bobs_center.clone());
         set_sender(ALICE.to_vec());
-        commit(0, 1, alices_hash.clone()).unwrap();
+        commit(0, 1, alices_onion.last().unwrap().to_vec()).unwrap();
         set_sender(BOB.to_vec());
-        commit(0, 1, bobs_hash.clone()).unwrap();
+        commit(0, 1, bobs_onion.last().unwrap().to_vec()).unwrap();
+        alices_onion.pop();
+        bobs_onion.pop();
 
         set_block_number(1);
         set_sender(ALICE.to_vec());
-        assert!(reveal(alices_value).is_ok());
+        assert!(reveal(alices_onion.last().unwrap().to_vec()).is_ok());
     }
 
     #[test]
