@@ -1,16 +1,17 @@
 pub use wasm_rpc::error::Error;
 
-pub const BLOCK_ALREADY_MINTED: Error = Error {
+pub const NOT_CURRENTLY_MINING: Error = Error {
     code: 1,
-    message: "this block has already been minted",
+    message: "Sender is not currently mining",
 };
+
 pub const INVALID_VALUE: Error = Error {
-    code: 1,
-    message: "invalid value",
+    code: 2,
+    message: "Invalid value",
 };
 pub const INSUFFICIENT_FUNDS: Error = Error {
-    code: 1,
-    message: "insufficient funds",
+    code: 3,
+    message: "Insufficient funds",
 };
 // lazy_static! {
 //     pub static ref BLOCK_ALREADY_MINTED: Error =
