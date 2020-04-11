@@ -1,3 +1,4 @@
+use ellipticoin::abort::{AbortOptionExt, AbortResultExt};
 use ellipticoin::{
     error::Error,
     export, sender,
@@ -9,11 +10,15 @@ use ethereum;
 use hashing::sha256;
 use std::collections::HashMap;
 enum Namespace {
-    Balances,
     Allowences,
-    SpoonedBalances,
+    Balances,
     Miners,
+    RandomSeed,
+    SpoonedBalances,
 }
+
+use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
+use std::convert::TryInto;
 
 #[export]
 mod token {
@@ -68,16 +73,47 @@ mod token {
     }
 
     pub fn reveal(value: Vec<u8>) -> Result<Value, Error> {
-        let miners = get_miners();
-        let hash = match miners.get(&sender()) {
-            Some((_bet_per_block, hash)) => hash,
-            None => return Err(errors::NOT_CURRENTLY_MINING),
-        };
-        if !hash.to_vec().eq(&sha256(value)) {
+        let mut miners = get_miners();
+        if sender() != winner(miners.clone()) {
+            return Err(errors::SENDER_IS_NOT_THE_WINNER);
+        }
+        let (bet_per_block, hash) = miners.get(&sender()).unwrap_or_abort();
+        if !hash.to_vec().eq(&sha256(value.clone())) {
             return Err(errors::INVALID_VALUE);
         }
-        settle_block_rewards(sender(), miners);
+        *miners.get_mut(&sender()).unwrap() = (*bet_per_block, value.clone());
+        settle_block_rewards(sender(), &miners);
+        set_miners(miners);
+        let random_seed = get_random_seed();
+        set_random_seed(
+            sha256([random_seed.to_vec(), value].concat())[0..16]
+                .try_into()
+                .unwrap(),
+        );
+
         Ok(Value::Null)
+    }
+
+    fn set_random_seed(random_seed: [u8; 16]) {
+        ellipticoin::set_memory(Namespace::RandomSeed as u8, random_seed.to_vec());
+    }
+    fn get_random_seed() -> [u8; 16] {
+        ellipticoin::get_memory::<_, Vec<u8>>(Namespace::RandomSeed as u8)[0..16]
+            .try_into()
+            .unwrap()
+    }
+
+    fn winner(miners: HashMap<Vec<u8>, (u64, Vec<u8>)>) -> Vec<u8> {
+        let random_seed: [u8; 16] = get_random_seed();
+        let mut rng = SmallRng::from_seed(random_seed);
+        let mut bets: Vec<(Vec<u8>, u64)> = miners
+            .iter()
+            .map(|(miner, (bet_per_block, _hash))| (miner.to_vec(), *bet_per_block))
+            .collect();
+        bets.sort();
+        bets.choose_weighted(&mut rng, |(_miner, bet_per_block)| *bet_per_block)
+            .map(|(miner, _bet_per_block)| miner.to_vec())
+            .unwrap_or_abort()
     }
 
     fn get_miners() -> HashMap<Vec<u8>, (u64, Vec<u8>)> {
@@ -91,12 +127,12 @@ mod token {
         );
     }
 
-    fn settle_block_rewards(winner: Vec<u8>, miners: HashMap<Vec<u8>, (u64, Vec<u8>)>) {
+    fn settle_block_rewards(winner: Vec<u8>, miners: &HashMap<Vec<u8>, (u64, Vec<u8>)>) {
         for (miner, (bet_per_block, _hash)) in miners {
-            if miner == winner {
-                credit(miner, bet_per_block);
+            if miner.to_vec() == winner {
+                credit(miner.to_vec(), *bet_per_block);
             } else {
-                debit(miner, bet_per_block);
+                debit(miner.to_vec(), *bet_per_block);
             }
         }
     }
@@ -189,28 +225,36 @@ mod tests {
 
     #[test]
     fn test_commit_and_reveal() {
-        set_balance(ALICE.to_vec(), 1);
-        set_balance(BOB.to_vec(), 1);
+        set_random_seed([2 as u8; 16]);
+        set_balance(ALICE.to_vec(), 5);
+        set_balance(BOB.to_vec(), 5);
         let alices_center = [0; 32].to_vec();
         let bobs_center = [1; 32].to_vec();
-        let mut alices_onion = generate_hash_onion(3, alices_center.clone());
-        let mut bobs_onion = generate_hash_onion(3, bobs_center.clone());
+        let mut alices_onion = generate_hash_onion(6, alices_center.clone());
+        let mut bobs_onion = generate_hash_onion(6, bobs_center.clone());
         set_sender(ALICE.to_vec());
         start_mining(1, alices_onion.last().unwrap().to_vec()).unwrap();
         set_sender(BOB.to_vec());
         start_mining(1, bobs_onion.last().unwrap().to_vec()).unwrap();
-        alices_onion.pop();
-        bobs_onion.pop();
 
-        set_block_number(1);
+        // With this random seed the winners are Alice, Alice, Bob in that order
         set_sender(ALICE.to_vec());
+        alices_onion.pop();
         assert!(reveal(alices_onion.last().unwrap().to_vec()).is_ok());
-        assert_eq!(balance_of(ALICE.to_vec()), 2);
-        assert_eq!(balance_of(BOB.to_vec()), 0);
+        set_sender(ALICE.to_vec());
+        alices_onion.pop();
+        assert!(reveal(alices_onion.last().unwrap().to_vec()).is_ok());
+        set_sender(BOB.to_vec());
+        bobs_onion.pop();
+        assert!(reveal(bobs_onion.last().unwrap().to_vec()).is_ok());
+
+        assert_eq!(balance_of(ALICE.to_vec()), 6);
+        assert_eq!(balance_of(BOB.to_vec()), 4);
     }
 
     #[test]
     fn test_commit_and_reveal_invalid() {
+        set_random_seed([0 as u8; 16]);
         let value = random_bytes(32);
         let hash = sha256(value.clone());
         let invalid_value = random_bytes(32);
