@@ -12,6 +12,7 @@ use std::collections::HashMap;
 enum Namespace {
     Allowences,
     Balances,
+    CurrentMiner,
     Miners,
     RandomSeed,
     SpoonedBalances,
@@ -74,7 +75,7 @@ mod token {
 
     pub fn reveal(value: Vec<u8>) -> Result<Value, Error> {
         let mut miners = get_miners();
-        if sender() != winner(miners.clone()) {
+        if sender() != get_current_miner() {
             return Err(errors::SENDER_IS_NOT_THE_WINNER);
         }
         let (bet_per_block, hash) = miners.get(&sender()).unwrap_or_abort();
@@ -82,16 +83,25 @@ mod token {
             return Err(errors::INVALID_VALUE);
         }
         *miners.get_mut(&sender()).unwrap() = (*bet_per_block, value.clone());
-        settle_block_rewards(sender(), &miners);
-        set_miners(miners);
+        settle_block_rewards(get_current_miner(), &miners);
         let random_seed = get_random_seed();
         set_random_seed(
             sha256([random_seed.to_vec(), value].concat())[0..16]
                 .try_into()
                 .unwrap(),
         );
+        set_current_miner(get_next_winner(&miners));
+        set_miners(miners);
 
         Ok(Value::Null)
+    }
+
+    fn set_current_miner(current_miner: Vec<u8>) {
+        ellipticoin::set_memory::<_, Vec<u8>>(Namespace::CurrentMiner as u8, current_miner);
+    }
+
+    fn get_current_miner() -> Vec<u8> {
+        ellipticoin::get_memory::<_, Vec<u8>>(Namespace::CurrentMiner as u8)
     }
 
     fn set_random_seed(random_seed: [u8; 16]) {
@@ -103,7 +113,7 @@ mod token {
             .unwrap()
     }
 
-    fn winner(miners: HashMap<Vec<u8>, (u64, Vec<u8>)>) -> Vec<u8> {
+    fn get_next_winner(miners: &HashMap<Vec<u8>, (u64, Vec<u8>)>) -> Vec<u8> {
         let random_seed: [u8; 16] = get_random_seed();
         let mut rng = SmallRng::from_seed(random_seed);
         let mut bets: Vec<(Vec<u8>, u64)> = miners
@@ -228,10 +238,11 @@ mod tests {
         set_random_seed([2 as u8; 16]);
         set_balance(ALICE.to_vec(), 5);
         set_balance(BOB.to_vec(), 5);
+        set_current_miner(ALICE.to_vec());
         let alices_center = [0; 32].to_vec();
         let bobs_center = [1; 32].to_vec();
-        let mut alices_onion = generate_hash_onion(6, alices_center.clone());
-        let mut bobs_onion = generate_hash_onion(6, bobs_center.clone());
+        let mut alices_onion = generate_hash_onion(3, alices_center.clone());
+        let mut bobs_onion = generate_hash_onion(3, bobs_center.clone());
         set_sender(ALICE.to_vec());
         start_mining(1, alices_onion.last().unwrap().to_vec()).unwrap();
         set_sender(BOB.to_vec());
@@ -241,7 +252,6 @@ mod tests {
         set_sender(ALICE.to_vec());
         alices_onion.pop();
         assert!(reveal(alices_onion.last().unwrap().to_vec()).is_ok());
-        set_sender(ALICE.to_vec());
         alices_onion.pop();
         assert!(reveal(alices_onion.last().unwrap().to_vec()).is_ok());
         set_sender(BOB.to_vec());
