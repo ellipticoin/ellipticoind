@@ -1,7 +1,7 @@
 set -e
 
 TARGET_PATH="../target/wasm32-unknown-unknown/release/"
-DIST_DIR="`pwd`/dist"
+DIST_DIR="`pwd`/../ellipticoind/dist"
 
 scriptsDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd $scriptsDir/..
