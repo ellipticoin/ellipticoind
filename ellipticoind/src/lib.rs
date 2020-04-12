@@ -24,6 +24,7 @@ pub mod models;
 mod network;
 mod run_loop;
 pub mod schema;
+mod start_up;
 mod system_contracts;
 mod transaction_processor;
 
@@ -41,7 +42,6 @@ use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
 use rand::rngs::OsRng;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use vm::rocksdb::ops::Open;
 lazy_static! {
     static ref BEST_BLOCK: async_std::sync::Arc<Mutex<Option<Block>>> =
         { async_std::sync::Arc::new(Mutex::new(None)) };
@@ -87,7 +87,7 @@ pub async fn run(
         vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
     let redis4 =
         vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
-    let rocksdb = Arc::new(vm::rocksdb::DB::open_default(rocksdb_path).unwrap());
+    let rocksdb = Arc::new(start_up::initialize_rocks_db(rocksdb_path).await);
     let api_state = api::State::new(redis, rocksdb.clone(), pg_pool, network_sender.clone());
     let mut vm_state = vm::State::new(redis2.get_connection().unwrap(), rocksdb.clone());
     vm_state.set_code(&TOKEN_CONTRACT.to_vec(), &system_contract.to_vec());
