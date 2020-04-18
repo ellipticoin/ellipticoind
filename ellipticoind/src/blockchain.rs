@@ -1,6 +1,6 @@
 // use rocksdb::ops::Put;
 // use rocksdb::ops::Get;
-// use vm::right_pad_vec;
+// use vm::zero_pad_vec;
 
 pub struct _Blockchain {
     pub redis: redis::Client,
@@ -18,8 +18,8 @@ impl _Blockchain {
     pub fn _initalize(&self) {
         // self.rocks_db.put(b"key", b"value");
         // let value = self.rocks_db.get(b"key").unwrap().unwrap().to_vec();
-        // self.rocks_db.put(&right_pad_vec([[0; 32].to_vec(), b"BaseToken".to_vec()].concat(), 64, 0), b"code");
+        // self.rocks_db.put(&zero_pad_vec([[0; 32].to_vec(), b"BaseToken".to_vec()].concat(), 64, 0), b"code");
         //
-        // let code = self.rocks_db.get(&right_pad_vec([[0; 32].to_vec(), b"BaseToken".to_vec()].concat(), 64, 0)).unwrap().unwrap().to_vec();
+        // let code = self.rocks_db.get(&zero_pad_vec([[0; 32].to_vec(), b"BaseToken".to_vec()].concat(), 64, 0)).unwrap().unwrap().to_vec();
     }
 }

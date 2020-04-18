@@ -1,5 +1,5 @@
 use gas_costs;
-use helpers::right_pad_vec;
+use helpers::zero_pad_vec;
 use metered_wasmi::{isa, RuntimeArgs, RuntimeValue, TrapKind};
 use result;
 use serde_cbor::{from_slice, to_vec};
@@ -40,15 +40,18 @@ impl<'a> VM<'a> {
     }
 
     pub fn caller(&self) -> Vec<u8> {
-        self.env.caller.clone().map(|v| v.to_vec()).unwrap_or(vec![])
+        self.env
+            .caller
+            .clone()
+            .map(|v| v.to_vec())
+            .unwrap_or(vec![])
     }
 
     pub fn get_memory(&mut self, key_pointer: i32) -> Result<Vec<u8>, metered_wasmi::TrapKind> {
         let key = self.read_pointer(key_pointer);
-        let value = self.state.get_memory(
-            &self.transaction.contract_address,
-            &key
-        );
+        let value = self
+            .state
+            .get_memory(&self.transaction.contract_address, &key);
 
         self.use_gas(value.len() as u32 * gas_costs::GET_BYTE_MEMORY)?;
         Ok(value)
@@ -72,10 +75,9 @@ impl<'a> VM<'a> {
 
     pub fn get_storage(&mut self, key_pointer: i32) -> Result<Vec<u8>, metered_wasmi::TrapKind> {
         let key = self.read_pointer(key_pointer);
-        let value = self.state.get_storage(
-            &self.transaction.contract_address,
-            &key
-        );
+        let value = self
+            .state
+            .get_storage(&self.transaction.contract_address, &key);
 
         self.use_gas(value.len() as u32 * gas_costs::GET_BYTE_STORAGE)?;
         Ok(value)
@@ -89,11 +91,8 @@ impl<'a> VM<'a> {
         let key = self.read_pointer(key_pointer);
         let value = self.read_pointer(value_pointer);
         self.use_gas(value.len() as u32 * gas_costs::SET_BYTE_STORAGE)?;
-        self.state.set_storage(
-            &self.transaction.contract_address,
-            &key,
-            &value
-        );
+        self.state
+            .set_storage(&self.transaction.contract_address, &key, &value);
         Ok(None)
     }
 
@@ -120,7 +119,9 @@ impl<'a> VM<'a> {
         transaction.contract_address = contract_address;
         transaction.function = function_name.to_string();
         let mut env = &mut self.env.clone();
-        env.caller = Some(serde_bytes::ByteBuf::from(self.transaction.contract_address.clone()));
+        env.caller = Some(serde_bytes::ByteBuf::from(
+            self.transaction.contract_address.clone(),
+        ));
         let mut vm = VM {
             instance: &module_instance,
             env: &env,
@@ -136,7 +137,7 @@ impl<'a> VM<'a> {
 
     pub fn namespaced_key(&self, key: Vec<u8>) -> Vec<u8> {
         [
-            right_pad_vec(self.transaction.contract_address.clone(), 64, 0),
+            zero_pad_vec(&self.transaction.contract_address, 64),
             key.clone(),
         ]
         .concat()
@@ -149,7 +150,10 @@ impl<'a> VM<'a> {
     ) -> Result<Option<RuntimeValue>, metered_wasmi::Trap> {
         let _log_level = self.read_pointer(log_level_pointer);
         let message = self.read_pointer(log_message_pointer);
-        println!("debug: WebAssembly log: {:?}", str::from_utf8(&message).unwrap());
+        println!(
+            "debug: WebAssembly log: {:?}",
+            str::from_utf8(&message).unwrap()
+        );
 
         Ok(None)
     }
@@ -186,7 +190,7 @@ impl metered_wasmi::Externals for VM<'_> {
                 let result_bytes = self.external_call(args.nth(0), args.nth(1), args.nth(2))?;
                 self.write_pointer(result_bytes)
             }
-            LOG_WRITE => self.log(args.nth(0), args.nth(1)), //{
+            LOG_WRITE => self.log(args.nth(0), args.nth(1)),
             _ => panic!("Called an unknown function index: {}", index),
         }
     }

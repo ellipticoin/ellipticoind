@@ -2,6 +2,7 @@ use ellipticoin::abort::{AbortOptionExt, AbortResultExt};
 use ellipticoin::{
     error::Error,
     export, sender,
+    serde_bytes::ByteBuf,
     value::{from_value, to_value},
     FromBytes, ToBytes, Value,
 };
@@ -15,35 +16,64 @@ enum Namespace {
     CurrentMiner,
     Miners,
     RandomSeed,
-    SpoonedBalances,
+    EthereumBalances,
 }
 
 use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
 use std::convert::TryInto;
 
+// #[cfg(not(test))]
+// #[no_mangle]
+// pub fn do_stuff(value: wasm_rpc::Pointer) -> wasm_rpc::Pointer {
+//     wasm_rpc::set_stdio();
+//     // wasm_rpc::Referenceable::as_pointer(
+//     // let n = wasm_rpc::to_vec(&(|value: Vec<u8>| -> Result<Value, Error> {
+//     let y: Value = wasm_rpc::from_slice(&wasm_rpc::Dereferenceable::as_raw_bytes(&value)).unwrap();
+//     let z: wasm_rpc::serde_bytes::ByteBuf = wasm_rpc::value::from_value(Value::Bytes(vec![1,2,3])).unwrap();
+//     // let z = vec![1];
+//     let x = (|value: Vec<u8>| -> Result<Value, Error> {
+//             {
+//                 Ok(value.into())
+//             }
+//         })(
+//             // wasm_rpc::value::from_value(y).unwrap()
+//             vec![1,2,3]
+//             );
+//
+//     let n: Result<Value, Error> = Ok(1.into());
+//     wasm_rpc::Referenceable::as_pointer(&wasm_rpc::to_vec(&z).unwrap())
+// }
+
 #[export]
 mod token {
-    pub fn approve(spender: Vec<u8>, amount: u64) {
-        set_memory(Namespace::Allowences, [sender(), spender].concat(), amount);
+    pub fn approve(spender: ByteBuf, amount: u64) {
+        set_memory(
+            Namespace::Allowences,
+            [sender(), spender.to_vec()].concat(),
+            amount,
+        );
     }
 
-    pub fn transfer_from(from: Vec<u8>, to: Vec<u8>, amount: u64) -> Result<Value, Error> {
-        let allowance: u64 = get_memory(Namespace::Allowences, [from.clone(), sender()].concat());
+    pub fn transfer_from(from: ByteBuf, to: ByteBuf, amount: u64) -> Result<Value, Error> {
+        let allowance: u64 = get_memory(
+            Namespace::Allowences,
+            [from.clone().to_vec(), sender()].concat(),
+        );
 
         if allowance >= amount {
-            debit_allowance(from.clone(), sender(), amount);
-            debit(from, amount);
-            credit(to, amount);
+            debit_allowance(from.clone().to_vec(), sender(), amount);
+            debit(from.to_vec(), amount);
+            credit(to.to_vec(), amount);
             Ok(Value::Null)
         } else {
             Err(errors::INSUFFICIENT_FUNDS)
         }
     }
 
-    pub fn transfer(to: Vec<u8>, amount: u64) -> Result<Value, Error> {
+    pub fn transfer(to: ByteBuf, amount: u64) -> Result<Value, Error> {
         if get_memory::<_, u64>(Namespace::Balances, sender()) >= amount {
             debit(sender(), amount);
-            credit(to, amount);
+            credit(to.to_vec(), amount);
             Ok(Value::Null)
         } else {
             Err(errors::INSUFFICIENT_FUNDS)
@@ -51,98 +81,117 @@ mod token {
     }
 
     fn debit_allowance(from: Vec<u8>, to: Vec<u8>, amount: u64) {
-        let allowance: u64 = get_memory(Namespace::Allowences, [from.clone(), to.clone()].concat());
+        let allowance: u64 = get_memory(
+            Namespace::Allowences,
+            [from.clone().to_vec(), to.clone().to_vec()].concat(),
+        );
         set_memory(
             Namespace::Allowences,
-            [from, to].concat(),
+            [from.to_vec(), to.to_vec()].concat(),
             allowance - amount,
         );
     }
 
-    pub fn unlock(unlock_signature: Vec<u8>) {
+    pub fn unlock(unlock_signature: ByteBuf) {
         let message = "unlock_ellipticoin";
         let address = ethereum::ecrecover_address(message.as_bytes(), &unlock_signature);
-        let balance = get_memory(Namespace::SpoonedBalances, address);
+        let balance = get_memory(Namespace::EthereumBalances, address);
         credit(sender(), balance);
     }
 
-    pub fn start_mining(bet_per_block: u64, hash_onion: Vec<u8>) -> Result<Value, Error> {
+    pub fn start_mining(bet_per_block: u64, hash_onion: ByteBuf) -> Result<Value, Error> {
         let mut miners = get_miners();
-        miners.insert(sender(), (bet_per_block, hash_onion.clone()));
+        miners.insert(
+            ByteBuf::from(sender()),
+            (bet_per_block, ByteBuf::from(hash_onion.clone().to_vec())),
+        );
         set_miners(miners);
         Ok(Value::Null)
     }
 
-    pub fn reveal(value: Vec<u8>) -> Result<Value, Error> {
+    pub fn do_stuff(value: ByteBuf) -> Result<Value, Error> {
+        ellipticoin::set_memory(vec![2 as u8], vec![233; 21]);
+        Ok(to_value(value).unwrap())
+    }
+    pub fn reveal(value: ByteBuf) -> Result<Value, Error> {
         let mut miners = get_miners();
-        if sender() != get_current_miner() {
+        if ByteBuf::from(sender()) != get_current_miner() {
             return Err(errors::SENDER_IS_NOT_THE_WINNER);
         }
-        let (bet_per_block, hash) = miners.get(&sender()).unwrap_or_abort();
-        if !hash.to_vec().eq(&sha256(value.clone())) {
+        let (bet_per_block, hash) = miners.get(&ByteBuf::from(sender())).unwrap_or_abort();
+        if !hash.to_vec().eq(&sha256(value.clone().to_vec())) {
             return Err(errors::INVALID_VALUE);
         }
-        *miners.get_mut(&sender()).unwrap() = (*bet_per_block, value.clone());
+        *miners.get_mut(&ByteBuf::from(sender())).unwrap() = (*bet_per_block, value.clone());
         settle_block_rewards(get_current_miner(), &miners);
         let random_seed = get_random_seed();
         set_random_seed(
-            sha256([random_seed.to_vec(), value].concat())[0..16]
+            sha256([random_seed.to_vec(), value.to_vec()].concat())[0..16]
                 .try_into()
                 .unwrap(),
         );
-        set_current_miner(get_next_winner(&miners));
+        ellipticoin::set_memory(vec![2 as u8], vec![233; 21]);
+        set_current_miner(get_next_winner(&miners).to_vec());
         set_miners(miners);
 
         Ok(Value::Null)
     }
 
     fn set_current_miner(current_miner: Vec<u8>) {
-        ellipticoin::set_memory::<_, Vec<u8>>(Namespace::CurrentMiner as u8, current_miner);
+        ellipticoin::set_memory::<_, Vec<u8>>(
+            Namespace::CurrentMiner as u8,
+            current_miner.to_vec(),
+        );
     }
 
-    fn get_current_miner() -> Vec<u8> {
-        ellipticoin::get_memory::<_, Vec<u8>>(Namespace::CurrentMiner as u8)
+    fn get_current_miner() -> ByteBuf {
+        ByteBuf::from(
+            ellipticoin::get_storage::<_, Vec<u8>>(Namespace::CurrentMiner as u8).to_vec(),
+        )
     }
 
     fn set_random_seed(random_seed: [u8; 16]) {
-        ellipticoin::set_memory(Namespace::RandomSeed as u8, random_seed.to_vec());
+        ellipticoin::set_storage(Namespace::RandomSeed as u8, random_seed.to_vec());
     }
     fn get_random_seed() -> [u8; 16] {
-        ellipticoin::get_memory::<_, Vec<u8>>(Namespace::RandomSeed as u8)[0..16]
+        ellipticoin::get_storage::<_, Vec<u8>>(Namespace::RandomSeed as u8)[0..16]
             .try_into()
             .unwrap()
     }
 
-    fn get_next_winner(miners: &HashMap<Vec<u8>, (u64, Vec<u8>)>) -> Vec<u8> {
+    fn get_next_winner(miners: &HashMap<ByteBuf, (u64, ByteBuf)>) -> ByteBuf {
         let random_seed: [u8; 16] = get_random_seed();
         let mut rng = SmallRng::from_seed(random_seed);
-        let mut bets: Vec<(Vec<u8>, u64)> = miners
+        let mut bets: Vec<(ByteBuf, u64)> = miners
             .iter()
-            .map(|(miner, (bet_per_block, _hash))| (miner.to_vec(), *bet_per_block))
+            .map(|(miner, (bet_per_block, _hash))| (ByteBuf::from(miner.to_vec()), *bet_per_block))
             .collect();
         bets.sort();
-        bets.choose_weighted(&mut rng, |(_miner, bet_per_block)| *bet_per_block)
-            .map(|(miner, _bet_per_block)| miner.to_vec())
-            .unwrap_or_abort()
+        ByteBuf::from(
+            bets.choose_weighted(&mut rng, |(_miner, bet_per_block)| *bet_per_block)
+                .map(|(miner, _bet_per_block)| miner.to_vec())
+                .unwrap_or_abort(),
+        )
     }
 
-    fn get_miners() -> HashMap<Vec<u8>, (u64, Vec<u8>)> {
-        from_value(ellipticoin::get_memory(Namespace::Miners as u8)).unwrap_or(HashMap::new())
+    fn get_miners() -> HashMap<ByteBuf, (u64, ByteBuf)> {
+        from_value(ellipticoin::get_storage(Namespace::Miners as u8)).unwrap_or(HashMap::new())
     }
 
-    fn set_miners(miners: HashMap<Vec<u8>, (u64, Vec<u8>)>) {
-        ellipticoin::set_memory(
+    fn set_miners(miners: HashMap<ByteBuf, (u64, ByteBuf)>) {
+        ellipticoin::set_storage(
             Namespace::Miners as u8,
             to_value(miners).unwrap_or(Value::Null),
         );
     }
 
-    fn settle_block_rewards(winner: Vec<u8>, miners: &HashMap<Vec<u8>, (u64, Vec<u8>)>) {
+    fn settle_block_rewards(winner: ByteBuf, miners: &HashMap<ByteBuf, (u64, ByteBuf)>) {
         for (miner, (bet_per_block, _hash)) in miners {
-            if miner.to_vec() == winner {
+            if miner.to_vec() == winner.to_vec() {
                 credit(miner.to_vec(), *bet_per_block);
             } else {
                 debit(miner.to_vec(), *bet_per_block);
+                credit(winner.to_vec(), *bet_per_block);
             }
         }
     }
@@ -224,7 +273,7 @@ mod tests {
         let ethereum_address = "43c01ab76d50c59e3893858ace624df81a14a596";
         set_sender(ALICE.to_vec());
         set_memory(
-            Namespace::SpoonedBalances,
+            Namespace::EthereumBalances,
             hex::decode(ethereum_address).unwrap(),
             1000 as u64,
         );
