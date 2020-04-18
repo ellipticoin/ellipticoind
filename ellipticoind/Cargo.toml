@@ -23,6 +23,7 @@ ed25519-dalek = "1.0.0-pre.3"
 futures = "0.3.4"
 futures-core-preview = "0.3.0-alpha.19"
 futures-timer = "2.0.2"
+hex-literal = "0.2.1"
 futures-util = "0.3.4"
 #futures_codec= { github = "matthunz/futures-codec", features = ["cbor"] }
 hashfactor = { path = "../hashfactor" }
@@ -33,7 +34,7 @@ mime = "0.3"
 network = { path = "../network" }
 rand = "*"
 redis = { git = "https://github.com/Marwes/redis-rs", branch = "async_await_api" }
-rocksdb = { git = "https://github.com/iSynaptic/rust-rocksdb", branch = "ops-and-structure"}
+rocksdb = { git = "https://github.com/rust-rocksdb/rust-rocksdb"}
 serde = { version = "1.0.90", features = ["derive"] }
 serde_bytes = "0.11.1"
 indicatif = "0.14.0"
@@ -42,7 +43,7 @@ sha2 = "0.8.0"
 tar = "0.4.26"
 tide = { git = "https://github.com/masonforest/tide" }
 tokio = "0.2.6"
-tungstenite = { version = "0.9.2", default-features = false}
+tungstenite = { version = "0.10.0", default-features = false}
 url = "*"
 vm = { path = "../vm" }
 warp = {git = "https://github.com/masonforest/warp.git", branch = "add-cbor-mime-type"}
