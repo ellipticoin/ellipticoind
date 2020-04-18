@@ -1,6 +1,7 @@
 use helpers::i32_to_vec;
 use metered_wasmi::{memory_units::Pages, ExternVal, MemoryInstance, RuntimeValue};
-use std::mem::{self, transmute};
+use std::convert::TryInto;
+use std::mem;
 use vm::VM;
 
 impl<'a> VM<'a> {
@@ -11,10 +12,8 @@ impl<'a> VM<'a> {
     }
 
     fn read_i32(&mut self, ptr: i32) -> i32 {
-        let mut fixed_slice: [u8; mem::size_of::<i32>()] = Default::default();
         let slice = self.read_memory(ptr, mem::size_of::<i32>() as i32);
-        fixed_slice.copy_from_slice(&slice);
-        unsafe { transmute(fixed_slice) }
+        i32::from_le_bytes(slice[..slice.len()].try_into().unwrap())
     }
 
     pub fn write_pointer(

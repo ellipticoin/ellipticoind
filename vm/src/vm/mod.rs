@@ -1,8 +1,8 @@
 extern crate hex;
 use env::Env;
 use metered_wasmi::{ImportsBuilder, Module, ModuleInstance, ModuleRef, NopExternals};
-use transaction::Transaction;
 use state::State;
+use transaction::Transaction;
 
 mod call;
 mod externals;

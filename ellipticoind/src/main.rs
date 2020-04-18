@@ -1,9 +1,9 @@
 #![feature(async_closure)]
-#[macro_use]
 extern crate clap;
+use crate::clap::Clap;
 use dotenv::dotenv;
+use ed25519_dalek::Keypair;
 use std::env;
-use std::include_bytes;
 use std::net::{IpAddr, SocketAddr, SocketAddrV4};
 
 #[derive(Clap, Debug)]
@@ -56,7 +56,6 @@ async fn main() {
             let database_url = opts
                 .database_url
                 .unwrap_or(env::var("DATABASE_URL").expect("DATABASE_URL must be set"));
-            let system_contract = include_bytes!("wasm/token.wasm");
             let mut bootnodes_txt = String::from(include_str!("bootnodes.txt"));
             bootnodes_txt.pop();
             let bootnodes = bootnodes_txt
@@ -74,7 +73,9 @@ async fn main() {
                     )
                 })
                 .collect::<Vec<(SocketAddr, Vec<u8>)>>();
-            let private_key = base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap();
+            let private_key =
+                Keypair::from_bytes(&base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap())
+                    .unwrap();
             let socket = (opts.bind_address.parse::<IpAddr>().unwrap(), opts.port).into();
 
             ellipticoind::run(
@@ -86,7 +87,6 @@ async fn main() {
                 socket,
                 private_key,
                 bootnodes,
-                system_contract.to_vec(),
             )
             .await
         }

@@ -1,7 +1,7 @@
-use helpers::right_pad_vec;
+use backend::Backend;
+use helpers::zero_pad_vec;
 use std::collections::HashMap;
 use std::sync::Arc;
-use backend::Backend;
 
 pub type Changeset = HashMap<Vec<u8>, Vec<u8>>;
 pub struct State {
@@ -12,10 +12,7 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(
-        redis: redis::Connection,
-        rocksdb: Arc<rocksdb::DB>,
-    ) -> Self {
+    pub fn new(redis: redis::Connection, rocksdb: Arc<rocksdb::DB>) -> Self {
         let vm_state = Self {
             redis,
             rocksdb,
@@ -29,37 +26,32 @@ impl State {
         self.get_storage(contract_address, &vec![])
     }
 
-    pub fn set_code(&mut self, contract_address: &[u8], value: &[u8])  {
+    pub fn set_code(&mut self, contract_address: &[u8], value: &[u8]) {
         self.set_storage(contract_address, &vec![], value)
     }
 
-
     pub fn get_memory(&mut self, contract_address: &[u8], key: &[u8]) -> Vec<u8> {
-        self.memory_changeset.get(&namespaced_key(contract_address, key)).unwrap_or(
-        &self
-            .redis
-            .get(namespaced_key(contract_address, key))
-            ).to_vec()
+        self.memory_changeset
+            .get(&db_key(contract_address, key))
+            .unwrap_or(&self.redis.get(db_key(contract_address, key)))
+            .to_vec()
     }
 
     pub fn set_memory(&mut self, contract_address: &[u8], key: &[u8], value: &[u8]) {
-        self
-            .memory_changeset
-            .insert(namespaced_key(contract_address, key), value.to_vec());
+        self.memory_changeset
+            .insert(db_key(contract_address, key), value.to_vec());
     }
 
     pub fn get_storage(&mut self, contract_address: &[u8], key: &[u8]) -> Vec<u8> {
-        self.storage_changeset.get(&namespaced_key(contract_address, key)).unwrap_or(
-        &self
-            .rocksdb
-            .get(namespaced_key(contract_address, key))
-            ).to_vec()
+        self.storage_changeset
+            .get(&db_key(contract_address, key))
+            .unwrap_or(&self.rocksdb.get(db_key(contract_address, key)))
+            .to_vec()
     }
 
-    pub fn set_storage(&mut self, contract_address: &[u8], key: &[u8], value: &[u8])  {
-        self
-            .storage_changeset
-            .insert(namespaced_key(contract_address, key), value.to_vec());
+    pub fn set_storage(&mut self, contract_address: &[u8], key: &[u8], value: &[u8]) {
+        self.storage_changeset
+            .insert(db_key(contract_address, key), value.to_vec());
     }
 
     pub fn commit(&mut self) {
@@ -68,9 +60,6 @@ impl State {
     }
 }
 
-pub fn namespaced_key(contract_address: &[u8], key: &[u8]) -> Vec<u8> {
-    [
-        right_pad_vec(contract_address.to_vec(), 64, 0),
-        key.to_vec(),
-    ].concat()
+pub fn db_key(contract_address: &[u8], key: &[u8]) -> Vec<u8> {
+    [zero_pad_vec(contract_address, 255 + 32), key.to_vec()].concat()
 }

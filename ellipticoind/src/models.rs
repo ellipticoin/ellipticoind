@@ -1,7 +1,9 @@
+use crate::constants::{CURRENT_MINER_ENUM, TOKEN_CONTRACT};
 use crate::diesel::ExpressionMethods;
 use crate::diesel::RunQueryDsl;
 use crate::helpers::sha256;
 use crate::schema::blocks;
+use crate::schema::hash_onion;
 use crate::schema::transactions;
 use crate::schema::transactions::columns::{nonce, sender};
 use crate::BEST_BLOCK;
@@ -48,6 +50,12 @@ pub async fn is_next_block(block: &Block) -> bool {
     } else {
         true
     }
+}
+
+pub fn is_block_winner(vm_state: &mut vm::State, public_key: Vec<u8>) -> bool {
+    vm_state
+        .get_storage(&TOKEN_CONTRACT, &CURRENT_MINER_ENUM)
+        .eq(&public_key)
 }
 
 impl From<Transaction> for vm::Transaction {
@@ -205,4 +213,21 @@ pub fn highest_nonce(
         .first(con)
         .optional()
         .unwrap()
+}
+
+#[derive(
+    Queryable,
+    Identifiable,
+    Insertable,
+    Associations,
+    PartialEq,
+    Clone,
+    Debug,
+    Serialize,
+    Deserialize,
+)]
+#[primary_key(layer)]
+#[table_name = "hash_onion"]
+pub struct HashOnion {
+    pub layer: Vec<u8>,
 }

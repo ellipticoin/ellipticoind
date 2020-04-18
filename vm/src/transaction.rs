@@ -40,17 +40,13 @@ pub struct _State {
 }
 
 impl Transaction {
-    pub fn run(
-        &self,
-        mut state: &mut crate::State,
-        env: &Env,
-    ) -> (Result, Option<u32>) {
+    pub fn run(&self, mut state: &mut crate::State, env: &Env) -> (Result, Option<u32>) {
         let code = state.get_code(&self.contract_address);
         if code.len() == 0 {
             return (
-                    result::contract_not_found(self),
-                    Some(self.gas_limit as u32),
-                );
+                result::contract_not_found(self),
+                Some(self.gas_limit as u32),
+            );
         }
         if let Ok(instance) = new_module_instance(code) {
             let mut vm = VM {
@@ -62,10 +58,7 @@ impl Transaction {
             };
             vm.call(&self.function, self.arguments.clone())
         } else {
-            return (
-                    result::invalid_wasm(),
-                    Some(self.gas_limit as u32),
-                );
+            return (result::invalid_wasm(), Some(self.gas_limit as u32));
         }
     }
 

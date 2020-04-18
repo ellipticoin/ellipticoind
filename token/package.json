@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@webassemblyjs/wasm-edit": "^1.8.1",
-    "cbor": "^5.0.1",
+    "cbor": "^5.0.2",
     "cryptojs": "^2.5.3",
     "lodash": "^4.17.15",
     "long": "^4.0.0"

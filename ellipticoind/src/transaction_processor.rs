@@ -1,4 +1,3 @@
-use crate::constants::TOKEN_CONTRACT;
 use crate::models::{Block, Transaction};
 use crate::system_contracts;
 use dotenv::dotenv;
@@ -10,7 +9,7 @@ use vm::Commands;
 use vm::Env;
 
 lazy_static! {
-    static ref TRANSACTION_PROCESSING_TIME: Duration = std::time::Duration::from_secs(1);
+    static ref TRANSACTION_PROCESSING_TIME: Duration = Duration::from_secs(4);
 }
 
 lazy_static! {
@@ -21,9 +20,8 @@ lazy_static! {
     };
 }
 pub fn apply_block(mut vm_state: &mut vm::State, block: Block, transactions: Vec<Transaction>) {
-    let env = env_from_block(&block);
     transactions.into_iter().for_each(|transaction| {
-        run_transaction(&mut vm_state, &transaction.into(), &env);
+        run_transaction(&mut vm_state, &transaction.into(), &block);
     });
 }
 
@@ -32,47 +30,31 @@ pub async fn run_transactions(
     mut vm_state: &mut vm::State,
     block: &Block,
 ) -> Vec<Transaction> {
-    let env = env_from_block(block);
     let now = Instant::now();
     let mut completed_transactions: Vec<Transaction> = Default::default();
     while now.elapsed() < *TRANSACTION_PROCESSING_TIME {
         if let Some(transaction) = get_next_transaction(con).await {
-            let completed_transaction = run_transaction(&mut vm_state, &transaction, &env);
+            let completed_transaction = run_transaction(&mut vm_state, &transaction, &block);
             remove_from_processing(con, &transaction).await;
             completed_transactions.push(completed_transaction);
         } else {
             sleep(Duration::from_millis(1));
         }
     }
-    let sender_nonce = random();
-    let mint_transaction = vm::Transaction {
-        contract_address: TOKEN_CONTRACT.to_vec(),
-        sender: PUBLIC_KEY.to_vec(),
-        nonce: sender_nonce,
-        function: "mint".to_string(),
-        arguments: vec![],
-        gas_limit: 10000000,
-    };
-    completed_transactions.push(run_transaction(&mut vm_state, &mint_transaction, &env));
     completed_transactions
 }
 
-fn random() -> u64 {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    rng.gen_range(0, u32::max_value() as u64)
-}
-
-fn run_transaction(
+pub fn run_transaction(
     mut state: &mut vm::State,
     transaction: &vm::Transaction,
-    env: &vm::Env,
+    block: &Block,
 ) -> Transaction {
+    let env = env_from_block(block);
     let result = if system_contracts::is_system_contract(&transaction) {
-        let result = system_contracts::run(transaction, &mut state, env);
+        let result = system_contracts::run(transaction, &mut state, &env);
         result
     } else {
-        let (result, gas_left) = transaction.run(&mut state, env);
+        let (result, gas_left) = transaction.run(&mut state, &env);
         let gas_used = transaction.gas_limit - gas_left.expect("no gas left") as u64;
 
         let env = vm::Env {
