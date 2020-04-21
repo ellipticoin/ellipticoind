@@ -64,11 +64,8 @@ impl<'a> VM<'a> {
     ) -> Result<Option<RuntimeValue>, metered_wasmi::Trap> {
         let key = self.read_pointer(key_pointer);
         let value = self.read_pointer(value_pointer);
-        self.state.set_memory(
-            &self.transaction.contract_address,
-            &key,
-            &value
-        );
+        self.state
+            .set_memory(&self.transaction.contract_address, &key, &value);
         self.use_gas(value.len() as u32 * gas_costs::SET_BYTE_MEMORY)?;
         Ok(None)
     }

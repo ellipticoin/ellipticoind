@@ -4,6 +4,7 @@ use serde_bytes::ByteBuf;
 use serde_cbor::to_vec;
 use std::collections::HashMap;
 use std::fs::File;
+use std::io::BufRead;
 use std::io::Read;
 use std::path::Path;
 use vm::state::db_key;
@@ -18,6 +19,8 @@ use diesel::r2d2::{ConnectionManager, PooledConnection};
 use diesel::PgConnection;
 use rand::Rng;
 use sha2::{Digest, Sha256};
+use vm::Commands;
+use std::convert::TryInto;
 
 enum Namespace {
     _Allowences,
@@ -36,8 +39,10 @@ lazy_static! {
     pub static ref CURRENT_MINER_ENUM: Vec<u8> = vec![2];
 }
 
-pub fn generate_hash_onion(db: &PooledConnection<ConnectionManager<PgConnection>>) -> Vec<u8> {
-    let hash_onion_size = 1000;
+pub fn generate_hash_onion(
+    db: &PooledConnection<ConnectionManager<PgConnection>>,
+) {
+    let hash_onion_size = 65534;
     let center: Vec<u8> = rand::thread_rng()
         .sample_iter(&rand::distributions::Standard)
         .take(32)
@@ -66,8 +71,6 @@ pub fn generate_hash_onion(db: &PooledConnection<ConnectionManager<PgConnection>
         .collect();
     let query = insert_into(hash_onion).values(&values);
     query.execute(db).unwrap();
-
-    hex!("66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925").to_vec()
 }
 
 pub fn sha256(value: Vec<u8>) -> Vec<u8> {
@@ -79,20 +82,97 @@ pub fn sha256(value: Vec<u8>) -> Vec<u8> {
 pub async fn initialize_rocks_db(
     path: &str,
     pg_db: &PooledConnection<ConnectionManager<PgConnection>>,
+    redis: &mut vm::Client
 ) -> vm::rocksdb::DB {
     if Path::new(path).exists() {
+        vm::rocksdb::DB::open_default(path).unwrap()
+    } else {
         let db = vm::rocksdb::DB::open_default(path).unwrap();
+        let file = File::open("dist/ethereum-balances-9858734.bin").unwrap();
+        let metadata = std::fs::metadata("dist/ethereum-balances-9858734.bin").unwrap();
+        let pb = ProgressBar::new(metadata.len() / 24);
+        println!("Importing Ethereum Balances");
+        pb.set_style(
+            indicatif::ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] [{bar}] {pos}/{len} ({percent}%)")
+                .progress_chars("=> "),
+        );
+        let mut batch = rocksdb::WriteBatch::default();
+        const CAP: usize = 24 * 1000;
+        let mut reader = std::io::BufReader::with_capacity(CAP, file);
 
-        let mut token_file = File::open("../token/dist/token.wasm").unwrap();
-        let mut token_wasm = Vec::new();
-        token_file.read_to_end(&mut token_wasm).unwrap();
-        db.put(db_key(&TOKEN_CONTRACT, &vec![]), &token_wasm)
+        loop {
+            let length = {
+                let buffer = reader.fill_buf().unwrap();
+                for chunk in buffer.chunks(24) {
+                    batch.put(
+                        db_key(
+                            &TOKEN_CONTRACT,
+                            &[ETHEREUM_BALANCE_ENUM.to_vec(), chunk[0..20].to_vec()].concat(),
+                        ),
+                        (u64::from_le_bytes([chunk[20..24].to_vec(), [0;4].to_vec()].concat()[..].try_into().unwrap())*10).to_le_bytes().to_vec());
+                }
+                pb.inc(1000);
+                db.write(batch).unwrap();
+                batch = rocksdb::WriteBatch::default();
+                buffer.len()
+            };
+            if length == 0 {
+                break;
+            }
+            reader.consume(length);
+        }
+        pb.finish();
+
+        let genesis_balance = db
+            .get(db_key(
+                &TOKEN_CONTRACT,
+                &[
+                    vec![Namespace::EthereumBalances as u8],
+                    GENISIS_ETHEREUM_ADRESS.to_vec(),
+                ]
+                .concat(),
+            ))
+            .unwrap()
             .unwrap();
+        println!("genesis_balance: {:?}", genesis_balance);
+        db.delete(db_key(
+            &TOKEN_CONTRACT,
+            &[
+                vec![Namespace::EthereumBalances as u8],
+                GENISIS_ETHEREUM_ADRESS.to_vec(),
+            ]
+            .concat(),
+        ))
+        .unwrap();
+        redis.set::<_,_,()>(
+            db_key(
+                &TOKEN_CONTRACT,
+                &[vec![Namespace::Balances as u8], GENISIS_ADRESS.to_vec()].concat(),
+            ),
+            genesis_balance
+        )
+        .unwrap();
+        println!("{:?}", base64::encode(
+            &db_key(
+                &TOKEN_CONTRACT,
+                &[vec![Namespace::Balances as u8], GENISIS_ADRESS.to_vec()].concat(),
+            )
+        ));
+        db.put(
+            db_key(&TOKEN_CONTRACT, &vec![Namespace::RandomSeed as u8]),
+            RANDOM_SEED.to_vec(),
+        )
+        .unwrap();
         db.put(
             db_key(&TOKEN_CONTRACT, &vec![Namespace::CurrentMiner as u8]),
             GENISIS_ADRESS.to_vec(),
         )
         .unwrap();
+        let mut token_file = File::open("../token/dist/token.wasm").unwrap();
+        let mut token_wasm = Vec::new();
+        token_file.read_to_end(&mut token_wasm).unwrap();
+        db.put(db_key(&TOKEN_CONTRACT, &vec![]), &token_wasm).unwrap();
         let mut miners: HashMap<ByteBuf, (u64, ByteBuf)> = HashMap::new();
         let skin: Vec<u8> = hash_onion
             .select(layer)
@@ -120,82 +200,7 @@ pub async fn initialize_rocks_db(
             RANDOM_SEED.to_vec(),
         )
         .unwrap();
-        db
-    } else {
-        let db = vm::rocksdb::DB::open_default(path).unwrap();
-        let mut file = File::open("dist/ethereum-balances-9858734.bin").unwrap();
-        let metadata = std::fs::metadata("dist/ethereum-balances-9858734.bin").unwrap();
-        let pb = ProgressBar::new(metadata.len() / 24);
-        println!("Importing Ethereum Balances");
-        pb.set_style(
-            indicatif::ProgressStyle::default_bar()
-                .template("[{elapsed_precise}] [{bar}] {pos}/{len} ({percent}%)")
-                .progress_chars("=> "),
-        );
-        let mut batch = rocksdb::WriteBatch::default();
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer).unwrap();
-        let mut i = 0;
-        for chunk in buffer.chunks(24) {
-            batch.put(
-                db_key(
-                    &TOKEN_CONTRACT,
-                    &[ETHEREUM_BALANCE_ENUM.to_vec(), chunk[0..20].to_vec()].concat(),
-                ), // [ETHEREUM_BALANCE_PREFIX.to_vec(), chunk[0..20].to_vec()].concat()
-                chunk[20..24].to_vec(),
-            );
-            if i % 1000 == 0 {
-                pb.inc(1000);
-            }
-            i += 1
-        }
-        pb.finish();
-        println!("Writing Ethereum balances to storage...");
-
-        db.write(batch).unwrap();
-        let genesis_balance = db
-            .get(db_key(
-                &TOKEN_CONTRACT,
-                &[
-                    vec![Namespace::EthereumBalances as u8],
-                    GENISIS_ETHEREUM_ADRESS.to_vec(),
-                ]
-                .concat(),
-            ))
-            .unwrap()
-            .unwrap();
-        db.delete(db_key(
-            &TOKEN_CONTRACT,
-            &[
-                vec![Namespace::EthereumBalances as u8],
-                GENISIS_ETHEREUM_ADRESS.to_vec(),
-            ]
-            .concat(),
-        ))
-        .unwrap();
-        db.put(
-            db_key(
-                &TOKEN_CONTRACT,
-                &[vec![Namespace::Balances as u8], GENISIS_ADRESS.to_vec()].concat(),
-            ),
-            genesis_balance,
-        )
-        .unwrap();
-        db.put(
-            db_key(&TOKEN_CONTRACT, &vec![Namespace::RandomSeed as u8]),
-            RANDOM_SEED.to_vec(),
-        )
-        .unwrap();
-        db.put(
-            db_key(&TOKEN_CONTRACT, &vec![Namespace::CurrentMiner as u8]),
-            GENISIS_ADRESS.to_vec(),
-        )
-        .unwrap();
-        let mut token_file = File::open("../token/dist/token.wasm").unwrap();
-        let mut token_wasm = Vec::new();
-        token_file.read_to_end(&mut token_wasm).unwrap();
-        db.put(db_key(&TOKEN_CONTRACT, &vec![]), &token_wasm)
-            .unwrap();
+        println!("{:?}", db.get(&base64::decode("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABFbGxpcHRpY29pbgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABvQMn3JvS3ATITteQ+gOYfuVSn2buuAH+4e8NY/CvtwA=").unwrap()));
 
         db
     }

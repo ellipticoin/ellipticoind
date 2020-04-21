@@ -87,13 +87,15 @@ pub async fn run(
         vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
     let redis4 =
         vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
+    let mut redis5 =
+        vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
     diesel::sql_query("TRUNCATE blocks CASCADE")
         .execute(&db)
         .unwrap();
     let _: () = redis::cmd("FLUSHALL").query(&mut redis3).unwrap();
     start_up::generate_hash_onion(&pg_pool.get().unwrap());
     let rocksdb =
-        Arc::new(start_up::initialize_rocks_db(rocksdb_path, &pg_pool.get().unwrap()).await);
+        Arc::new(start_up::initialize_rocks_db(rocksdb_path, &pg_pool.get().unwrap(), &mut redis5).await);
     let api_state = api::State::new(redis, rocksdb.clone(), pg_pool, network_sender.clone());
     let _vm_state = vm::State::new(redis2.get_connection().unwrap(), rocksdb.clone());
     let (new_block_sender, new_block_receiver) = channel(1);
