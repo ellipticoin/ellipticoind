@@ -9,5 +9,6 @@ pub async fn show(req: tide::Request<State>) -> Response {
     let value = redis
         .get::<Vec<u8>, Vec<u8>>(base64::decode_config(&key, base64::URL_SAFE).unwrap())
         .unwrap();
+
     Response::new(200).body(Body::from(serde_cbor::to_vec(&value).unwrap()))
 }

@@ -130,7 +130,6 @@ mod token {
                 .try_into()
                 .unwrap(),
         );
-        ellipticoin::set_memory(vec![2 as u8], vec![233; 21]);
         set_current_miner(get_next_winner(&miners).to_vec());
         set_miners(miners);
 
@@ -187,11 +186,9 @@ mod token {
 
     fn settle_block_rewards(winner: ByteBuf, miners: &HashMap<ByteBuf, (u64, ByteBuf)>) {
         for (miner, (bet_per_block, _hash)) in miners {
-            if miner.to_vec() == winner.to_vec() {
-                credit(miner.to_vec(), *bet_per_block);
-            } else {
-                debit(miner.to_vec(), *bet_per_block);
+            if miner.to_vec() != winner.to_vec() {
                 credit(winner.to_vec(), *bet_per_block);
+                debit(miner.to_vec(), *bet_per_block);
             }
         }
     }
