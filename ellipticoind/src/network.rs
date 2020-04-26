@@ -16,6 +16,7 @@ pub async fn handle_messages(
     block_sender: sync::Sender<(Block, Vec<Transaction>)>,
 ) {
     loop {
+        println!("waiting on messages!");
         match &network_receiver.next().await {
             Ok(Message::Block((block, transactions))) => {
                 block_sender
