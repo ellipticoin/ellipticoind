@@ -42,7 +42,9 @@ pub async fn run(
             *BEST_BLOCK.lock().await = Some(new_block.clone());
             continue;
         }
+        println!("waiting on block");
         let (new_block, transactions) = new_block_receiver.next().map(Option::unwrap).await;
+        println!("got a block!");
         if is_next_block(&new_block).await {
             new_block.clone().insert(&db, transactions.clone());
             transaction_processor::apply_block(

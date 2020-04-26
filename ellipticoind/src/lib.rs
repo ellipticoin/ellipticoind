@@ -72,57 +72,70 @@ pub async fn run(
 ) {
     diesel_migrations::embed_migrations!();
     let mut network = Server::new(keypair.to_bytes().to_vec(), socket, bootnodes).await;
-    let (network_sender, incomming_network_receiver) = network.channel().await;
-    let db = PgConnection::establish(&database_url)
-        .expect(&format!("Error connecting to {}", database_url));
-    embedded_migrations::run(&db).unwrap();
-    let manager = ConnectionManager::<PgConnection>::new(database_url.clone());
-    let pg_pool = Pool::new(manager).expect("Postgres connection pool could not be created");
-
-    let redis =
-        vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
-    let redis2 =
-        vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
-    let mut redis3 =
-        vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
-    let redis4 =
-        vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
-    let mut redis5 =
-        vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
-    diesel::sql_query("TRUNCATE blocks CASCADE")
-        .execute(&db)
-        .unwrap();
-    let _: () = redis::cmd("FLUSHALL").query(&mut redis3).unwrap();
-    start_up::generate_hash_onion(&pg_pool.get().unwrap());
-    let rocksdb =
-        Arc::new(start_up::initialize_rocks_db(rocksdb_path, &pg_pool.get().unwrap(), &mut redis5).await);
-    let api_state = api::State::new(redis, rocksdb.clone(), pg_pool, network_sender.clone());
-    let _vm_state = vm::State::new(redis2.get_connection().unwrap(), rocksdb.clone());
-    let (new_block_sender, new_block_receiver) = channel(1);
-    async_std::task::spawn(api(api_state).listen(api_socket));
-    async_std::task::spawn(network::handle_messages(
-        redis4.get_connection().unwrap(),
-        incomming_network_receiver,
-        new_block_sender,
-    ));
-    let websocket = api::websocket::Websocket::new();
-    async_std::task::spawn(websocket.clone().bind(websocket_socket));
-    *BEST_BLOCK.lock().await = get_best_block(&db);
-    // let public = private_key.public.to_bytes();
-    let public_key = Arc::new(keypair.public);
-    async_std::task::spawn(async {
-        let manager = ConnectionManager::<PgConnection>::new(database_url);
-        let pg_pool = Pool::new(manager).expect("Postgres connection pool could not be created");
-        run_loop::run(
-            public_key,
-            websocket,
-            network_sender,
-            redis2,
-            rocksdb,
-            pg_pool,
-            new_block_receiver,
-        )
-        .await
+    let (mut network_sender, mut incomming_network_receiver) = network.channel().await;
+    let db_url = database_url.clone();
+    async_std::task::spawn(async move {
+        loop {
+            if(&db_url == "postgres://masonf:@%2Ftmp/ellipticoind") {
+                println!("sending");
+                network_sender.send("test").await;
+            } else {
+                println!("waiting");
+                let m: String = incomming_network_receiver.next().await.unwrap();
+                println!("{:?}", m);
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1))
+        }
     });
+    // let db = PgConnection::establish(&database_url)
+    //     .expect(&format!("Error connecting to {}", database_url));
+    // embedded_migrations::run(&db).unwrap();
+    // let manager = ConnectionManager::<PgConnection>::new(database_url.clone());
+    // let pg_pool = Pool::new(manager).expect("Postgres connection pool could not be created");
+    //
+    // let redis =
+    //     vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
+    // let redis2 =
+    //     vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
+    // let mut redis3 =
+    //     vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
+    // let redis4 =
+    //     vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
+    // let mut redis5 =
+    //     vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
+    // diesel::sql_query("TRUNCATE blocks CASCADE")
+    //     .execute(&db)
+    //     .unwrap();
+    // let _: () = redis::cmd("FLUSHALL").query(&mut redis3).unwrap();
+    // let rocksdb =
+    //     Arc::new(start_up::initialize_rocks_db(rocksdb_path, &pg_pool.get().unwrap(), &mut redis5).await);
+    // let api_state = api::State::new(redis, rocksdb.clone(), pg_pool, network_sender.clone());
+    // let _vm_state = vm::State::new(redis2.get_connection().unwrap(), rocksdb.clone());
+    // let (new_block_sender, new_block_receiver) = channel(1);
+    // async_std::task::spawn(api(api_state).listen(api_socket));
+    // async_std::task::spawn(network::handle_messages(
+    //     redis4.get_connection().unwrap(),
+    //     incomming_network_receiver,
+    //     new_block_sender,
+    // ));
+    // let websocket = api::websocket::Websocket::new();
+    // async_std::task::spawn(websocket.clone().bind(websocket_socket));
+    // *BEST_BLOCK.lock().await = get_best_block(&db);
+    // // let public = private_key.public.to_bytes();
+    // let public_key = Arc::new(keypair.public);
+    // async_std::task::spawn(async {
+    //     let manager = ConnectionManager::<PgConnection>::new(database_url);
+    //     let pg_pool = Pool::new(manager).expect("Postgres connection pool could not be created");
+    //     run_loop::run(
+    //         public_key,
+    //         websocket,
+    //         network_sender,
+    //         redis2,
+    //         rocksdb,
+    //         pg_pool,
+    //         new_block_receiver,
+    //     )
+    //     .await
+    // });
     network.listen().await;
 }
