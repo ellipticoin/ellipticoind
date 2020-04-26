@@ -135,7 +135,6 @@ pub async fn initialize_rocks_db(
             ))
             .unwrap()
             .unwrap();
-        println!("genesis_balance: {:?}", genesis_balance);
         db.delete(db_key(
             &TOKEN_CONTRACT,
             &[
@@ -153,12 +152,6 @@ pub async fn initialize_rocks_db(
             genesis_balance
         )
         .unwrap();
-        println!("{:?}", base64::encode(
-            &db_key(
-                &TOKEN_CONTRACT,
-                &[vec![Namespace::Balances as u8], GENISIS_ADRESS.to_vec()].concat(),
-            )
-        ));
         db.put(
             db_key(&TOKEN_CONTRACT, &vec![Namespace::RandomSeed as u8]),
             RANDOM_SEED.to_vec(),
@@ -200,8 +193,7 @@ pub async fn initialize_rocks_db(
             RANDOM_SEED.to_vec(),
         )
         .unwrap();
-        println!("{:?}", db.get(&base64::decode("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABFbGxpcHRpY29pbgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABvQMn3JvS3ATITteQ+gOYfuVSn2buuAH+4e8NY/CvtwA=").unwrap()));
-
+        generate_hash_onion(pg_db);
         db
     }
 }

@@ -24,7 +24,7 @@ struct Opts {
     rocksdb_path: String,
     #[clap(long = "redis-url", default_value = "redis://127.0.0.1")]
     redis_url: String,
-    #[clap(short = "db", long = "database-url")]
+    #[clap(short = "d", long = "database-url")]
     database_url: Option<String>,
     #[clap(subcommand)]
     subcmd: Option<SubCommand>,
