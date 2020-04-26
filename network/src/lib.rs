@@ -1,12 +1,9 @@
-#[macro_use]
-extern crate lazy_static;
-use async_std::io;
-use async_std::net::Incoming;
+use async_std::net::SocketAddr;
 use async_std::net::TcpListener;
 use async_std::net::TcpStream;
 use async_std::pin::Pin;
 pub use async_std::sync;
-use async_std::{sync::channel, task};
+use async_std::task;
 use futures::prelude::*;
 pub use futures::{
     future,
@@ -17,94 +14,37 @@ pub use futures::{
     task::{Context, Poll},
     AsyncRead, AsyncWrite, Sink, Stream,
 };
-use libp2p::gossipsub::protocol::MessageId;
-use libp2p::gossipsub::{GossipsubEvent, GossipsubMessage, Topic};
-use libp2p::identity::ed25519;
-pub use libp2p::identity::Keypair;
-use libp2p::{
-    floodsub::{self, Floodsub, FloodsubEvent},
-    swarm::NetworkBehaviourEventProcess,
-    Multiaddr, NetworkBehaviour, PeerId, Swarm,
-};
-use libp2p::{gossipsub, identity};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
-use std::error::Error;
-use std::hash::{Hash, Hasher};
-use std::net::SocketAddr;
-use std::time::Duration;
-
-lazy_static! {
-    static ref OUTGOING_SENDER: futures::lock::Mutex<HashMap<PeerId, sync::Sender<Vec<u8>>>> = {
-        let m = HashMap::new();
-        futures::lock::Mutex::new(m)
-    };
-    static ref OUTGOING_RECIEIVER: futures::lock::Mutex<HashMap<PeerId, sync::Receiver<Vec<u8>>>> = {
-        let m = HashMap::new();
-        futures::lock::Mutex::new(m)
-    };
-    static ref INCOMMING_SENDER: futures::lock::Mutex<HashMap<PeerId, sync::Sender<Vec<u8>>>> = {
-        let m = HashMap::new();
-        futures::lock::Mutex::new(m)
-    };
-    static ref INCOMMING_RECIEIVER: futures::lock::Mutex<HashMap<PeerId, sync::Receiver<Vec<u8>>>> = {
-        let m = HashMap::new();
-        futures::lock::Mutex::new(m)
-    };
-}
 
 #[derive(Clone, Debug)]
 pub struct Sender {
     inner: sync::Sender<Vec<u8>>,
 }
 
-impl Sender {
-    pub async fn send<M: Clone + Serialize>(&mut self, message: M) {
-        self.inner
-            .send(serde_cbor::to_vec(&message.clone()).unwrap())
-            .await
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Receiver {
-    inner: sync::Receiver<Vec<u8>>,
-}
-
-impl Receiver {
-    pub async fn next<T: DeserializeOwned>(&mut self) -> Result<T, serde_cbor::error::Error> {
-        let bytes = self.inner.next().await.unwrap();
-        serde_cbor::from_slice(&bytes)
-    }
-}
+// pub async fn send<M: Clone + Serialize>(&mut self, message: M) {
+// pub async fn next<T: DeserializeOwned>(&mut self) -> Result<T, serde_cbor::error::Error> {
 
 #[derive(Debug)]
 pub struct Server {
     pub private_key: Vec<u8>,
     pub bootnodes: Vec<SocketAddr>,
-    // pub stream: Option<TcpStream>,
     pub listener: Option<TcpListener>,
     pub receiver: async_std::sync::Receiver<Vec<u8>>,
-    // pub sender: async_std::sync::Sender<Vec<u8>>,
-    // _lifetime: PhantomData<&'a ()>
 }
 
 impl Server {
     pub async fn listen(
-        &mut self, address: SocketAddr,
+        &mut self,
+        address: SocketAddr,
         sender: async_std::sync::Sender<Vec<u8>>,
         mut receiver: async_std::sync::Receiver<Vec<u8>>,
-        bootnodes: Vec<SocketAddr>
+        bootnodes: Vec<SocketAddr>,
     ) {
         let listener = TcpListener::bind(address).await.unwrap();
         task::spawn(async move {
             for bootnode in bootnodes {
                 let mut stream = TcpStream::connect(bootnode).await.unwrap();
-                // stream.write(&[1]).await.unwrap();
                 while let Some(message) = receiver.next().await {
-                stream.write(&message).await.unwrap();
+                    stream.write(&message).await.unwrap();
                 }
             }
         });
@@ -128,21 +68,20 @@ impl Stream for Server {
         _ctx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<std::option::Option<<Self as futures::stream::Stream>::Item>> {
         async_std::sync::Receiver::poll_next(Pin::new(&mut self.receiver), _ctx)
-
     }
 }
 impl Sink<Vec<u8>> for Server {
     type Error = std::io::Error;
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
-    fn start_send(self: Pin<&mut Self>, item: Vec<u8>) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, _item: Vec<u8>) -> Result<(), Self::Error> {
         Ok(())
     }
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Pending
     }
 }
@@ -150,10 +89,11 @@ impl Sink<Vec<u8>> for Server {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures_timer::Delay;
+    use libp2p::identity::ed25519;
+    // use serde::de::DeserializeOwned;
     use serde::Deserialize;
-    use std::net::{Ipv4Addr, SocketAddrV4};
-    use std::time::Duration;
+    use serde::Serialize;
+    use async_std::sync::channel;
 
     #[derive(Serialize, Deserialize, PartialEq, Clone, Debug)]
     pub enum Message {
@@ -166,7 +106,7 @@ mod tests {
         let alices_key = ed25519::Keypair::generate();
         let bobs_key = ed25519::Keypair::generate();
         let (s, r) = channel::<Vec<u8>>(1);
-        let (s1, r1) = channel::<Vec<u8>>(1);
+        let (_s1, r1) = channel::<Vec<u8>>(1);
         let mut alices_server = Server {
             private_key: alices_key.encode().clone().to_vec(),
             bootnodes: vec![],
@@ -176,34 +116,30 @@ mod tests {
         alices_server
             .listen("0.0.0.0:1234".parse().unwrap(), s, r1, vec![])
             .await;
-        let (mut alices_sender, mut alices_receiver) = alices_server.split();
+        let (_alices_sender, mut alices_receiver) = alices_server.split();
 
-        // task::spawn(async move {
-        //     sender.send(vec![1, 2, 3]).await.unwrap();
-        // });
         let (s2, r2) = channel::<Vec<u8>>(1);
         let (s3, r3) = channel::<Vec<u8>>(1);
         let mut bobs_server = Server {
-             private_key: bobs_key.encode().clone().to_vec(),
-            bootnodes: vec![
-                "0.0.0.0:1234".parse().unwrap()
-            ],
+            private_key: bobs_key.encode().clone().to_vec(),
+            bootnodes: vec!["0.0.0.0:1234".parse().unwrap()],
             listener: None,
             receiver: r2,
         };
         bobs_server
-            .listen("0.0.0.0:1235".parse().unwrap(), s2, r3,
-vec![
-                    "0.0.0.0:1234".parse().unwrap()
-                ]
-            ).await;
-        let (mut bobs_sender, mut bobs_receiver) = bobs_server.split();
+            .listen(
+                "0.0.0.0:1235".parse().unwrap(),
+                s2,
+                r3,
+                vec!["0.0.0.0:1234".parse().unwrap()],
+            )
+            .await;
+        let (mut bobs_sender, _bobs_receiiver) = bobs_server.split();
         task::spawn(async move {
-            bobs_sender.send(vec![1,2,3]).await;
-            s3.send(vec![1,2,3]).await;
-            // s2.send(vec![1,2,3]).await;
+            bobs_sender.send(vec![1, 2, 3]).await.unwrap();
+            s3.send(vec![1, 2, 3]).await;
         });
-        // let message_received = bobs_receiver.next().await.unwrap();
-        // assert_eq!(message_received, vec![1,2,3]);
+        let message_received = alices_receiver.next().await.unwrap();
+        assert_eq!(message_received, vec![1, 2, 3]);
     }
 }
