@@ -36,15 +36,15 @@ impl Server {
         &mut self,
         address: SocketAddr,
         sender: async_std::sync::Sender<Vec<u8>>,
-        mut receiver: async_std::sync::Receiver<Vec<u8>>,
+        mut receiver: futures::channel::mpsc::Receiver<Vec<u8>>,
         bootnodes: Vec<SocketAddr>,
     ) {
         let listener = TcpListener::bind(address).await.unwrap();
         task::spawn(async move {
             for bootnode in bootnodes {
                 let mut stream = TcpStream::connect(bootnode).await.unwrap();
-                while let Some(message) = receiver.next().await {
-                    stream.write(&message).await.unwrap();
+                while let Ok(message) = receiver.try_next() {
+                    stream.write(&message.unwrap()).await.unwrap();
                 }
             }
         });
@@ -106,7 +106,7 @@ mod tests {
         let alices_key = ed25519::Keypair::generate();
         let bobs_key = ed25519::Keypair::generate();
         let (s, r) = channel::<Vec<u8>>(1);
-        let (_s1, r1) = channel::<Vec<u8>>(1);
+        let (_s1, r1) = futures::channel::mpsc::channel::<Vec<u8>>(1);
         let mut alices_server = Server {
             private_key: alices_key.encode().clone().to_vec(),
             bootnodes: vec![],
@@ -119,7 +119,7 @@ mod tests {
         let (_alices_sender, mut alices_receiver) = alices_server.split();
 
         let (s2, r2) = channel::<Vec<u8>>(1);
-        let (s3, r3) = channel::<Vec<u8>>(1);
+        let (mut s3, r3) =  futures::channel::mpsc::channel::<Vec<u8>>(1);
         let mut bobs_server = Server {
             private_key: bobs_key.encode().clone().to_vec(),
             bootnodes: vec!["0.0.0.0:1234".parse().unwrap()],
@@ -135,10 +135,8 @@ mod tests {
             )
             .await;
         let (mut bobs_sender, _bobs_receiiver) = bobs_server.split();
-        task::spawn(async move {
-            bobs_sender.send(vec![1, 2, 3]).await.unwrap();
-            s3.send(vec![1, 2, 3]).await;
-        });
+        bobs_sender.send(vec![1, 2, 3]).await.unwrap();
+        s3.send(vec![1, 2, 3]).await;
         let message_received = alices_receiver.next().await.unwrap();
         assert_eq!(message_received, vec![1, 2, 3]);
     }
