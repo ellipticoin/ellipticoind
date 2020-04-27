@@ -15,6 +15,7 @@ pub use futures::{
     task::{Context, Poll},
     AsyncRead, AsyncWrite, Sink, Stream,
 };
+use futures::channel::mpsc;
 
 #[derive(Clone, Debug)]
 pub struct Sender {
@@ -29,13 +30,13 @@ pub struct Server {
     pub private_key: Vec<u8>,
     pub bootnodes: Vec<SocketAddr>,
     pub listener: Option<TcpListener>,
-    pub receiver: async_std::sync::Receiver<Vec<u8>>,
-    pub sender: futures::channel::mpsc::Sender<Vec<u8>>,
+    pub incommming_channel: (sync::Sender<Vec<u8>>, sync::Receiver<Vec<u8>>),
+    pub outgoing_channel: (mpsc::Sender<Vec<u8>>, mpsc::Receiver<Vec<u8>>),
 }
 
 pub async fn spawn_read_loop(
     mut read_half: futures::io::ReadHalf<TcpStream>,
-    mut sender: futures::channel::mpsc::UnboundedSender<Vec<u8>>,
+    mut sender: mpsc::UnboundedSender<Vec<u8>>,
 ) {
     task::spawn(async move {
         loop {
@@ -46,16 +47,31 @@ pub async fn spawn_read_loop(
     });
 }
 impl Server {
-    pub async fn listen(
-        &mut self,
+    pub fn new(
+    private_key: Vec<u8>,
+    bootnodes: Vec<SocketAddr>,
+    listener: Option<TcpListener>,
+    ) -> Self {
+        Self {
+            private_key,
+            bootnodes,
+            listener,
+            incommming_channel: async_std::sync::channel::<Vec<u8>>(1),
+            outgoing_channel: futures::channel::mpsc::channel::<Vec<u8>>(1),
+        }
+    }
+    pub async fn channel(
+        self,
         address: SocketAddr,
-        sender: async_std::sync::Sender<Vec<u8>>,
-        mut receiver: futures::channel::mpsc::Receiver<Vec<u8>>,
         bootnodes: Vec<SocketAddr>,
-    ) {
+    ) ->
+(futures::channel::mpsc::Sender<Vec<u8>>, async_std::sync::Receiver<Vec<u8>>)
+    {
         let listener = TcpListener::bind(address).await.unwrap();
         let (read_sender, mut read_receiver) = futures::channel::mpsc::unbounded();
         let (stream_sender, mut stream_receiver) = async_std::sync::channel::<TcpStream>(1);
+        let sender  = self.incommming_channel.0.clone();
+        let (read_sender2, mut receiver) = futures::channel::mpsc::unbounded::<Vec<u8>>();
         task::spawn(async move {
             let mut streams = vec![];
             for bootnode in bootnodes {
@@ -96,6 +112,14 @@ impl Server {
                 stream_sender.send(stream).await;
             }
         });
+        // self.split()
+        let (sender1, receiver1)  = self.outgoing_channel;
+        let (sender2, receiver2)  = self.incommming_channel;
+        task::spawn(async move {
+            receiver1.map(Ok).forward(read_sender2).await.unwrap();
+        });
+        // (self.incommming_channel.1, self.outgoing_channel.0)
+        (sender1, receiver2)
     }
 }
 
@@ -105,16 +129,16 @@ impl Stream for Server {
         mut self: Pin<&mut Self>,
         _ctx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<std::option::Option<<Self as futures::stream::Stream>::Item>> {
-        async_std::sync::Receiver::poll_next(Pin::new(&mut self.receiver), _ctx)
+        async_std::sync::Receiver::poll_next(Pin::new(&mut self.incommming_channel.1), _ctx)
     }
 }
 impl Sink<Vec<u8>> for Server {
     type Error = futures::channel::mpsc::SendError;
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        self.sender.poll_ready(cx)
+        self.outgoing_channel.0.poll_ready(cx)
     }
     fn start_send(mut self: Pin<&mut Self>, item: Vec<u8>) -> Result<(), Self::Error> {
-        self.sender.start_send(item)
+        self.outgoing_channel.0.start_send(item)
     }
     fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
@@ -143,38 +167,26 @@ mod tests {
         // let expected_message = message.clone();
         let alices_key = ed25519::Keypair::generate();
         let bobs_key = ed25519::Keypair::generate();
-        let (s, r) = channel::<Vec<u8>>(1);
-        let (s1, r1) = futures::channel::mpsc::channel::<Vec<u8>>(1);
-        let mut alices_server = Server {
-            private_key: alices_key.encode().clone().to_vec(),
-            bootnodes: vec![],
-            listener: None,
-            receiver: r,
-            sender: s1,
-        };
-        alices_server
-            .listen("0.0.0.0:1234".parse().unwrap(), s, r1, vec![])
+        let mut alices_server = Server::new(
+            alices_key.encode().clone().to_vec(),
+            vec![],
+            None
+        );
+        let (mut alices_sender, mut alices_receiver) = alices_server
+            .channel("0.0.0.0:1234".parse().unwrap(), vec![])
             .await;
-        let (mut alices_sender, mut alices_receiver) = alices_server.split();
 
-        let (s2, r2) = channel::<Vec<u8>>(1);
-        let (s3, r3) = futures::channel::mpsc::channel::<Vec<u8>>(1);
-        let mut bobs_server = Server {
-            private_key: bobs_key.encode().clone().to_vec(),
-            bootnodes: vec!["0.0.0.0:1234".parse().unwrap()],
-            listener: None,
-            receiver: r2,
-            sender: s3,
-        };
-        bobs_server
-            .listen(
+        let mut bobs_server = Server::new(
+            bobs_key.encode().clone().to_vec(),
+            vec!["0.0.0.0:1234".parse().unwrap()],
+            None
+        );
+        let (mut bobs_sender, mut bobs_receiver) = bobs_server
+            .channel(
                 "0.0.0.0:1235".parse().unwrap(),
-                s2,
-                r3,
                 vec!["0.0.0.0:1234".parse().unwrap()],
             )
             .await;
-        let (mut bobs_sender, mut bobs_receiver) = bobs_server.split();
         bobs_sender
             .send("test".as_bytes().to_vec())
             .await
