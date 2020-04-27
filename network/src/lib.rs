@@ -28,8 +28,8 @@ pub struct Sender {
 #[derive(Debug)]
 pub struct Server {
     pub private_key: Vec<u8>,
+    pub socket_addr: SocketAddr,
     pub bootnodes: Vec<SocketAddr>,
-    pub listener: Option<TcpListener>,
     pub incommming_channel: (sync::Sender<Vec<u8>>, sync::Receiver<Vec<u8>>),
     pub outgoing_channel: (mpsc::Sender<Vec<u8>>, mpsc::Receiver<Vec<u8>>),
 }
@@ -49,29 +49,29 @@ pub async fn spawn_read_loop(
 impl Server {
     pub fn new(
     private_key: Vec<u8>,
+    socket_addr: SocketAddr,
     bootnodes: Vec<SocketAddr>,
-    listener: Option<TcpListener>,
     ) -> Self {
         Self {
             private_key,
             bootnodes,
-            listener,
+            socket_addr,
             incommming_channel: async_std::sync::channel::<Vec<u8>>(1),
             outgoing_channel: futures::channel::mpsc::channel::<Vec<u8>>(1),
         }
     }
     pub async fn channel(
         self,
-        address: SocketAddr,
-        bootnodes: Vec<SocketAddr>,
     ) ->
 (futures::channel::mpsc::Sender<Vec<u8>>, async_std::sync::Receiver<Vec<u8>>)
     {
-        let listener = TcpListener::bind(address).await.unwrap();
+        let socket_addr = self.socket_addr;
+        let bootnodes = self.bootnodes;
+        let listener = TcpListener::bind(socket_addr).await.unwrap();
         let (read_sender, mut read_receiver) = futures::channel::mpsc::unbounded();
         let (stream_sender, mut stream_receiver) = async_std::sync::channel::<TcpStream>(1);
-        let sender  = self.incommming_channel.0.clone();
-        let (read_sender2, mut receiver) = futures::channel::mpsc::unbounded::<Vec<u8>>();
+        let (outgoing_sender, mut outgoing_receiver)  = self.outgoing_channel;
+        let (incommming_sender, incomming_receiver)  = self.incommming_channel;
         task::spawn(async move {
             let mut streams = vec![];
             for bootnode in bootnodes {
@@ -89,15 +89,15 @@ impl Server {
                         spawn_read_loop(read_half,read_sender.clone()).await;
                         streams.push(write_half);
                     },
-                    message = next_read_receiver_fused => {
-                        if let Some(message) = message {
-                            sender.send(message.clone()).await;
+                    incommming_message = next_read_receiver_fused => {
+                        if let Some(incommming_message) = incommming_message {
+                            incommming_sender.send(incommming_message).await;
                         }
                     },
-                    message = receiver.next() => {
-                        if let Some(message) = message {
+                    outgoing_message = outgoing_receiver.next() => {
+                        if let Some(outgoing_message) = outgoing_message {
                             for mut stream in &mut streams {
-                                stream.write_all(&message.clone()).await.expect("failed to write");
+                                stream.write_all(&outgoing_message).await.expect("failed to write");
                             }
                         }
                     },
@@ -112,14 +112,7 @@ impl Server {
                 stream_sender.send(stream).await;
             }
         });
-        // self.split()
-        let (sender1, receiver1)  = self.outgoing_channel;
-        let (sender2, receiver2)  = self.incommming_channel;
-        task::spawn(async move {
-            receiver1.map(Ok).forward(read_sender2).await.unwrap();
-        });
-        // (self.incommming_channel.1, self.outgoing_channel.0)
-        (sender1, receiver2)
+        (outgoing_sender, incomming_receiver)
     }
 }
 
@@ -153,7 +146,7 @@ mod tests {
     use super::*;
     use libp2p::identity::ed25519;
     // use serde::de::DeserializeOwned;
-    use async_std::sync::channel;
+    // use async_std::sync::channel;
     use serde::Deserialize;
     use serde::Serialize;
 
@@ -167,25 +160,22 @@ mod tests {
         // let expected_message = message.clone();
         let alices_key = ed25519::Keypair::generate();
         let bobs_key = ed25519::Keypair::generate();
-        let mut alices_server = Server::new(
+        let alices_server = Server::new(
             alices_key.encode().clone().to_vec(),
+            "0.0.0.0:1234".parse().unwrap(),
             vec![],
-            None
         );
         let (mut alices_sender, mut alices_receiver) = alices_server
-            .channel("0.0.0.0:1234".parse().unwrap(), vec![])
+            .channel()
             .await;
 
-        let mut bobs_server = Server::new(
+        let bobs_server = Server::new(
             bobs_key.encode().clone().to_vec(),
+                "0.0.0.0:1235".parse().unwrap(),
             vec!["0.0.0.0:1234".parse().unwrap()],
-            None
         );
         let (mut bobs_sender, mut bobs_receiver) = bobs_server
-            .channel(
-                "0.0.0.0:1235".parse().unwrap(),
-                vec!["0.0.0.0:1234".parse().unwrap()],
-            )
+            .channel()
             .await;
         bobs_sender
             .send("test".as_bytes().to_vec())
