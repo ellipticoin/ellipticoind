@@ -53,6 +53,7 @@ pub async fn is_next_block(block: &Block) -> bool {
 }
 
 pub fn is_block_winner(vm_state: &mut vm::State, public_key: Vec<u8>) -> bool {
+    println!("winner: {}", base64::encode(&vm_state.get_storage(&TOKEN_CONTRACT, &CURRENT_MINER_ENUM)));
     vm_state
         .get_storage(&TOKEN_CONTRACT, &CURRENT_MINER_ENUM)
         .eq(&public_key)
@@ -119,12 +120,6 @@ impl Block {
     }
 
     pub fn insert(self, db: &PgConnection, transactions: Vec<Transaction>) {
-        // println!("inserting {} transction hash wth hash: {} \nand block hash{}",
-        //          transactions.len(),
-        //          base64::encode(&transactions[0].hash),
-        //          base64::encode(&transactions[0].block_hash),
-        //          );
-
         insert_into(blocks::dsl::blocks)
             .values(&self)
             .execute(db)
@@ -132,10 +127,7 @@ impl Block {
         insert_into(transactions::dsl::transactions)
             .values(&transactions)
             .execute(db)
-            .expect(&format!(
-                "failed to insert transaction: {}",
-                base64::encode(&to_vec(&transactions).unwrap())
-            ));
+            .expect("failed to insert transaction");
     }
 }
 
