@@ -42,7 +42,8 @@ lazy_static! {
 pub fn generate_hash_onion(
     db: &PooledConnection<ConnectionManager<PgConnection>>,
 ) {
-    let hash_onion_size = 65534;
+    // let hash_onion_size = 65534;
+    let hash_onion_size = 100;
     let center: Vec<u8> = rand::thread_rng()
         .sample_iter(&rand::distributions::Standard)
         .take(32)
@@ -88,7 +89,8 @@ pub async fn initialize_rocks_db(
         vm::rocksdb::DB::open_default(path).unwrap()
     } else {
         let db = vm::rocksdb::DB::open_default(path).unwrap();
-        let file = File::open("dist/ethereum-balances-9858734.bin").unwrap();
+        // let file = File::open("dist/ethereum-balances-9858734.bin").unwrap();
+        let file = File::open("dist/development-balances.bin").unwrap();
         let metadata = std::fs::metadata("dist/ethereum-balances-9858734.bin").unwrap();
         let pb = ProgressBar::new(metadata.len() / 24);
         println!("Importing Ethereum Balances");
@@ -167,6 +169,7 @@ pub async fn initialize_rocks_db(
         token_file.read_to_end(&mut token_wasm).unwrap();
         db.put(db_key(&TOKEN_CONTRACT, &vec![]), &token_wasm).unwrap();
         let mut miners: HashMap<ByteBuf, (u64, ByteBuf)> = HashMap::new();
+        generate_hash_onion(pg_db);
         let skin: Vec<u8> = hash_onion
             .select(layer)
             .order(id.desc())
@@ -174,15 +177,19 @@ pub async fn initialize_rocks_db(
             .unwrap();
         miners.insert(
             ByteBuf::from(GENISIS_ADRESS.to_vec()),
-            (100 as u64, ByteBuf::from(skin)),
+            (100 as u64, ByteBuf::from(skin.clone())),
         );
         sql_query(
             "delete from hash_onion where id in (
         select id from hash_onion order by id desc limit 1
     )",
-        )
-        .execute(pg_db)
+        ).execute(pg_db)
         .unwrap();
+        let skin2: Vec<u8> = hash_onion
+            .select(layer)
+            .order(id.desc())
+            .first(pg_db)
+            .unwrap();
         db.put(
             db_key(&TOKEN_CONTRACT, &vec![Namespace::Miners as u8]),
             to_vec(&miners).unwrap(),
@@ -193,7 +200,6 @@ pub async fn initialize_rocks_db(
             RANDOM_SEED.to_vec(),
         )
         .unwrap();
-        generate_hash_onion(pg_db);
         db
     }
 }
