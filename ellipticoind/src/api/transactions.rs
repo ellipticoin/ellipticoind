@@ -9,6 +9,8 @@ use diesel::RunQueryDsl;
 use http_service::Body;
 use serde_cbor::from_slice;
 use tide::Response;
+use serde::Serialize;
+use futures::sink::SinkExt;
 use vm::redis::Commands;
 
 pub async fn show(req: tide::Request<State>) -> Response {
@@ -33,7 +35,7 @@ pub async fn create(mut req: tide::Request<State>) -> Response {
     let transaction: vm::Transaction = from_slice(&transaction_bytes).unwrap();
     let mut network_sender = req.state().network_sender.clone();
     network_sender
-        .send(&Message::Transaction(transaction))
+        .send(Message::Transaction(transaction))
         .await;
     let mut redis = req.state().redis.get_connection().unwrap();
     redis
