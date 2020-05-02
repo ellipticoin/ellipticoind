@@ -1,7 +1,7 @@
 use super::State;
 use http_service::Body;
-use tide::Response;
 use serde::Serialize;
+use tide::Response;
 use vm::redis::Commands;
 
 pub async fn show(req: tide::Request<State>) -> Response {

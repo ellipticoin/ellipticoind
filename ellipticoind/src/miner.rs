@@ -27,7 +27,7 @@ pub fn get_best_block(db: &PgConnection) -> Option<Block> {
 pub async fn next_block_template() -> Block {
     BEST_BLOCK.lock().await.as_ref().map_or(
         Block {
-            number: 1,
+            number: 0,
             ..Default::default()
         },
         |Block { number, hash, .. }| Block {
@@ -43,19 +43,16 @@ pub async fn mine_next_block(
     pg_db: PooledConnection<ConnectionManager<PgConnection>>,
     mut vm_state: vm::State,
 ) -> ((Block, Vec<Transaction>), vm::State) {
-    println!("a");
     let mut block = next_block_template().await;
     block.winner = PUBLIC_KEY.to_vec();
     let mut transactions = run_transactions(con, &mut vm_state, &block).await;
 
-    println!("b");
     let sender_nonce = random();
     let skin: Vec<u8> = hash_onion
         .select(layer)
         .order(id.desc())
         .first(&pg_db)
         .unwrap();
-    println!("c");
     let reveal_transaction = vm::Transaction {
         contract_address: TOKEN_CONTRACT.to_vec(),
         sender: PUBLIC_KEY.to_vec(),
@@ -64,7 +61,6 @@ pub async fn mine_next_block(
         arguments: vec![Value::Bytes(skin.clone().into())],
         gas_limit: 10000000,
     };
-    println!("d");
     let reveal_result = run_transaction(&mut vm_state, &reveal_transaction, &block);
     sql_query(
         "delete from hash_onion where id in (
@@ -75,7 +71,6 @@ pub async fn mine_next_block(
     .unwrap();
     transactions.push(reveal_result);
     block.set_hash();
-    println!("e");
     transactions.iter_mut().for_each(|transaction| {
         transaction.set_hash();
         transaction.block_hash = block.hash.clone();

@@ -63,20 +63,20 @@ async fn main() {
                 bootnodes = vec![];
             } else {
                 bootnodes = bootnodes_txt
-                .split("\n")
-                .map(|bootnode| {
-                    let mut parts = bootnode.splitn(2, "/");
-                    // (
+                    .split("\n")
+                    .map(|bootnode| {
+                        let mut parts = bootnode.splitn(2, "/");
+                        // (
                         parts
                             .next()
                             .unwrap()
                             .parse::<SocketAddrV4>()
                             .unwrap()
                             .into()
-                    //     base64::decode(&parts.next().unwrap()).unwrap(),
-                    // )
-                })
-                .collect::<Vec<SocketAddr>>();
+                        //     base64::decode(&parts.next().unwrap()).unwrap(),
+                        // )
+                    })
+                    .collect::<Vec<SocketAddr>>();
             }
             let private_key =
                 Keypair::from_bytes(&base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap())

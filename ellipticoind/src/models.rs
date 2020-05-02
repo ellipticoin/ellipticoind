@@ -53,7 +53,6 @@ pub async fn is_next_block(block: &Block) -> bool {
 }
 
 pub fn is_block_winner(vm_state: &mut vm::State, public_key: Vec<u8>) -> bool {
-    println!("winner: {}", base64::encode(&vm_state.get_storage(&TOKEN_CONTRACT, &CURRENT_MINER_ENUM)));
     vm_state
         .get_storage(&TOKEN_CONTRACT, &CURRENT_MINER_ENUM)
         .eq(&public_key)

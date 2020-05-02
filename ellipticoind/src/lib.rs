@@ -40,13 +40,11 @@ use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
 use ed25519_dalek::{ExpandedSecretKey, Keypair, PublicKey, SecretKey};
+pub use futures::{sink::SinkExt, stream::StreamExt};
 use rand::rngs::OsRng;
 use std::net::SocketAddr;
 use std::sync::Arc;
-pub use futures::{
-    stream::StreamExt,
-    sink::SinkExt,
-};
+use std::env;
 lazy_static! {
     static ref BEST_BLOCK: async_std::sync::Arc<Mutex<Option<Block>>> =
         { async_std::sync::Arc::new(Mutex::new(None)) };
@@ -97,11 +95,17 @@ pub async fn run(
         .execute(&db)
         .unwrap();
     let _: () = redis::cmd("FLUSHALL").query(&mut redis3).unwrap();
-    let rocksdb =
-        Arc::new(start_up::initialize_rocks_db(rocksdb_path, &pg_pool.get().unwrap(), &mut redis5).await);
-    start_up::start_miner(&rocksdb, &pg_pool.get().unwrap(), keypair.public, &bootnodes);
+    let rocksdb = Arc::new(
+        start_up::initialize_rocks_db(rocksdb_path, &pg_pool.get().unwrap(), &mut redis5).await,
+    );
+    start_up::start_miner(
+        &rocksdb,
+        &pg_pool.get().unwrap(),
+        keypair.public,
+        &bootnodes,
+    );
     let api_state = api::State::new(redis, rocksdb.clone(), pg_pool, network_sender.clone());
-    let _vm_state = vm::State::new(redis2.get_connection().unwrap(), rocksdb.clone());
+    let mut vm_state = vm::State::new(redis2.get_connection().unwrap(), rocksdb.clone());
     let (new_block_sender, new_block_receiver) = channel(1);
     async_std::task::spawn(api(api_state).listen(api_socket));
     async_std::task::spawn(network::handle_messages(
@@ -116,6 +120,13 @@ pub async fn run(
     let public_key = Arc::new(keypair.public);
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     let pg_pool = Pool::new(manager).expect("Postgres connection pool could not be created");
+    
+    if env::var("GENISIS_NODE").is_err() {
+        crate::start_up::catch_up(
+            &mut vm_state,
+            &bootnodes,
+        ).await;
+    }
     run_loop::run(
         public_key,
         websocket,
@@ -124,6 +135,6 @@ pub async fn run(
         rocksdb,
         pg_pool,
         new_block_receiver,
-        )
-        .await
+    )
+    .await
 }

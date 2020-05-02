@@ -137,7 +137,7 @@ mod token {
     }
 
     fn set_current_miner(current_miner: Vec<u8>) {
-        ellipticoin::set_memory::<_, Vec<u8>>(
+        ellipticoin::set_storage::<_, Vec<u8>>(
             Namespace::CurrentMiner as u8,
             current_miner.to_vec(),
         );

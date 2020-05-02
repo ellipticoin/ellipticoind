@@ -6,11 +6,11 @@ use crate::network::Message;
 use crate::schema::transactions::dsl::transactions;
 use diesel::QueryDsl;
 use diesel::RunQueryDsl;
+use futures::sink::SinkExt;
 use http_service::Body;
+use serde::Serialize;
 use serde_cbor::from_slice;
 use tide::Response;
-use serde::Serialize;
-use futures::sink::SinkExt;
 use vm::redis::Commands;
 
 pub async fn show(req: tide::Request<State>) -> Response {
@@ -34,9 +34,7 @@ pub async fn create(mut req: tide::Request<State>) -> Response {
     let transaction_bytes = req.body_bytes().await.unwrap();
     let transaction: vm::Transaction = from_slice(&transaction_bytes).unwrap();
     let mut network_sender = req.state().network_sender.clone();
-    network_sender
-        .send(Message::Transaction(transaction))
-        .await;
+    network_sender.send(Message::Transaction(transaction)).await;
     let mut redis = req.state().redis.get_connection().unwrap();
     redis
         .rpush::<&str, Vec<u8>, ()>("transactions::pending", transaction_bytes)
