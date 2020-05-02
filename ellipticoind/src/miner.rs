@@ -58,7 +58,7 @@ pub async fn mine_next_block(
         sender: PUBLIC_KEY.to_vec(),
         nonce: sender_nonce,
         function: "reveal".to_string(),
-        arguments: vec![Value::Bytes(skin.into())],
+        arguments: vec![Value::Bytes(skin.clone().into())],
         gas_limit: 10000000,
     };
     let reveal_result = run_transaction(&mut vm_state, &reveal_transaction, &block);
