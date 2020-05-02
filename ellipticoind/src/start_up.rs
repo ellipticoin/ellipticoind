@@ -14,17 +14,17 @@ use crate::diesel::ExpressionMethods;
 use crate::diesel::QueryDsl;
 use crate::diesel::RunQueryDsl;
 use crate::schema::hash_onion::dsl::*;
+use async_std::task;
 use diesel::dsl::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use diesel::PgConnection;
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::net::SocketAddr;
-use vm::Commands;
 use std::convert::TryInto;
 use std::env;
-use async_std::task;
-use serde::{Serialize, Deserialize};
+use std::net::SocketAddr;
+use vm::Commands;
 
 enum Namespace {
     _Allowences,
@@ -61,48 +61,72 @@ pub fn start_miner(
     bootnodes: &Vec<SocketAddr>,
 ) {
     if env::var("ENABLE_MINER").is_ok() {
-        let burn_per_block: i128 = env::var("BURN_PER_BLOCK").expect("BURN_PER_BLOCK no set").parse().unwrap();
-        println!("{:?}", burn_per_block);
-        let miners: HashMap<ByteBuf, (u64, ByteBuf)> = serde_cbor::from_slice(&db
-            .get(db_key(
-                &TOKEN_CONTRACT,
-                &vec![Namespace::Miners as u8]
-            ))
-            .unwrap()
-            .unwrap()).unwrap();
+        let burn_per_block: i128 = env::var("BURN_PER_BLOCK")
+            .expect("BURN_PER_BLOCK no set")
+            .parse()
+            .unwrap();
+        let miners: HashMap<ByteBuf, (u64, ByteBuf)> = serde_cbor::from_slice(
+            &db.get(db_key(&TOKEN_CONTRACT, &vec![Namespace::Miners as u8]))
+                .unwrap()
+                .unwrap(),
+        )
+        .unwrap();
         let current_burn_per_block = miners.get(&ByteBuf::from(public_key.as_bytes().to_vec()));
-       if current_burn_per_block.is_none() {
-           task::block_on(async {
-               let skin: Vec<u8> = hash_onion
-                   .select(layer)
-                   .order(id.desc())
-                   .first(pg_db)
-                   .unwrap();
-               println!("burn_per_block: {}", burn_per_block);
-               let start_mining_transaction = Transaction {
-                   contract_address: TOKEN_CONTRACT.to_vec(),
-                   sender: public_key.to_bytes().to_vec(),
-                   nonce: 0,
-                   function: "start_mining".to_string(),
-                   arguments: vec![
-                       serde_cbor::Value::Integer(99),
-                       serde_cbor::Value::Bytes(skin.into()),
-                   ],
-                   gas_limit: 10000000,
-               };
-               let mut bootnode = bootnodes[0];
-               bootnode.set_port(4461);
-               let uri = format!("http://{}/transactions", bootnode);
-               surf::post(uri).body_bytes(serde_cbor::to_vec(&start_mining_transaction).unwrap())
-                   .set_header("Content-type", "application/cbor")
-                   .await.expect("Could not connect to bootnode");
-           });
-       }
+        if current_burn_per_block.is_none() {
+            task::block_on(async {
+                let skin: Vec<u8> = hash_onion
+                    .select(layer)
+                    .order(id.desc())
+                    .first(pg_db)
+                    .unwrap();
+                let start_mining_transaction = Transaction {
+                    contract_address: TOKEN_CONTRACT.to_vec(),
+                    sender: public_key.to_bytes().to_vec(),
+                    nonce: 0,
+                    function: "start_mining".to_string(),
+                    arguments: vec![
+                        serde_cbor::Value::Integer(99),
+                        serde_cbor::Value::Bytes(skin.into()),
+                    ],
+                    gas_limit: 10000000,
+                };
+                let mut bootnode = bootnodes[0];
+                bootnode.set_port(4461);
+                let uri = format!("http://{}/transactions", bootnode);
+                surf::post(uri)
+                    .body_bytes(serde_cbor::to_vec(&start_mining_transaction).unwrap())
+                    .set_header("Content-type", "application/cbor")
+                    .await
+                    .expect("Could not connect to bootnode");
+            });
+        }
     }
 }
-pub fn generate_hash_onion(
-    db: &PooledConnection<ConnectionManager<PgConnection>>,
+pub async fn catch_up(
+    mut vm_state: &mut vm::State,
+    bootnodes: &Vec<SocketAddr>,
+
 ) {
+    let mut bootnode = bootnodes[0];
+    bootnode.set_port(4461);
+    for block_number in 0.. {
+        let mut res = surf::get(format!("http://{}/blocks/{}", bootnode, block_number)).await.unwrap();
+        if res.status() == 200 {
+            let block_view: crate::api::views::Block = serde_cbor::value::from_value(serde_cbor::from_slice::<serde_cbor::Value>(&res.body_bytes().await.unwrap()).unwrap()).unwrap();
+            let (block , transactions) = block_view.into();
+            println!("Applied block #{}", &block.number);
+            crate::transaction_processor::apply_block(
+                vm_state,
+                block,
+                transactions,
+            );
+        } else {
+            println!("Catchup complete");
+            break;
+        }
+    }
+}
+pub fn generate_hash_onion(db: &PooledConnection<ConnectionManager<PgConnection>>) {
     // let hash_onion_size = 65534;
     let hash_onion_size = 100;
     let center: Vec<u8> = rand::thread_rng()
@@ -144,7 +168,7 @@ pub fn sha256(value: Vec<u8>) -> Vec<u8> {
 pub async fn initialize_rocks_db(
     path: &str,
     pg_db: &PooledConnection<ConnectionManager<PgConnection>>,
-    redis: &mut vm::Client
+    redis: &mut vm::Client,
 ) -> vm::rocksdb::DB {
     if Path::new(path).exists() {
         vm::rocksdb::DB::open_default(path).unwrap()
@@ -173,7 +197,14 @@ pub async fn initialize_rocks_db(
                             &TOKEN_CONTRACT,
                             &[ETHEREUM_BALANCE_ENUM.to_vec(), chunk[0..20].to_vec()].concat(),
                         ),
-                        (u64::from_le_bytes([chunk[20..24].to_vec(), [0;4].to_vec()].concat()[..].try_into().unwrap())*10).to_le_bytes().to_vec());
+                        (u64::from_le_bytes(
+                            [chunk[20..24].to_vec(), [0; 4].to_vec()].concat()[..]
+                                .try_into()
+                                .unwrap(),
+                        ) * 10)
+                            .to_le_bytes()
+                            .to_vec(),
+                    );
                 }
                 pb.inc(1000);
                 db.write(batch).unwrap();
@@ -198,7 +229,10 @@ pub async fn initialize_rocks_db(
             ))
             .unwrap()
             .unwrap();
-        println!("{}", u32::from_le_bytes(genesis_balance[0..4].try_into().unwrap()));
+        println!(
+            "{}",
+            u32::from_le_bytes(genesis_balance[0..4].try_into().unwrap())
+        );
         db.delete(db_key(
             &TOKEN_CONTRACT,
             &[
@@ -208,14 +242,15 @@ pub async fn initialize_rocks_db(
             .concat(),
         ))
         .unwrap();
-        redis.set::<_,_,()>(
-            db_key(
-                &TOKEN_CONTRACT,
-                &[vec![Namespace::Balances as u8], GENISIS_ADRESS.to_vec()].concat(),
-            ),
-            genesis_balance
-        )
-        .unwrap();
+        redis
+            .set::<_, _, ()>(
+                db_key(
+                    &TOKEN_CONTRACT,
+                    &[vec![Namespace::Balances as u8], GENISIS_ADRESS.to_vec()].concat(),
+                ),
+                genesis_balance,
+            )
+            .unwrap();
         db.put(
             db_key(&TOKEN_CONTRACT, &vec![Namespace::RandomSeed as u8]),
             RANDOM_SEED.to_vec(),
@@ -229,7 +264,8 @@ pub async fn initialize_rocks_db(
         let mut token_file = File::open("../token/dist/token.wasm").unwrap();
         let mut token_wasm = Vec::new();
         token_file.read_to_end(&mut token_wasm).unwrap();
-        db.put(db_key(&TOKEN_CONTRACT, &vec![]), &token_wasm).unwrap();
+        db.put(db_key(&TOKEN_CONTRACT, &vec![]), &token_wasm)
+            .unwrap();
         let mut miners: HashMap<ByteBuf, (u64, ByteBuf)> = HashMap::new();
         generate_hash_onion(pg_db);
         let skin: Vec<u8> = hash_onion
@@ -245,7 +281,8 @@ pub async fn initialize_rocks_db(
             "delete from hash_onion where id in (
         select id from hash_onion order by id desc limit 1
     )",
-        ).execute(pg_db)
+        )
+        .execute(pg_db)
         .unwrap();
         let skin2: Vec<u8> = hash_onion
             .select(layer)
