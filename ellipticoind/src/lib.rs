@@ -75,7 +75,7 @@ pub async fn run(
     bootnodes: Vec<SocketAddr>,
 ) {
     diesel_migrations::embed_migrations!();
-    let network = Server::new(keypair.to_bytes().to_vec(), socket, bootnodes);
+    let network = Server::new(keypair.to_bytes().to_vec(), socket, bootnodes.clone());
     let (network_sender, incomming_network_receiver) = network.channel().await;
     let db = PgConnection::establish(&database_url)
         .expect(&format!("Error connecting to {}", database_url));
@@ -99,6 +99,7 @@ pub async fn run(
     let _: () = redis::cmd("FLUSHALL").query(&mut redis3).unwrap();
     let rocksdb =
         Arc::new(start_up::initialize_rocks_db(rocksdb_path, &pg_pool.get().unwrap(), &mut redis5).await);
+    start_up::start_miner(&rocksdb, &pg_pool.get().unwrap(), keypair.public, &bootnodes);
     let api_state = api::State::new(redis, rocksdb.clone(), pg_pool, network_sender.clone());
     let _vm_state = vm::State::new(redis2.get_connection().unwrap(), rocksdb.clone());
     let (new_block_sender, new_block_receiver) = channel(1);

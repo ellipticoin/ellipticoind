@@ -78,10 +78,11 @@ impl<S: Clone + Serialize + std::marker::Send + 'static + std::marker::Sync, D: 
         task::spawn(async move {
             let mut streams = vec![];
             for bootnode in bootnodes {
-                let stream = TcpStream::connect(bootnode).await.unwrap();
-                let (read_half, write_half) = stream.split();
-                streams.push(write_half);
-                spawn_read_loop(read_half, read_sender.clone()).await;
+                if let Ok(stream) = TcpStream::connect(bootnode).await {
+                    let (read_half, write_half) = stream.split();
+                    streams.push(write_half);
+                    spawn_read_loop(read_half, read_sender.clone()).await;
+                }
             }
             loop {
                 let mut next_stream_receiver_fused = stream_receiver.next().fuse();
