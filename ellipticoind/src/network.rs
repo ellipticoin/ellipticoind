@@ -1,8 +1,12 @@
 use crate::models::{Block, Transaction};
 use async_std::sync;
-use network::Receiver;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
+use network::serde::Serialize;
 use vm::Commands;
+use futures::channel::mpsc::Receiver;
+pub use futures::{
+    stream::StreamExt,
+};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Message {
@@ -12,18 +16,17 @@ pub enum Message {
 
 pub async fn handle_messages(
     mut redis: redis::Connection,
-    mut network_receiver: Receiver,
+    mut network_receiver: Receiver<Message>,
     block_sender: sync::Sender<(Block, Vec<Transaction>)>,
 ) {
     loop {
-        println!("waiting on messages!");
         match &network_receiver.next().await {
-            Ok(Message::Block((block, transactions))) => {
+            Some(Message::Block((block, transactions))) => {
                 block_sender
                     .send((block.clone(), transactions.clone()))
                     .await;
             }
-            Ok(Message::Transaction(transaction)) => {
+            Some(Message::Transaction(transaction)) => {
                 redis
                     .rpush::<&str, Vec<u8>, ()>(
                         "transactions::pending",
@@ -31,7 +34,7 @@ pub async fn handle_messages(
                     )
                     .unwrap();
             }
-            Err(_) => println!("Recieved an invalid message"),
+            None => println!("Recieved an invalid message"),
         }
     }
 }

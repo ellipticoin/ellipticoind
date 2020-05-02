@@ -13,6 +13,7 @@ use http_service::Body;
 use serde::Deserialize;
 use serde_cbor::ser::to_vec;
 use tide::Response;
+use serde::Serialize;
 
 #[derive(Deserialize, Debug)]
 struct QueryParams {

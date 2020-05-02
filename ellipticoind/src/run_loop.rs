@@ -10,12 +10,13 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use ed25519_dalek::PublicKey;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
-use network::Sender;
+use futures::channel::mpsc;
+use futures_util::sink::SinkExt;
 
 pub async fn run(
     public_key: std::sync::Arc<PublicKey>,
     mut websocket: api::websocket::Websocket,
-    mut network_sender: Sender,
+    mut network_sender: mpsc::Sender<Message>,
     redis: redis::Client,
     rocksdb: std::sync::Arc<rocksdb::DB>,
     db_pool: Pool<ConnectionManager<diesel::PgConnection>>,
@@ -36,15 +37,13 @@ pub async fn run(
                 .send::<api::Block>((&new_block, &transactions).into())
                 .await;
             network_sender
-                .send(&Message::Block((new_block.clone(), transactions.clone())))
-                .await;
+                .send(Message::Block((new_block.clone(), transactions.clone())))
+                .await.unwrap();
             println!("Mined block #{}", &new_block.number);
             *BEST_BLOCK.lock().await = Some(new_block.clone());
             continue;
         }
-        println!("waiting on block");
         let (new_block, transactions) = new_block_receiver.next().map(Option::unwrap).await;
-        println!("got a block!");
         if is_next_block(&new_block).await {
             new_block.clone().insert(&db, transactions.clone());
             transaction_processor::apply_block(

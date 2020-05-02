@@ -1,6 +1,7 @@
 use super::State;
 use crate::api::{addresses, blocks, memory, transactions};
 use tide::middleware::Cors;
+use serde::Serialize;
 
 pub fn app(state: State) -> tide::server::Server<State> {
     let mut app = tide::with_state(state);

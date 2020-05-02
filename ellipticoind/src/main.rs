@@ -58,21 +58,26 @@ async fn main() {
                 .unwrap_or(env::var("DATABASE_URL").expect("DATABASE_URL must be set"));
             let mut bootnodes_txt = String::from(include_str!("bootnodes.txt"));
             bootnodes_txt.pop();
-            let bootnodes = bootnodes_txt
+            let bootnodes;
+            if env::var("GENISIS_NODE").is_ok() {
+                bootnodes = vec![];
+            } else {
+                bootnodes = bootnodes_txt
                 .split("\n")
                 .map(|bootnode| {
                     let mut parts = bootnode.splitn(2, "/");
-                    (
+                    // (
                         parts
                             .next()
                             .unwrap()
                             .parse::<SocketAddrV4>()
                             .unwrap()
-                            .into(),
-                        base64::decode(&parts.next().unwrap()).unwrap(),
-                    )
+                            .into()
+                    //     base64::decode(&parts.next().unwrap()).unwrap(),
+                    // )
                 })
-                .collect::<Vec<(SocketAddr, Vec<u8>)>>();
+                .collect::<Vec<SocketAddr>>();
+            }
             let private_key =
                 Keypair::from_bytes(&base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap())
                     .unwrap();
