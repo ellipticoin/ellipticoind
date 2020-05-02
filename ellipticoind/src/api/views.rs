@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Block {
     #[serde(with = "serde_bytes")]
     pub hash: Vec<u8>,
@@ -16,7 +16,7 @@ pub struct Block {
     pub transactions: Vec<Transaction>,
 }
 
-#[derive(Serialize, Clone, Deserialize)]
+#[derive(Serialize, Clone, Deserialize, Debug)]
 pub struct Transaction {
     pub arguments: Vec<serde_cbor::Value>,
     #[serde(with = "serde_bytes")]
@@ -63,6 +63,42 @@ impl From<&crate::models::Transaction> for Transaction {
             arguments: serde_cbor::from_slice(&transaction.arguments).unwrap(),
             return_value: serde_cbor::from_slice(&transaction.return_value).unwrap(),
             return_code: transaction.return_code as u64,
+        }
+    }
+}
+
+impl From<Block> for (crate::models::Block, Vec<crate::models::Transaction>) {
+    fn from(block: Block) -> Self {
+        (
+        crate::models::Block {
+            hash: block.hash.clone(),
+            parent_hash: block.parent_hash.clone(),
+            number: block.number,
+            winner: block.winner.clone(),
+            memory_changeset_hash: block.memory_changeset_hash.clone(),
+            storage_changeset_hash: block.storage_changeset_hash.clone(),
+            proof_of_work_value: block.proof_of_work_value.clone(),
+        },
+            block.transactions.into_iter()
+                .map(crate::models::Transaction::from)
+                .collect()
+        )
+    }
+}
+
+impl From<Transaction> for crate::models::Transaction {
+    fn from(transaction: Transaction) -> Self {
+        Self {
+            hash: vec![],
+            contract_address: transaction.contract_address.clone(),
+            block_hash: transaction.block_hash.clone(),
+            sender: transaction.sender.clone(),
+            nonce: transaction.nonce as i64,
+            gas_limit: transaction.gas_limit as i64,
+            function: transaction.function.clone(),
+            arguments: serde_cbor::to_vec(&transaction.arguments).unwrap(),
+            return_value: serde_cbor::to_vec(&transaction.return_value).unwrap(),
+            return_code: transaction.return_code as i64,
         }
     }
 }

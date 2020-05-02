@@ -1,17 +1,17 @@
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
+use futures::channel::mpsc;
 use futures::channel::mpsc::UnboundedSender;
+use network::serde::Serialize;
 use std::sync::{Arc, Mutex};
 use tungstenite::protocol::Message;
-use futures::channel::mpsc;
-use network::serde::Serialize;
 pub use views::Block;
 mod addresses;
 pub mod app;
 mod blocks;
 mod memory;
 mod transactions;
-mod views;
+pub mod views;
 pub mod websocket;
 
 pub struct State {
