@@ -1,9 +1,10 @@
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
 use futures::channel::mpsc::UnboundedSender;
-use network::Sender;
 use std::sync::{Arc, Mutex};
 use tungstenite::protocol::Message;
+use futures::channel::mpsc;
+use network::serde::Serialize;
 pub use views::Block;
 mod addresses;
 pub mod app;
@@ -18,7 +19,7 @@ pub struct State {
     pub redis: vm::redis::Client,
     pub rocksdb: Arc<rocksdb::DB>,
     pub db: Pool<ConnectionManager<PgConnection>>,
-    pub network_sender: Sender,
+    pub network_sender: mpsc::Sender<crate::network::Message>,
 }
 
 impl State {
@@ -26,7 +27,7 @@ impl State {
         redis: vm::redis::Client,
         rocksdb: Arc<rocksdb::DB>,
         db: Pool<ConnectionManager<PgConnection>>,
-        network_sender: Sender,
+        network_sender: mpsc::Sender<crate::network::Message>,
     ) -> Self {
         Self {
             websockets: Arc::new(Mutex::new(Vec::new())),
