@@ -19,8 +19,12 @@ use diesel::r2d2::{ConnectionManager, PooledConnection};
 use diesel::PgConnection;
 use rand::Rng;
 use sha2::{Digest, Sha256};
+use std::net::SocketAddr;
 use vm::Commands;
 use std::convert::TryInto;
+use std::env;
+use async_std::task;
+use serde::{Serialize, Deserialize};
 
 enum Namespace {
     _Allowences,
@@ -39,6 +43,63 @@ lazy_static! {
     pub static ref CURRENT_MINER_ENUM: Vec<u8> = vec![2];
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
+pub struct Transaction {
+    #[serde(with = "serde_bytes")]
+    pub contract_address: Vec<u8>,
+    #[serde(with = "serde_bytes")]
+    pub sender: Vec<u8>,
+    pub nonce: u64,
+    pub gas_limit: u64,
+    pub function: String,
+    pub arguments: Vec<serde_cbor::Value>,
+}
+pub fn start_miner(
+    db: &std::sync::Arc<rocksdb::DB>,
+    pg_db: &PooledConnection<ConnectionManager<PgConnection>>,
+    public_key: ed25519_dalek::PublicKey,
+    bootnodes: &Vec<SocketAddr>,
+) {
+    if env::var("ENABLE_MINER").is_ok() {
+        let burn_per_block: i128 = env::var("BURN_PER_BLOCK").expect("BURN_PER_BLOCK no set").parse().unwrap();
+        println!("{:?}", burn_per_block);
+        let miners: HashMap<ByteBuf, (u64, ByteBuf)> = serde_cbor::from_slice(&db
+            .get(db_key(
+                &TOKEN_CONTRACT,
+                &vec![Namespace::Miners as u8]
+            ))
+            .unwrap()
+            .unwrap()).unwrap();
+        let current_burn_per_block = miners.get(&ByteBuf::from(public_key.as_bytes().to_vec()));
+       if current_burn_per_block.is_none() {
+           task::block_on(async {
+               let skin: Vec<u8> = hash_onion
+                   .select(layer)
+                   .order(id.desc())
+                   .first(pg_db)
+                   .unwrap();
+               println!("burn_per_block: {}", burn_per_block);
+               let start_mining_transaction = Transaction {
+                   contract_address: TOKEN_CONTRACT.to_vec(),
+                   sender: public_key.to_bytes().to_vec(),
+                   nonce: 0,
+                   function: "start_mining".to_string(),
+                   arguments: vec![
+                       serde_cbor::Value::Integer(99),
+                       serde_cbor::Value::Bytes(skin.into()),
+                   ],
+                   gas_limit: 10000000,
+               };
+               let mut bootnode = bootnodes[0];
+               bootnode.set_port(4461);
+               let uri = format!("http://{}/transactions", bootnode);
+               surf::post(uri).body_bytes(serde_cbor::to_vec(&start_mining_transaction).unwrap())
+                   .set_header("Content-type", "application/cbor")
+                   .await.expect("Could not connect to bootnode");
+           });
+       }
+    }
+}
 pub fn generate_hash_onion(
     db: &PooledConnection<ConnectionManager<PgConnection>>,
 ) {
@@ -88,7 +149,8 @@ pub async fn initialize_rocks_db(
         vm::rocksdb::DB::open_default(path).unwrap()
     } else {
         let db = vm::rocksdb::DB::open_default(path).unwrap();
-        let file = File::open("dist/ethereum-balances-9858734.bin").unwrap();
+        // let file = File::open("dist/ethereum-balances-9858734.bin").unwrap();
+        let file = File::open("dist/development-balances.bin").unwrap();
         let metadata = std::fs::metadata("dist/ethereum-balances-9858734.bin").unwrap();
         let pb = ProgressBar::new(metadata.len() / 24);
         println!("Importing Ethereum Balances");
@@ -135,6 +197,7 @@ pub async fn initialize_rocks_db(
             ))
             .unwrap()
             .unwrap();
+        println!("{}", u32::from_le_bytes(genesis_balance[0..4].try_into().unwrap()));
         db.delete(db_key(
             &TOKEN_CONTRACT,
             &[
