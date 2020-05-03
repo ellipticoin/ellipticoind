@@ -16,9 +16,9 @@ if ! command -v  wasm-snip > /dev/null; then
 fi
 
 cp "$BASE_NAME.wasm" "$BASE_NAME.min.wasm"
-wasm-snip --snip-rust-fmt-code --snip-rust-panicking-code "$BASE_NAME.min.wasm" -o "$BASE_NAME.min.wasm"
-wasm-gc "$BASE_NAME.min.wasm"
-wasm-opt -Oz --strip-debug --strip-producers "$BASE_NAME.min.wasm" -o "$BASE_NAME.min.wasm"
+# wasm-snip --snip-rust-fmt-code --snip-rust-panicking-code "$BASE_NAME.min.wasm" -o "$BASE_NAME.min.wasm"
+# wasm-gc "$BASE_NAME.min.wasm"
+# wasm-opt -Oz --strip-debug --strip-producers "$BASE_NAME.min.wasm" -o "$BASE_NAME.min.wasm"
 
 mkdir -p $DIST_DIR
 

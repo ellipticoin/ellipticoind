@@ -1,6 +1,5 @@
 use super::State;
 use http_service::Body;
-use serde::Serialize;
 use tide::Response;
 use vm::redis::Commands;
 
