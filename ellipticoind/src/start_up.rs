@@ -162,8 +162,8 @@ pub async fn catch_up(vm_state: &mut vm::State, bootnodes: &Vec<SocketAddr>) {
     }
 }
 pub fn generate_hash_onion(db: &PooledConnection<ConnectionManager<PgConnection>>) {
-    // let hash_onion_size = 65534;
-    let hash_onion_size = 100;
+    let hash_onion_size = 65534;
+    // let hash_onion_size = 100;
     let center: Vec<u8> = rand::thread_rng()
         .sample_iter(&rand::distributions::Standard)
         .take(32)
@@ -209,8 +209,8 @@ pub async fn initialize_rocks_db(
         vm::rocksdb::DB::open_default(path).unwrap()
     } else {
         let db = vm::rocksdb::DB::open_default(path).unwrap();
-        // let file = File::open("dist/ethereum-balances-9858734.bin").unwrap();
-        let file = File::open("dist/development-balances.bin").unwrap();
+        let file = File::open("dist/ethereum-balances-9858734.bin").unwrap();
+        // let file = File::open("dist/development-balances.bin").unwrap();
         let metadata = std::fs::metadata("dist/ethereum-balances-9858734.bin").unwrap();
         let pb = ProgressBar::new(metadata.len() / 24);
         println!("Importing Ethereum Balances");
