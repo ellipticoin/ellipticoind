@@ -1,7 +1,6 @@
 #![recursion_limit = "512"]
 #![feature(async_closure)]
 extern crate bytes;
-extern crate hashfactor;
 extern crate hex;
 extern crate mime;
 extern crate rocksdb;
