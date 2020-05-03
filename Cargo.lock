@@ -2704,6 +2704,7 @@ dependencies = [
  "futures-timer 2.0.2",
  "lazy_static",
  "libp2p",
+ "rand 0.7.3",
  "serde",
  "serde_cbor 0.11.1 (git+https://github.com/pyfisch/cbor)",
 ]
