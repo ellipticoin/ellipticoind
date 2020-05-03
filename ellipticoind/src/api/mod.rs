@@ -2,7 +2,6 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
 use futures::channel::mpsc;
 use futures::channel::mpsc::UnboundedSender;
-use network::serde::Serialize;
 use std::sync::{Arc, Mutex};
 use tungstenite::protocol::Message;
 pub use views::Block;

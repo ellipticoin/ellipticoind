@@ -1,13 +1,13 @@
-#![recursion_limit="256"]
+#![recursion_limit = "256"]
 pub extern crate serde;
 use async_std::net::SocketAddr;
 use async_std::net::TcpListener;
 use async_std::net::TcpStream;
 use async_std::pin::Pin;
 pub use async_std::sync;
-use serde::de::DeserializeOwned;
 use async_std::task;
-use serde::Serialize;
+use futures::channel::mpsc;
+use futures::io::WriteHalf;
 use futures::prelude::*;
 pub use futures::{
     future,
@@ -18,11 +18,19 @@ pub use futures::{
     task::{Context, Poll},
     AsyncRead, AsyncWrite, Sink, Stream,
 };
-use futures::channel::mpsc;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use std::mem;
 
 #[derive(Clone, Debug)]
 pub struct Sender {
     inner: sync::Sender<Vec<u8>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Protocol {
+    NewPeer((SocketAddr, Vec<u8>)),
+    Message(Vec<u8>),
 }
 
 #[derive(Debug)]
@@ -40,7 +48,7 @@ pub async fn spawn_read_loop(
 ) {
     task::spawn(async move {
         loop {
-            let mut length_buf = [0u8; 4];
+            let mut length_buf = [0u8; mem::size_of::<u32>()];
             read_half.read(&mut length_buf).await.unwrap();
             let length = u32::from_le_bytes(length_buf) as usize;
             let mut buf = vec![0u8; length];
@@ -49,12 +57,12 @@ pub async fn spawn_read_loop(
         }
     });
 }
-impl<S: Clone + Serialize + std::marker::Send + 'static + std::marker::Sync, D: DeserializeOwned + std::marker::Send +'static> Server<S, D> {
-    pub fn new(
-    private_key: Vec<u8>,
-    socket_addr: SocketAddr,
-    bootnodes: Vec<SocketAddr>,
-    ) -> Self {
+impl<
+        S: Clone + Serialize + std::marker::Send + 'static + std::marker::Sync,
+        D: DeserializeOwned + std::marker::Send + 'static,
+    > Server<S, D>
+{
+    pub fn new(private_key: Vec<u8>, socket_addr: SocketAddr, bootnodes: Vec<SocketAddr>) -> Self {
         Self {
             private_key,
             bootnodes,
@@ -63,67 +71,89 @@ impl<S: Clone + Serialize + std::marker::Send + 'static + std::marker::Sync, D: 
             outgoing_channel: mpsc::channel::<S>(1),
         }
     }
-    pub async fn channel(
-        self,
-    ) ->
-(mpsc::Sender<S>, mpsc::Receiver<D>)
-    {
+    pub async fn channel(self) -> (mpsc::Sender<S>, mpsc::Receiver<D>) {
         let socket_addr = self.socket_addr;
         let bootnodes = self.bootnodes;
         let listener = TcpListener::bind(socket_addr).await.unwrap();
         let (read_sender, mut read_receiver) = mpsc::unbounded();
         let (stream_sender, mut stream_receiver) = mpsc::channel::<TcpStream>(1);
-        let (outgoing_sender, mut outgoing_receiver)  = self.outgoing_channel;
-        let (mut incommming_sender, incomming_receiver)  = self.incommming_channel;
+        let (outgoing_sender, mut outgoing_receiver) = self.outgoing_channel;
+        let (mut incommming_sender, incomming_receiver) = self.incommming_channel;
         task::spawn(async move {
             let mut streams = vec![];
-            for bootnode in bootnodes {
-                if let Ok(stream) = TcpStream::connect(bootnode).await {
-                    let (read_half, write_half) = stream.split();
-                    streams.push(write_half);
-                    spawn_read_loop(read_half, read_sender.clone()).await;
-                }
+            for stream in stream::iter(bootnodes).map(TcpStream::connect).next().await {
+                handle_stream(stream.await.unwrap(), &mut streams, read_sender.clone()).await;
             }
             loop {
                 let mut next_stream_receiver_fused = stream_receiver.next().fuse();
                 let mut next_read_receiver_fused = read_receiver.next().fuse();
                 select! {
-                    stream = next_stream_receiver_fused => {
-                        let (mut read_half, write_half) = stream.expect("1").split();
-                        spawn_read_loop(read_half,read_sender.clone()).await;
-                        streams.push(write_half);
-                    },
-                    incommming_message = next_read_receiver_fused => {
-                        if let Some(incommming_message) = incommming_message {
-                            incommming_sender.send(serde_cbor::from_slice(&incommming_message).unwrap()).await.unwrap();
-                        }
-                    },
-                    outgoing_message = outgoing_receiver.next() => {
+                    stream = next_stream_receiver_fused =>
+                        handle_stream(stream.unwrap(), &mut streams, read_sender.clone()).await
+                    ,
+                    incommming_message = next_read_receiver_fused =>
+                        handle_incomming_message(incommming_message.unwrap(), &mut incommming_sender).await,
+                    outgoing_message = outgoing_receiver.next() =>{
                         if let Some(outgoing_message) = outgoing_message {
-                            for mut stream in &mut streams {
-                                let outgoing_message_bytes = serde_cbor::to_vec(&outgoing_message).unwrap();
-                                let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32); 
-                                stream.write_all(&length_bytes).await.expect("failed to write");
-                                stream.write_all(&outgoing_message_bytes).await.expect("failed to write");
-                            }
-                        }
-                    },
+                        handle_outgoing_message(outgoing_message, &mut streams).await
+                        }},
                     complete => (),
                 }
             }
         });
 
         task::spawn(async move {
-            listener.incoming()
-            .map(Result::unwrap)
-            .map(Ok)
-            .forward(stream_sender).await.unwrap();
+            listener
+                .incoming()
+                .map(Result::unwrap)
+                .map(Ok)
+                .forward(stream_sender)
+                .await
+                .unwrap();
         });
         (outgoing_sender, incomming_receiver)
     }
 }
 
-impl<S: Clone + Serialize+ std::marker::Send +'static, D: DeserializeOwned+ std::marker::Send +'static> Stream for Server<S, D> {
+async fn handle_outgoing_message<
+    S: Clone + Serialize + std::marker::Send + 'static + std::marker::Sync,
+>(
+    outgoing_message: S,
+    streams: &mut Vec<WriteHalf<TcpStream>>,
+) {
+    for stream in streams {
+        let outgoing_message_bytes = serde_cbor::to_vec(&outgoing_message).unwrap();
+        let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
+        stream.write_all(&length_bytes).await.unwrap();
+        stream.write_all(&outgoing_message_bytes).await.unwrap();
+    }
+}
+
+async fn handle_incomming_message<D: DeserializeOwned + std::marker::Send + 'static>(
+    incommming_message: Vec<u8>,
+    incomming_sender: &mut mpsc::Sender<D>,
+) {
+    incomming_sender
+        .send(serde_cbor::from_slice(&incommming_message).unwrap())
+        .await
+        .unwrap();
+}
+
+async fn handle_stream(
+    stream: TcpStream,
+    streams: &mut Vec<WriteHalf<TcpStream>>,
+    read_sender: mpsc::UnboundedSender<Vec<u8>>,
+) {
+    let (read_half, write_half) = stream.split();
+    streams.push(write_half);
+    spawn_read_loop(read_half, read_sender.clone()).await;
+}
+
+impl<
+        S: Clone + Serialize + std::marker::Send + 'static,
+        D: DeserializeOwned + std::marker::Send + 'static,
+    > Stream for Server<S, D>
+{
     type Item = D;
     fn poll_next(
         mut self: Pin<&mut Self>,
@@ -132,7 +162,11 @@ impl<S: Clone + Serialize+ std::marker::Send +'static, D: DeserializeOwned+ std:
         mpsc::Receiver::poll_next(Pin::new(&mut self.incommming_channel.1), _ctx)
     }
 }
-impl<S: Clone + Serialize+ std::marker::Send +'static, D: DeserializeOwned+ std::marker::Send +'static> Sink<S> for Server<S, D> {
+impl<
+        S: Clone + Serialize + std::marker::Send + 'static,
+        D: DeserializeOwned + std::marker::Send + 'static,
+    > Sink<S> for Server<S, D>
+{
     type Error = futures::channel::mpsc::SendError;
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
         self.outgoing_channel.0.poll_ready(cx)
@@ -170,33 +204,17 @@ mod tests {
             "0.0.0.0:1234".parse().unwrap(),
             vec![],
         );
-        let (mut alices_sender, mut alices_receiver) = alices_server
-            .channel()
-            .await;
+        let (mut alices_sender, mut alices_receiver) = alices_server.channel().await;
 
         let bobs_server: Server<Message, Message> = Server::new(
             bobs_key.encode().clone().to_vec(),
-                "0.0.0.0:1235".parse().unwrap(),
+            "0.0.0.0:1235".parse().unwrap(),
             vec!["0.0.0.0:1234".parse().unwrap()],
         );
-        let (mut bobs_sender, mut bobs_receiver) = bobs_server
-            .channel()
-            .await;
-        bobs_sender
-            .send(message.clone())
-            .await
-            .unwrap();
-        assert_eq!(
-            alices_receiver.next().await.unwrap(),
-            expected_message
-        );
-        alices_sender
-            .send(message)
-            .await
-            .unwrap();
-        assert_eq!(
-            bobs_receiver.next().await.unwrap(),
-            expected_message
-        );
+        let (mut bobs_sender, mut bobs_receiver) = bobs_server.channel().await;
+        bobs_sender.send(message.clone()).await.unwrap();
+        assert_eq!(alices_receiver.next().await.unwrap(), expected_message);
+        alices_sender.send(message.clone()).await.unwrap();
+        assert_eq!(bobs_receiver.next().await.unwrap(), expected_message);
     }
 }

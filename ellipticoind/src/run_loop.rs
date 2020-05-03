@@ -1,5 +1,4 @@
 use crate::api;
-use crate::constants::TOKEN_CONTRACT;
 use crate::miner::mine_next_block;
 use crate::models::{is_block_winner, is_next_block};
 use crate::models::{Block, Transaction};
@@ -13,18 +12,6 @@ use futures::channel::mpsc;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use futures_util::sink::SinkExt;
-use serde_bytes::ByteBuf;
-use std::collections::HashMap;
-use vm::state::db_key;
-
-enum Namespace {
-    _Allowences,
-    Balances,
-    CurrentMiner,
-    Miners,
-    RandomSeed,
-    EthereumBalances,
-}
 
 pub async fn run(
     public_key: std::sync::Arc<PublicKey>,
@@ -70,14 +57,6 @@ pub async fn run(
                 .send::<api::Block>((&new_block, &transactions).into())
                 .await;
             println!("Applied block #{}", &new_block.number);
-
-            let current_miner = &rocksdb
-                .get(db_key(
-                    &TOKEN_CONTRACT,
-                    &vec![Namespace::CurrentMiner as u8],
-                ))
-                .unwrap()
-                .unwrap();
             *BEST_BLOCK.lock().await = Some(new_block.clone());
         }
     }

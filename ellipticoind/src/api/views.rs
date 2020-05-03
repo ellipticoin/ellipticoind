@@ -70,18 +70,20 @@ impl From<&crate::models::Transaction> for Transaction {
 impl From<Block> for (crate::models::Block, Vec<crate::models::Transaction>) {
     fn from(block: Block) -> Self {
         (
-        crate::models::Block {
-            hash: block.hash.clone(),
-            parent_hash: block.parent_hash.clone(),
-            number: block.number,
-            winner: block.winner.clone(),
-            memory_changeset_hash: block.memory_changeset_hash.clone(),
-            storage_changeset_hash: block.storage_changeset_hash.clone(),
-            proof_of_work_value: block.proof_of_work_value.clone(),
-        },
-            block.transactions.into_iter()
+            crate::models::Block {
+                hash: block.hash.clone(),
+                parent_hash: block.parent_hash.clone(),
+                number: block.number,
+                winner: block.winner.clone(),
+                memory_changeset_hash: block.memory_changeset_hash.clone(),
+                storage_changeset_hash: block.storage_changeset_hash.clone(),
+                proof_of_work_value: block.proof_of_work_value.clone(),
+            },
+            block
+                .transactions
+                .into_iter()
                 .map(crate::models::Transaction::from)
-                .collect()
+                .collect(),
         )
     }
 }
