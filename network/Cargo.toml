@@ -14,3 +14,4 @@ futures-timer = "2.0.2"
 serde_cbor = { git = "https://github.com/pyfisch/cbor" }
 serde = { version = "1.0.90", features = ["derive"] }
 libp2p = { git = "https://github.com/libp2p/rust-libp2p.git" }
+rand = {version = "0.7.3"}
