@@ -22,28 +22,6 @@ enum Namespace {
 use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
 use std::convert::TryInto;
 
-// #[cfg(not(test))]
-// #[no_mangle]
-// pub fn do_stuff(value: wasm_rpc::Pointer) -> wasm_rpc::Pointer {
-//     wasm_rpc::set_stdio();
-//     // wasm_rpc::Referenceable::as_pointer(
-//     // let n = wasm_rpc::to_vec(&(|value: Vec<u8>| -> Result<Value, Error> {
-//     let y: Value = wasm_rpc::from_slice(&wasm_rpc::Dereferenceable::as_raw_bytes(&value)).unwrap();
-//     let z: wasm_rpc::serde_bytes::ByteBuf = wasm_rpc::value::from_value(Value::Bytes(vec![1,2,3])).unwrap();
-//     // let z = vec![1];
-//     let x = (|value: Vec<u8>| -> Result<Value, Error> {
-//             {
-//                 Ok(value.into())
-//             }
-//         })(
-//             // wasm_rpc::value::from_value(y).unwrap()
-//             vec![1,2,3]
-//             );
-//
-//     let n: Result<Value, Error> = Ok(1.into());
-//     wasm_rpc::Referenceable::as_pointer(&wasm_rpc::to_vec(&z).unwrap())
-// }
-
 #[export]
 mod token {
     pub fn approve(spender: ByteBuf, amount: u64) {
@@ -105,14 +83,10 @@ mod token {
             ByteBuf::from(sender()),
             (bet_per_block, ByteBuf::from(hash_onion.clone().to_vec())),
         );
-        set_miners(miners);
+        set_miners(&miners);
         Ok(Value::Null)
     }
 
-    pub fn do_stuff(value: ByteBuf) -> Result<Value, Error> {
-        ellipticoin::set_memory(vec![2 as u8], vec![233; 21]);
-        Ok(to_value(value).unwrap())
-    }
     pub fn reveal(value: ByteBuf) -> Result<Value, Error> {
         let mut miners = get_miners();
         if ByteBuf::from(sender()) != get_current_miner() {
@@ -130,8 +104,8 @@ mod token {
                 .try_into()
                 .unwrap(),
         );
+        set_miners(&miners);
         set_current_miner(get_next_winner(&miners).to_vec());
-        set_miners(miners);
 
         Ok(Value::Null)
     }
@@ -177,7 +151,7 @@ mod token {
         from_value(ellipticoin::get_storage(Namespace::Miners as u8)).unwrap_or(HashMap::new())
     }
 
-    fn set_miners(miners: HashMap<ByteBuf, (u64, ByteBuf)>) {
+    fn set_miners(miners: &HashMap<ByteBuf, (u64, ByteBuf)>) {
         ellipticoin::set_storage(
             Namespace::Miners as u8,
             to_value(miners).unwrap_or(Value::Null),

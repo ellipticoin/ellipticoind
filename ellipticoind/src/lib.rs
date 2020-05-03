@@ -42,9 +42,9 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use ed25519_dalek::{ExpandedSecretKey, Keypair, PublicKey, SecretKey};
 pub use futures::{sink::SinkExt, stream::StreamExt};
 use rand::rngs::OsRng;
+use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::env;
 lazy_static! {
     static ref BEST_BLOCK: async_std::sync::Arc<Mutex<Option<Block>>> =
         { async_std::sync::Arc::new(Mutex::new(None)) };
@@ -91,6 +91,8 @@ pub async fn run(
         vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
     let mut redis5 =
         vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
+    let mut redis6 =
+        vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
     diesel::sql_query("TRUNCATE blocks CASCADE")
         .execute(&db)
         .unwrap();
@@ -101,8 +103,9 @@ pub async fn run(
     start_up::start_miner(
         &rocksdb,
         &pg_pool.get().unwrap(),
+        &mut redis6,
         keypair.public,
-        &bootnodes,
+        network_sender.clone(),
     );
     let api_state = api::State::new(redis, rocksdb.clone(), pg_pool, network_sender.clone());
     let mut vm_state = vm::State::new(redis2.get_connection().unwrap(), rocksdb.clone());
@@ -120,12 +123,9 @@ pub async fn run(
     let public_key = Arc::new(keypair.public);
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     let pg_pool = Pool::new(manager).expect("Postgres connection pool could not be created");
-    
+
     if env::var("GENISIS_NODE").is_err() {
-        crate::start_up::catch_up(
-            &mut vm_state,
-            &bootnodes,
-        ).await;
+        crate::start_up::catch_up(&mut vm_state, &bootnodes).await;
     }
     run_loop::run(
         public_key,
