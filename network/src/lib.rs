@@ -92,17 +92,10 @@ impl<
                         ))
                     .unwrap();
                 let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
-                use std::time::Duration;
-
-use async_std::task;
 
                 stream.write_all(&length_bytes).await.unwrap();
                 stream.write_all(&outgoing_message_bytes).await.unwrap();
-                task::sleep(Duration::from_secs(1)).await;
                 handle_stream(stream, &mut streams, read_sender.clone()).await;
-                // let (read_half, write_half) = stream.split();
-                // streams.push(write_half);
-                // spawn_read_loop(read_half, read_sender.clone()).await;
 
             };
             
@@ -146,7 +139,7 @@ async fn broadcast_new_peer(
     peer: SocketAddr,
 ) {
     for (stream_addr, stream) in streams {
-        if (socket_addr.eq(stream_addr)) {
+        if stream_addr.clone().eq(&socket_addr) || stream_addr.clone().eq(&peer) {
             break;
         }
         let outgoing_message_bytes = serde_cbor::to_vec(&Protocol::NewPeer(
@@ -194,7 +187,7 @@ async fn handle_incomming_message<D: DeserializeOwned + std::marker::Send + 'sta
             broadcast_new_peer(socket_addr, streams, address).await;
         },
         Ok(Protocol::NewPeer(address)) => {
-            let stream = TcpStream::connect(address).await.unwrap();
+            let stream = TcpStream::connect(address).await.expect(&format!("Can't connect to {:?}", address));
             handle_stream(stream, &mut streams, read_sender.clone()).await;
         },
         _ => (),
