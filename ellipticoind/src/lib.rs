@@ -38,7 +38,7 @@ use async_std::sync::Mutex;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
-use ed25519_dalek::{ExpandedSecretKey, Keypair, PublicKey, SecretKey};
+use ed25519_dalek::Keypair;
 pub use futures::{sink::SinkExt, stream::StreamExt};
 use rand::rngs::OsRng;
 use std::env;
@@ -46,18 +46,16 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 lazy_static! {
     static ref BEST_BLOCK: async_std::sync::Arc<Mutex<Option<Block>>> =
-        { async_std::sync::Arc::new(Mutex::new(None)) };
+         async_std::sync::Arc::new(Mutex::new(None)) ;
 }
 
 pub fn generate_keypair() {
     let mut csprng = OsRng {};
-    let secret_key = SecretKey::generate(&mut csprng);
-    let expanded_secret_key: ExpandedSecretKey = (&secret_key).into();
-    let public_key: PublicKey = (&secret_key).into();
-    println!("Public Key (Address): {}", base64::encode(&public_key));
+    let keypair: Keypair = Keypair::generate(&mut csprng);
+    println!("Public Key (Address): {}", base64::encode(&keypair.public.to_bytes()));
     println!(
         "Private Key: {}",
-        base64::encode(&expanded_secret_key.to_bytes().to_vec())
+        base64::encode(&keypair.to_bytes().to_vec())
     );
 }
 

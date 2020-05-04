@@ -1,5 +1,5 @@
 [package]
-name = "network"
+name = "ec-client"
 version = "0.1.0"
 authors = ["Mason Fischer <mason@kissr.co>"]
 edition = "2018"
@@ -13,4 +13,4 @@ futures = "0.3.1"
 futures-timer = "2.0.2"
 serde_cbor = { git = "https://github.com/pyfisch/cbor" }
 serde = { version = "1.0.90", features = ["derive"] }
-rand = {version = "0.7.3"}
+libp2p = { git = "https://github.com/libp2p/rust-libp2p.git" }
