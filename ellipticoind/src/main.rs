@@ -10,8 +10,10 @@ use std::net::{IpAddr, SocketAddr, SocketAddrV4};
 struct Opts {
     #[clap(short = "p", long = "port", default_value = "4460")]
     port: u16,
-    #[clap(short = "a", long = "bind-addres", default_value = "0.0.0.0")]
+    #[clap(short = "a", long = "bind-address", default_value = "0.0.0.0")]
     bind_address: String,
+    #[clap(short = "e", long = "external-ip", default_value = "0.0.0.0")]
+    external_ip: String,
     #[clap(long = "api-port", default_value = "4461")]
     api_port: u16,
     #[clap(long = "api-bind-address", default_value = "0.0.0.0")]
@@ -83,6 +85,7 @@ async fn main() {
                 Keypair::from_bytes(&base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap())
                     .unwrap();
             let socket = (opts.bind_address.parse::<IpAddr>().unwrap(), opts.port).into();
+            let external_socket = (opts.external_ip.parse::<IpAddr>().unwrap(), opts.port).into();
 
             ellipticoind::run(
                 api_socket,
@@ -91,6 +94,7 @@ async fn main() {
                 &opts.rocksdb_path,
                 &opts.redis_url,
                 socket,
+                external_socket,
                 private_key,
                 bootnodes,
             )
