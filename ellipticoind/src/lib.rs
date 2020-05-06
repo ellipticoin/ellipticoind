@@ -66,11 +66,12 @@ pub async fn run(
     rocksdb_path: &str,
     redis_url: &str,
     socket: SocketAddr,
+    external_socket: SocketAddr,
     keypair: Keypair,
     bootnodes: Vec<SocketAddr>,
 ) {
     diesel_migrations::embed_migrations!();
-    let network = Server::new(keypair.to_bytes().to_vec(), socket, bootnodes.clone());
+    let network = Server::new(keypair.to_bytes().to_vec(), socket, external_socket, bootnodes.clone());
     let (network_sender, incomming_network_receiver) = network.channel().await;
     let db = PgConnection::establish(&database_url)
         .expect(&format!("Error connecting to {}", database_url));

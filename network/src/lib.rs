@@ -40,6 +40,7 @@ pub enum Protocol {
 pub struct Server<S: Clone + Serialize + std::marker::Send, D: DeserializeOwned> {
     pub private_key: Vec<u8>,
     pub socket_addr: SocketAddr,
+    pub external_socket_addr: SocketAddr,
     pub bootnodes: Vec<SocketAddr>,
     pub incommming_channel: (mpsc::Sender<D>, mpsc::Receiver<D>),
     pub outgoing_channel: (mpsc::Sender<S>, mpsc::Receiver<S>),
@@ -65,10 +66,13 @@ impl<
         D: DeserializeOwned + std::marker::Send + 'static,
     > Server<S, D>
 {
-    pub fn new(private_key: Vec<u8>, socket_addr: SocketAddr, bootnodes: Vec<SocketAddr>) -> Self {
+    pub fn new(private_key: Vec<u8>, socket_addr: SocketAddr,
+               external_socket_addr: SocketAddr
+               , bootnodes: Vec<SocketAddr>) -> Self {
         Self {
             private_key,
             bootnodes,
+            external_socket_addr, 
             socket_addr,
             incommming_channel: mpsc::channel::<D>(1),
             outgoing_channel: mpsc::channel::<S>(1),
@@ -76,6 +80,7 @@ impl<
     }
     pub async fn channel(self) -> (mpsc::Sender<S>, mpsc::Receiver<D>) {
         let socket_addr = self.socket_addr;
+        let external_socket_addr = self.external_socket_addr;
         let bootnodes = self.bootnodes;
         let listener = TcpListener::bind(socket_addr).await.unwrap();
         let (mut read_sender, mut read_receiver) = mpsc::unbounded();
@@ -88,7 +93,7 @@ impl<
             if let Some(bootnode) = random_bootnode {
                 let mut stream = TcpStream::connect(bootnode).await.unwrap();
                 let outgoing_message_bytes = serde_cbor::to_vec(&Protocol::Hello(
-                        socket_addr
+                        external_socket_addr
                         ))
                     .unwrap();
                 let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
