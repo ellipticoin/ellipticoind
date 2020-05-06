@@ -25,8 +25,6 @@ pub async fn handle_messages(
                     .await;
             }
             Some(Message::Transaction(transaction)) => {
-                println!("received a transaction from the network");
-                println!("adding in network {:?}", base64::encode(&serde_cbor::to_vec(&transaction).unwrap()));
                 redis
                     .rpush::<&str, Vec<u8>, ()>(
                         "transactions::pending",

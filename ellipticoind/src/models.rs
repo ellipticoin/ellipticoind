@@ -119,12 +119,6 @@ impl Block {
     }
 
     pub fn insert(self, db: &PgConnection, transactions: Vec<Transaction>) {
-        for transaction in transactions.clone().iter() {
-            if transaction.function == "transfer" {
-                println!("inserting {}", transaction.nonce);
-
-            }
-        }
         insert_into(blocks::dsl::blocks)
             .values(&self)
             .execute(db)
