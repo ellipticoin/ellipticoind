@@ -17,7 +17,7 @@ pub async fn run(
     public_key: std::sync::Arc<PublicKey>,
     mut websocket: api::websocket::Websocket,
     mut network_sender: mpsc::Sender<Message>,
-    redis: redis::Client,
+    mut redis: redis::Client,
     rocksdb: std::sync::Arc<rocksdb::DB>,
     db_pool: Pool<ConnectionManager<diesel::PgConnection>>,
     mut new_block_receiver: sync::Receiver<(Block, Vec<Transaction>)>,
@@ -48,10 +48,11 @@ pub async fn run(
         if is_next_block(&new_block).await {
             new_block.clone().insert(&db, transactions.clone());
             transaction_processor::apply_block(
+                &mut redis,
                 &mut vm_state,
                 new_block.clone(),
                 transactions.clone(),
-            );
+            ).await;
             vm_state.commit();
             websocket
                 .send::<api::Block>((&new_block, &transactions).into())

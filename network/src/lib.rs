@@ -144,7 +144,9 @@ async fn broadcast_new_peer(
     peer: SocketAddr,
 ) {
     for (stream_addr, stream) in streams {
-        if stream_addr.clone().eq(&socket_addr) || stream_addr.clone().eq(&peer) {
+        println!("telling {:?} about {:?}", &stream_addr, peer);
+        if stream_addr.ip().clone().eq(&socket_addr.ip()) || stream_addr.ip().clone().eq(&peer.ip()) {
+            println!("jk");
             break;
         }
         let outgoing_message_bytes = serde_cbor::to_vec(&Protocol::NewPeer(

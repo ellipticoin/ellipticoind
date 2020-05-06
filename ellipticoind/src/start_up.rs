@@ -29,7 +29,7 @@ use std::net::SocketAddr;
 use vm::state::db_key;
 use vm::Commands;
 
-enum Namespace {
+pub enum Namespace {
     _Allowences,
     Balances,
     CurrentMiner,
@@ -133,7 +133,9 @@ fn process_transaction(transaction: vm::Transaction, redis: &mut vm::Client) {
         )
         .unwrap();
 }
-pub async fn catch_up(vm_state: &mut vm::State, bootnodes: &Vec<SocketAddr>) {
+pub async fn catch_up(
+    con: &mut vm::Client,
+    vm_state: &mut vm::State, bootnodes: &Vec<SocketAddr>) {
     let mut bootnode = bootnodes[0];
     bootnode.set_port(4461);
     for block_number in 0.. {
@@ -151,7 +153,7 @@ pub async fn catch_up(vm_state: &mut vm::State, bootnodes: &Vec<SocketAddr>) {
                 transaction.set_hash();
                 transaction.block_hash = block.hash.clone();
             });
-            crate::transaction_processor::apply_block(vm_state, block.clone(), transactions);
+            crate::transaction_processor::apply_block(con, vm_state, block.clone(), transactions).await;
             vm_state.commit();
             *crate::BEST_BLOCK.lock().await = Some(block.clone());
             println!("Applied block #{}", &block.number);
@@ -209,8 +211,8 @@ pub async fn initialize_rocks_db(
         vm::rocksdb::DB::open_default(path).unwrap()
     } else {
         let db = vm::rocksdb::DB::open_default(path).unwrap();
-        let file = File::open("dist/ethereum-balances-9858734.bin").unwrap();
-        // let file = File::open("dist/development-balances.bin").unwrap();
+        // let file = File::open("dist/ethereum-balances-9858734.bin").unwrap();
+        let file = File::open("dist/development-balances.bin").unwrap();
         let metadata = std::fs::metadata("dist/ethereum-balances-9858734.bin").unwrap();
         let pb = ProgressBar::new(metadata.len() / 24);
         println!("Importing Ethereum Balances");
@@ -264,6 +266,7 @@ pub async fn initialize_rocks_db(
             ))
             .unwrap()
             .unwrap();
+        println!("genesis_balance: {:?}", genesis_balance);
         db.delete(db_key(
             &TOKEN_CONTRACT,
             &[

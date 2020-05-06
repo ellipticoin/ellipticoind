@@ -19,10 +19,23 @@ lazy_static! {
         private_key[32..64].to_vec()
     };
 }
-pub fn apply_block(mut vm_state: &mut vm::State, block: Block, transactions: Vec<Transaction>) {
-    transactions.into_iter().for_each(|transaction| {
-        run_transaction(&mut vm_state, &transaction.into(), &block);
-    });
+pub async fn apply_block(
+    con: &mut vm::Client,
+    mut vm_state: &mut vm::State, block: Block, transactions: Vec<Transaction>) {
+    for transaction in transactions.into_iter() {
+        run_transaction(&mut vm_state, &transaction.clone().into(), &block);
+        remove_from_pending(&mut con.get_connection().unwrap(), &transaction.into()).await;
+    }
+    if let Ok(count) = con.llen::<&str, i32>("transactions::pending") {
+    if count > 0 {
+        let transaction_bytes: Vec<u8> = vm::redis::cmd("LPOP")
+            .arg("transactions::pending")
+            .query(con)
+            .unwrap();
+        println!("still pending {:?} ", serde_cbor::from_slice::<vm::Transaction>(&transaction_bytes));
+        panic!("boom!")
+    }
+    }
 }
 
 pub async fn run_transactions(
@@ -82,7 +95,7 @@ fn env_from_block(block: &Block) -> Env {
 }
 async fn get_next_transaction(conn: &mut vm::Connection) -> Option<vm::Transaction> {
     if conn.llen::<&str, i32>("transactions::pending").unwrap_or(0) > 0 {
-        // println!("longer than 0!");
+        // println!("trnasctions left in pending {:?}");
     }
     let transaction_bytes: Vec<u8> = vm::redis::cmd("RPOPLPUSH")
         .arg("transactions::pending")
@@ -105,4 +118,28 @@ async fn remove_from_processing(redis: &mut vm::Connection, transaction: &vm::Tr
         .arg(transaction_bytes.as_slice())
         .query(redis)
         .unwrap()
+}
+
+async fn remove_from_pending(redis: &mut vm::Connection, transaction: &vm::Transaction) {
+    let transaction_bytes = to_vec(&transaction).unwrap();
+    // println!("removing {:?} {:?}", base64::encode(&transaction_bytes), &transaction);
+    // if let Ok(count) = redis.llen::<&str, i32>("transactions::pending") {
+    // if count > 0 {
+    //     println!("{} transactions we could remove:", count);
+    //     let transaction_bytes1: Vec<u8> = vm::redis::cmd("LPOP")
+    //         .arg("transactions::pending")
+    //         .query(redis)
+    //         .unwrap();
+    //     println!("{:?} {}", serde_cbor::from_slice::<vm::Transaction>(&transaction_bytes1), transaction_bytes.eq(&transaction_bytes1));
+    //     println!("{}=={}", base64::encode(&transaction_bytes), base64::encode(&transaction_bytes1))
+    // }
+    // }
+    println!("removed {} items",
+    vm::redis::cmd("LREM")
+        .arg("transactions::pending")
+        .arg(0)
+        .arg(transaction_bytes.as_slice())
+        .query::<u64>(redis)
+        .unwrap()
+        );
 }
