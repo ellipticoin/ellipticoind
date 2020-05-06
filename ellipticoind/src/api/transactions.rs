@@ -34,12 +34,13 @@ pub async fn create(mut req: tide::Request<State>) -> Response {
     let transaction: vm::Transaction = from_slice(&transaction_bytes).unwrap();
     let mut network_sender = req.state().network_sender.clone();
     network_sender
-        .send(Message::Transaction(transaction))
+        .send(Message::Transaction(transaction.clone()))
         .await
         .unwrap();
     let mut redis = req.state().redis.get_connection().unwrap();
+    println!("adding in api {:?} {:?}", base64::encode(&serde_cbor::to_vec(&transaction).unwrap()), &transaction);
     redis
-        .rpush::<&str, Vec<u8>, ()>("transactions::pending", transaction_bytes)
+        .rpush::<&str, Vec<u8>, ()>("transactions::pending", serde_cbor::to_vec(&transaction).unwrap())
         .unwrap();
 
     Response::new(201)

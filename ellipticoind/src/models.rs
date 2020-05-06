@@ -119,6 +119,12 @@ impl Block {
     }
 
     pub fn insert(self, db: &PgConnection, transactions: Vec<Transaction>) {
+        for transaction in transactions.clone().iter() {
+            if transaction.function == "transfer" {
+                println!("inserting {}", transaction.nonce);
+
+            }
+        }
         insert_into(blocks::dsl::blocks)
             .values(&self)
             .execute(db)
@@ -126,7 +132,7 @@ impl Block {
         insert_into(transactions::dsl::transactions)
             .values(&transactions)
             .execute(db)
-            .expect("failed to insert transaction");
+            .expect(&format!("{:?}", transactions.iter().map(|t| (t.function.clone(), base64::encode(&t.sender.clone()))).collect::<Vec<(String, String)>>()));
     }
 }
 

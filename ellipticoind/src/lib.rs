@@ -91,10 +91,13 @@ pub async fn run(
         vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
     let mut redis6 =
         vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
+    let mut redis7 =
+        vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
     diesel::sql_query("TRUNCATE blocks CASCADE")
         .execute(&db)
         .unwrap();
-    let _: () = redis::cmd("FLUSHALL").query(&mut redis3).unwrap();
+    // let _: () = redis::cmd("FLUSHALL").query(&mut redis3).unwrap();
+
     let rocksdb = Arc::new(
         start_up::initialize_rocks_db(rocksdb_path, &pg_pool.get().unwrap(), &mut redis5).await,
     );
@@ -123,7 +126,7 @@ pub async fn run(
     let pg_pool = Pool::new(manager).expect("Postgres connection pool could not be created");
 
     if env::var("GENISIS_NODE").is_err() {
-        crate::start_up::catch_up(&mut vm_state, &bootnodes).await;
+        crate::start_up::catch_up(&mut redis7, &mut vm_state, &bootnodes).await;
     }
     run_loop::run(
         public_key,
