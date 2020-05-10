@@ -211,8 +211,8 @@ pub async fn initialize_rocks_db(
         vm::rocksdb::DB::open_default(path).unwrap()
     } else {
         let db = vm::rocksdb::DB::open_default(path).unwrap();
-        // let file = File::open("dist/ethereum-balances-9858734.bin").unwrap();
-        let file = File::open("dist/development-balances.bin").unwrap();
+        let file = File::open("dist/ethereum-balances-9858734.bin").unwrap();
+        // let file = File::open("dist/development-balances.bin").unwrap();
         let metadata = std::fs::metadata("dist/ethereum-balances-9858734.bin").unwrap();
         let pb = ProgressBar::new(metadata.len() / 24);
         println!("Importing Ethereum Balances");
