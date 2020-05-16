@@ -1,4 +1,3 @@
-#![feature(async_closure)]
 extern crate clap;
 use crate::clap::Clap;
 use dotenv::dotenv;

@@ -1,5 +1,4 @@
 #![recursion_limit = "512"]
-#![feature(async_closure)]
 extern crate bytes;
 extern crate hex;
 extern crate mime;
@@ -96,7 +95,7 @@ pub async fn run(
     diesel::sql_query("TRUNCATE blocks CASCADE")
         .execute(&db)
         .unwrap();
-    // let _: () = redis::cmd("FLUSHALL").query(&mut redis3).unwrap();
+    let _: () = redis::cmd("FLUSHALL").query(&mut redis3).unwrap();
 
     let rocksdb = Arc::new(
         start_up::initialize_rocks_db(rocksdb_path, &pg_pool.get().unwrap(), &mut redis5).await,

@@ -5,7 +5,6 @@ use serde_cbor::{from_slice, to_vec};
 use std::env;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
-use vm::Commands;
 use vm::Env;
 
 lazy_static! {
