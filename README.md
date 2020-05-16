@@ -9,27 +9,28 @@ Building from source and running a miner:
 1. Clone the repo
 
 ```
-git clone git@github.com:ellipticoin/ellipticoind.git 
+git clone https://github.com/ellipticoin/ellipticoind.git
 ```
 
 2. Install rust
 
 ```
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+$ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+$ source $HOME/.cargo/env
 ```
 
 3. Install the required dependencies
 
 ```
-$ sudo apt install install build-essential libpq-dev pkg-config libssl-dev postgresql postgresql-contrib redis llvm clang-dev redis
+$ sudo apt-get update && apt-get install install install build-essential libpq-dev pkg-config libssl-dev postgresql postgresql-contrib redis-server llvm clang redis git-lfs
+```
+6. Build  ellipticoind
+```
+$ cd ellipticoind
+$ C_INCLUDE_PATH=/usr/lib/gcc/x86_64-linux-gnu/7/include cargo build
 ```
 
-4. Create the postgres user and database
 
-```
-$ su postgres -c"createuser root"
-$ createdb ellipticoind
-```
 
 5. Generate a key pair:
 
@@ -57,9 +58,23 @@ Make the following change to `/etc/postgresql/10/main/pg_hba.conf`:
 - local   all           postgres                                md5
 + local   all           postgres                                peer
 ```
-
-6. Run  ellipticoind
+4. Create the postgres user and database
 
 ```
-$ cargo run --external-ip <your-ip>
+#
+$ cd /
+$ su postgres -c"createuser root"
+$ su postgres -c"createdb ellipticoind"
+$ cd /root/ellipticoind 
+```
+
+7. Pull down the Ethereum Balances file from GitHub
+```
+$ git lfs install
+$ git lfs pull
+```
+6. Run  ellipticoind (replace <your-external-ip> with your IP)
+
+```
+$ cargo run -- --external-ip <your-external-ip>
 ```

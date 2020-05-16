@@ -206,7 +206,7 @@ async fn handle_stream(
     streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
     read_sender: mpsc::UnboundedSender<Vec<u8>>,
 ) {
-    let addr = stream.local_addr().unwrap();
+    let addr = stream.peer_addr().unwrap();
     let (read_half, write_half) = stream.split();
     streams.push((addr, write_half));
     spawn_read_loop(read_half, read_sender.clone()).await;
