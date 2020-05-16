@@ -3,65 +3,8 @@ Ellipticoind
 
 Ellipticoind is an Ellipticoin node written in Rust.
 
-Installation (on Ubuntu 18 or similar):
-==========================
-1. Download ellipticoind
 
-```
-$ wget -O ellipticoind https://github.com/ellipticoin/ellipticoind/releases/download/v0.0.1/ellipticoind-ubuntu-x64
-```
-
-2. Create an `ellipticoin` directory
-
-```
-$ mkdir ellpiticoin && cd ellpiticoin
-```
-
-
-3. Install the required dependencies
-
-```
-$ sudo apt install postgresql libpq-dev redis-server
-```
-
-4. Create the postgres user and database
-
-```
-$ su postgres -c"createuser root"
-$ createdb ellipticoind
-```
-
-5. Generate a key pair:
-
-```
-./ellipticoind generate-keypair
-Public Key (Address): cwZitLN90FXTaOovm0ygsGNJ+nDJgFXg0Angzz7Lsbw=
-Private Key: gNCgX1Jfs3gXHDEvd7ano6bflJR0oNscgBI1O4JEN2N06SFQL1isJysk3/ix35gkwG7MztBrGv2iO/q2Th7SnQ==
-```
-
-
-6. Paste the following into `.env`:
-
-```
-# .env
-DATABASE_URL=postgres://root:@/ellipticoind
-PRIVATE_KEY=<Your Base64 Encoded Private Key from above>
-```
-
-7. Change the permissions on the binary to make it executable
-
-```
-$ chmod 755 ellipticoind
-```
-
-8. Run `ellipticoind`!
-
-```
-$ ./ellipticoind
-```
-
-
-Building and running from source:
+Building from source and running a miner:
 ==========================
 1. Clone the repo
 
@@ -78,7 +21,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 3. Install the required dependencies
 
 ```
-$ sudo apt install postgresql libpq-dev redis-server
+$ sudo apt install install build-essential libpq-dev pkg-config libssl-dev postgresql postgresql-contrib redis llvm clang-dev redis
 ```
 
 4. Create the postgres user and database
@@ -102,10 +45,21 @@ Private Key: gNCgX1Jfs3gXHDEvd7ano6bflJR0oNscgBI1O4JEN2N06SFQL1isJysk3/ix35gkwG7
 # .env
 DATABASE_URL=postgres://root:@/ellipticoind
 PRIVATE_KEY=<Your Base 64 Encoded Private Key>
+ENABLE_MINER=true
+BURN_PER_BLOCK=100
 ```
 
-5. Run  ellipticoind
+5. Allow postgres connections from localhost
+
+Make the following change to `/etc/postgresql/10/main/pg_hba.conf`:
+```diff
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+- local   all           postgres                                md5
++ local   all           postgres                                peer
+```
+
+6. Run  ellipticoind
 
 ```
-$ cargo run
+$ cargo run --external-ip <your-ip>
 ```
