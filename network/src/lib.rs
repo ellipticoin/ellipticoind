@@ -1,14 +1,13 @@
 #![recursion_limit = "256"]
-pub extern crate serde;
-extern crate rand;
 extern crate ed25519_dalek;
+extern crate rand;
+pub extern crate serde;
 use async_std::net::SocketAddr;
 use async_std::net::TcpListener;
 use async_std::net::TcpStream;
 use async_std::pin::Pin;
 pub use async_std::sync;
 use async_std::task;
-use rand::seq::SliceRandom;
 use futures::channel::mpsc;
 use futures::io::WriteHalf;
 use futures::prelude::*;
@@ -21,6 +20,7 @@ pub use futures::{
     task::{Context, Poll},
     AsyncRead, AsyncWrite, Sink, Stream,
 };
+use rand::seq::SliceRandom;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::mem;
@@ -33,13 +33,9 @@ pub struct Sender {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Protocol {
     Hello(SocketAddr),
+    Hi,
     NewPeer(SocketAddr),
     Message(Vec<u8>),
-}
-#[derive(PartialEq, Clone,Debug)]
-enum SocketDirection {
-    Incomming,
-    Outgoing,
 }
 
 #[derive(Debug)]
@@ -72,13 +68,16 @@ impl<
         D: DeserializeOwned + std::marker::Send + 'static,
     > Server<S, D>
 {
-    pub fn new(private_key: Vec<u8>, socket_addr: SocketAddr,
-               external_socket_addr: SocketAddr
-               , bootnodes: Vec<SocketAddr>) -> Self {
+    pub fn new(
+        private_key: Vec<u8>,
+        socket_addr: SocketAddr,
+        external_socket_addr: SocketAddr,
+        bootnodes: Vec<SocketAddr>,
+    ) -> Self {
         Self {
             private_key,
             bootnodes,
-            external_socket_addr, 
+            external_socket_addr,
             socket_addr,
             incommming_channel: mpsc::channel::<D>(1),
             outgoing_channel: mpsc::channel::<S>(1),
@@ -98,25 +97,22 @@ impl<
             let random_bootnode = bootnodes.choose(&mut rand::thread_rng());
             if let Some(bootnode) = random_bootnode {
                 let mut stream = TcpStream::connect(bootnode).await.unwrap();
-                let outgoing_message_bytes = serde_cbor::to_vec(&Protocol::Hello(
-                        external_socket_addr
-                        ))
-                    .unwrap();
+                let outgoing_message_bytes =
+                    serde_cbor::to_vec(&Protocol::Hello(external_socket_addr)).unwrap();
                 let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
 
                 stream.write_all(&length_bytes).await.unwrap();
                 stream.write_all(&outgoing_message_bytes).await.unwrap();
-                handle_stream(SocketDirection::Outgoing, stream, &mut streams, read_sender.clone()).await;
-
+                handle_stream(stream, &mut streams, read_sender.clone()).await;
             };
-            
+
             loop {
                 let mut next_stream_receiver_fused = stream_receiver.next().fuse();
                 let mut next_read_receiver_fused = read_receiver.next().fuse();
                 select! {
                     stream = next_stream_receiver_fused =>{
                         if let Some(stream) = stream {
-                            handle_stream(SocketDirection::Incomming, stream, &mut streams, read_sender.clone()).await;
+                            handle_stream(stream, &mut streams, read_sender.clone()).await;
                         }
                 },
                     incommming_message = next_read_receiver_fused =>{
@@ -145,31 +141,22 @@ impl<
 
 async fn broadcast_new_peer(
     socket_addr: SocketAddr,
-    streams: &mut Vec<(SocketDirection, SocketAddr, WriteHalf<TcpStream>)>,
+    all_streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
     peer: SocketAddr,
 ) {
-    for (socket_direction, stream_addr, stream) in streams {
-        #[cfg(test)]
-        if(!(
-                (socket_direction.clone() == SocketDirection::Outgoing &&
-                stream_addr.port() == 1234 &&
-                peer.port() == 1236)
-                ||
-                (socket_direction.clone() == SocketDirection::Incomming &&
-                stream_addr.port() > 5000 &&
-                peer.port() == 1236)
+    // It's non-trivial to test using multiple IP addresses
+    // This is a hack to test using only 127.0.0.1
+    #[cfg(test)]
+    let streams = all_streams
+        .iter_mut()
+        .filter(|_| peer.port() == 1236 || socket_addr.ne(&socket_addr));
 
-        )) {
-            break;
-        }
-        #[cfg(not(test))]
-        if (stream_addr.ip().clone().eq(&socket_addr.ip()) || (stream_addr.ip().clone().eq(&peer.ip()))) {
-            break;
-        }
-        let outgoing_message_bytes = serde_cbor::to_vec(&Protocol::NewPeer(
-                peer
-        ))
-        .unwrap();
+    #[cfg(not(test))]
+    let streams = all_streams.iter_mut().filter(|(stream_addr, _)| {
+        stream_addr.ip().clone() != socket_addr.ip() && stream_addr.ip().clone() != peer.ip()
+    });
+    for (_, stream) in streams {
+        let outgoing_message_bytes = serde_cbor::to_vec(&Protocol::NewPeer(peer)).unwrap();
         let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
         stream.write_all(&length_bytes).await.unwrap();
         stream.write_all(&outgoing_message_bytes).await.unwrap();
@@ -179,10 +166,10 @@ async fn broadcast_new_peer(
 async fn handle_outgoing_message<
     S: Clone + Serialize + std::marker::Send + 'static + std::marker::Sync,
 >(
-    streams: &mut Vec<(SocketDirection, SocketAddr, WriteHalf<TcpStream>)>,
+    streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
     outgoing_message: S,
 ) {
-    for (_, _, stream) in streams {
+    for (_, stream) in streams {
         let outgoing_message_bytes = serde_cbor::to_vec(&Protocol::Message(
             serde_cbor::to_vec(&outgoing_message).unwrap(),
         ))
@@ -195,7 +182,7 @@ async fn handle_outgoing_message<
 
 async fn handle_incomming_message<D: DeserializeOwned + std::marker::Send + 'static>(
     socket_addr: SocketAddr,
-    mut streams: &mut Vec<(SocketDirection, SocketAddr, WriteHalf<TcpStream>)>,
+    mut streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
     incommming_message: Vec<u8>,
     incomming_sender: &mut mpsc::Sender<D>,
     read_sender: &mut mpsc::UnboundedSender<Vec<u8>>,
@@ -206,27 +193,28 @@ async fn handle_incomming_message<D: DeserializeOwned + std::marker::Send + 'sta
                 .send(serde_cbor::from_slice(&incommming_message).unwrap())
                 .await
                 .unwrap();
-        },
+        }
         Ok(Protocol::Hello(address)) => {
             broadcast_new_peer(socket_addr, streams, address).await;
-        },
+        }
         Ok(Protocol::NewPeer(address)) => {
-            let stream = TcpStream::connect(address).await.expect(&format!("Can't connect to {:?}", address));
-            handle_stream(SocketDirection::Outgoing, stream, &mut streams, read_sender.clone()).await;
-        },
+            let stream = TcpStream::connect(address)
+                .await
+                .expect(&format!("Can't connect to {:?}", address));
+            handle_stream(stream, &mut streams, read_sender.clone()).await;
+        }
         _ => (),
     }
 }
 
 async fn handle_stream(
-    socket_direction: SocketDirection,
     stream: TcpStream,
-    streams: &mut Vec<(SocketDirection, SocketAddr, WriteHalf<TcpStream>)>,
+    streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
     read_sender: mpsc::UnboundedSender<Vec<u8>>,
 ) {
     let addr = stream.peer_addr().unwrap();
     let (read_half, write_half) = stream.split();
-    streams.push((socket_direction, addr, write_half));
+    streams.push((addr, write_half));
     spawn_read_loop(read_half, read_sender.clone()).await;
 }
 
@@ -266,8 +254,8 @@ impl<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::rngs::OsRng;
     use ed25519_dalek::Keypair;
+    use rand::rngs::OsRng;
     use serde::Deserialize;
     use serde::Serialize;
 
@@ -311,13 +299,12 @@ mod tests {
         let (mut carols_sender, _carols_receiver) = carols_server.channel().await;
         use std::time::Duration;
 
-use async_std::task;
+        use async_std::task;
 
-task::sleep(Duration::from_secs(1)).await;
+        task::sleep(Duration::from_millis(100)).await;
 
         carols_sender.send(message.clone()).await.unwrap();
         assert_eq!(alices_receiver.next().await.unwrap(), expected_message);
-task::sleep(Duration::from_secs(1)).await;
-        
+        task::sleep(Duration::from_millis(100)).await;
     }
 }
