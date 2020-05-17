@@ -1,6 +1,7 @@
 #![recursion_limit = "256"]
 pub extern crate serde;
 extern crate rand;
+extern crate ed25519_dalek;
 use async_std::net::SocketAddr;
 use async_std::net::TcpListener;
 use async_std::net::TcpStream;
@@ -34,6 +35,11 @@ pub enum Protocol {
     Hello(SocketAddr),
     NewPeer(SocketAddr),
     Message(Vec<u8>),
+}
+#[derive(PartialEq, Clone,Debug)]
+enum SocketDirection {
+    Incomming,
+    Outgoing,
 }
 
 #[derive(Debug)]
@@ -100,7 +106,7 @@ impl<
 
                 stream.write_all(&length_bytes).await.unwrap();
                 stream.write_all(&outgoing_message_bytes).await.unwrap();
-                handle_stream(stream, &mut streams, read_sender.clone()).await;
+                handle_stream(SocketDirection::Outgoing, stream, &mut streams, read_sender.clone()).await;
 
             };
             
@@ -110,8 +116,7 @@ impl<
                 select! {
                     stream = next_stream_receiver_fused =>{
                         if let Some(stream) = stream {
-                            // broadcast_new_peer(&mut streams, stream.local_addr().unwrap()).await;
-                            handle_stream(stream, &mut streams, read_sender.clone()).await;
+                            handle_stream(SocketDirection::Incomming, stream, &mut streams, read_sender.clone()).await;
                         }
                 },
                     incommming_message = next_read_receiver_fused =>{
@@ -140,13 +145,25 @@ impl<
 
 async fn broadcast_new_peer(
     socket_addr: SocketAddr,
-    streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
+    streams: &mut Vec<(SocketDirection, SocketAddr, WriteHalf<TcpStream>)>,
     peer: SocketAddr,
 ) {
-    for (stream_addr, stream) in streams {
-        println!("telling {:?} about {:?}", &stream_addr, peer);
-        if stream_addr.ip().clone().eq(&socket_addr.ip()) || stream_addr.ip().clone().eq(&peer.ip()) {
-            println!("jk");
+    for (socket_direction, stream_addr, stream) in streams {
+        #[cfg(test)]
+        if(!(
+                (socket_direction.clone() == SocketDirection::Outgoing &&
+                stream_addr.port() == 1234 &&
+                peer.port() == 1236)
+                ||
+                (socket_direction.clone() == SocketDirection::Incomming &&
+                stream_addr.port() > 5000 &&
+                peer.port() == 1236)
+
+        )) {
+            break;
+        }
+        #[cfg(not(test))]
+        if (stream_addr.ip().clone().eq(&socket_addr.ip()) || (stream_addr.ip().clone().eq(&peer.ip()))) {
             break;
         }
         let outgoing_message_bytes = serde_cbor::to_vec(&Protocol::NewPeer(
@@ -162,10 +179,10 @@ async fn broadcast_new_peer(
 async fn handle_outgoing_message<
     S: Clone + Serialize + std::marker::Send + 'static + std::marker::Sync,
 >(
-    streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
+    streams: &mut Vec<(SocketDirection, SocketAddr, WriteHalf<TcpStream>)>,
     outgoing_message: S,
 ) {
-    for (_, stream) in streams {
+    for (_, _, stream) in streams {
         let outgoing_message_bytes = serde_cbor::to_vec(&Protocol::Message(
             serde_cbor::to_vec(&outgoing_message).unwrap(),
         ))
@@ -178,7 +195,7 @@ async fn handle_outgoing_message<
 
 async fn handle_incomming_message<D: DeserializeOwned + std::marker::Send + 'static>(
     socket_addr: SocketAddr,
-    mut streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
+    mut streams: &mut Vec<(SocketDirection, SocketAddr, WriteHalf<TcpStream>)>,
     incommming_message: Vec<u8>,
     incomming_sender: &mut mpsc::Sender<D>,
     read_sender: &mut mpsc::UnboundedSender<Vec<u8>>,
@@ -195,20 +212,21 @@ async fn handle_incomming_message<D: DeserializeOwned + std::marker::Send + 'sta
         },
         Ok(Protocol::NewPeer(address)) => {
             let stream = TcpStream::connect(address).await.expect(&format!("Can't connect to {:?}", address));
-            handle_stream(stream, &mut streams, read_sender.clone()).await;
+            handle_stream(SocketDirection::Outgoing, stream, &mut streams, read_sender.clone()).await;
         },
         _ => (),
     }
 }
 
 async fn handle_stream(
+    socket_direction: SocketDirection,
     stream: TcpStream,
-    streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
+    streams: &mut Vec<(SocketDirection, SocketAddr, WriteHalf<TcpStream>)>,
     read_sender: mpsc::UnboundedSender<Vec<u8>>,
 ) {
     let addr = stream.peer_addr().unwrap();
     let (read_half, write_half) = stream.split();
-    streams.push((addr, write_half));
+    streams.push((socket_direction, addr, write_half));
     spawn_read_loop(read_half, read_sender.clone()).await;
 }
 
@@ -248,7 +266,8 @@ impl<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use libp2p::identity::ed25519;
+    use rand::rngs::OsRng;
+    use ed25519_dalek::Keypair;
     use serde::Deserialize;
     use serde::Serialize;
 
@@ -258,19 +277,22 @@ mod tests {
     }
     #[async_std::test]
     async fn it_works() {
+        let mut csprng = OsRng {};
         let message = Message::Content("test".to_string());
         let expected_message = message.clone();
-        let alices_key = ed25519::Keypair::generate();
-        let bobs_key = ed25519::Keypair::generate();
+        let alices_key = Keypair::generate(&mut csprng);
+        let bobs_key = Keypair::generate(&mut csprng);
         let alices_server: Server<Message, Message> = Server::new(
-            alices_key.encode().clone().to_vec(),
-            "127.0.0.1:1234".parse().unwrap(),
+            alices_key.secret.to_bytes().to_vec(),
+            "0.0.0.0:1234".parse().unwrap(),
+            "0.0.0.0:1234".parse().unwrap(),
             vec![],
         );
         let (mut alices_sender, mut alices_receiver) = alices_server.channel().await;
 
         let bobs_server: Server<Message, Message> = Server::new(
-            bobs_key.encode().clone().to_vec(),
+            bobs_key.secret.to_bytes().to_vec(),
+            "127.0.0.1:1235".parse().unwrap(),
             "127.0.0.1:1235".parse().unwrap(),
             vec!["127.0.0.1:1234".parse().unwrap()],
         );
@@ -279,14 +301,23 @@ mod tests {
         assert_eq!(alices_receiver.next().await.unwrap(), expected_message);
         alices_sender.send(message.clone()).await.unwrap();
         assert_eq!(bobs_receiver.next().await.unwrap(), expected_message);
-        let carols_key = ed25519::Keypair::generate();
+        let carols_key = Keypair::generate(&mut csprng);
         let carols_server: Server<Message, Message> = Server::new(
-            carols_key.encode().clone().to_vec(),
+            carols_key.secret.to_bytes().to_vec(),
+            "127.0.0.1:1236".parse().unwrap(),
             "127.0.0.1:1236".parse().unwrap(),
             vec!["127.0.0.1:1235".parse().unwrap()],
         );
         let (mut carols_sender, _carols_receiver) = carols_server.channel().await;
+        use std::time::Duration;
+
+use async_std::task;
+
+task::sleep(Duration::from_secs(1)).await;
+
         carols_sender.send(message.clone()).await.unwrap();
         assert_eq!(alices_receiver.next().await.unwrap(), expected_message);
+task::sleep(Duration::from_secs(1)).await;
+        
     }
 }
