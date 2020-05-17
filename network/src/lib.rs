@@ -92,27 +92,36 @@ impl<
         let (stream_sender, mut stream_receiver) = mpsc::channel::<TcpStream>(1);
         let (outgoing_sender, mut outgoing_receiver) = self.outgoing_channel;
         let (mut incommming_sender, incomming_receiver) = self.incommming_channel;
+        let mut streams = vec![];
+        let random_bootnode = bootnodes.choose(&mut rand::thread_rng());
+        if let Some(bootnode) = random_bootnode {
+            let mut stream = TcpStream::connect(bootnode).await.unwrap();
+            let outgoing_message_bytes =
+                serde_cbor::to_vec(&Protocol::Hello(external_socket_addr)).unwrap();
+            let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
+
+            stream.write_all(&length_bytes).await.unwrap();
+            stream.write_all(&outgoing_message_bytes).await.unwrap();
+            let addr = stream.peer_addr().unwrap();
+            let (mut read_half, write_half) = stream.split();
+            streams.push((addr, write_half));
+            let mut length_buf = [0u8; mem::size_of::<u32>()];
+            read_half.read(&mut length_buf).await.unwrap();
+            let length = u32::from_le_bytes(length_buf) as usize;
+            let mut buf = vec![0u8; length];
+            read_half.read_exact(&mut buf).await.unwrap();
+            if let Ok(Protocol::Hi) = serde_cbor::from_slice(&buf) {
+                spawn_read_loop(read_half, read_sender.clone()).await;
+            }
+        };
         task::spawn(async move {
-            let mut streams = vec![];
-            let random_bootnode = bootnodes.choose(&mut rand::thread_rng());
-            if let Some(bootnode) = random_bootnode {
-                let mut stream = TcpStream::connect(bootnode).await.unwrap();
-                let outgoing_message_bytes =
-                    serde_cbor::to_vec(&Protocol::Hello(external_socket_addr)).unwrap();
-                let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
-
-                stream.write_all(&length_bytes).await.unwrap();
-                stream.write_all(&outgoing_message_bytes).await.unwrap();
-                handle_stream(stream, &mut streams, read_sender.clone()).await;
-            };
-
             loop {
                 let mut next_stream_receiver_fused = stream_receiver.next().fuse();
                 let mut next_read_receiver_fused = read_receiver.next().fuse();
                 select! {
                     stream = next_stream_receiver_fused =>{
                         if let Some(stream) = stream {
-                            handle_stream(stream, &mut streams, read_sender.clone()).await;
+                            handle_incomming_stream(stream, &mut streams, read_sender.clone()).await;
                         }
                 },
                     incommming_message = next_read_receiver_fused =>{
@@ -140,7 +149,7 @@ impl<
 }
 
 async fn broadcast_new_peer(
-    socket_addr: SocketAddr,
+    _socket_addr: SocketAddr,
     all_streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
     peer: SocketAddr,
 ) {
@@ -149,11 +158,11 @@ async fn broadcast_new_peer(
     #[cfg(test)]
     let streams = all_streams
         .iter_mut()
-        .filter(|_| peer.port() == 1236 || socket_addr.ne(&socket_addr));
+        .filter(|(stream_socket_addr, _)| peer.port() == 1236 && stream_socket_addr.port() < 5000);
 
     #[cfg(not(test))]
     let streams = all_streams.iter_mut().filter(|(stream_addr, _)| {
-        stream_addr.ip().clone() != socket_addr.ip() && stream_addr.ip().clone() != peer.ip()
+        stream_addr.ip().clone() != _socket_addr.ip() && stream_addr.ip().clone() != peer.ip()
     });
     for (_, stream) in streams {
         let outgoing_message_bytes = serde_cbor::to_vec(&Protocol::NewPeer(peer)).unwrap();
@@ -196,18 +205,37 @@ async fn handle_incomming_message<D: DeserializeOwned + std::marker::Send + 'sta
         }
         Ok(Protocol::Hello(address)) => {
             broadcast_new_peer(socket_addr, streams, address).await;
+            for (stream_socket_addr, stream) in streams {
+                if stream_socket_addr.clone().ip() == address.ip() {
+                    let outgoing_message_bytes = serde_cbor::to_vec(&Protocol::Hi).unwrap();
+                    let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
+                    stream.write_all(&length_bytes).await.unwrap();
+                    stream.write_all(&outgoing_message_bytes).await.unwrap();
+                };
+            }
         }
         Ok(Protocol::NewPeer(address)) => {
             let stream = TcpStream::connect(address)
                 .await
                 .expect(&format!("Can't connect to {:?}", address));
-            handle_stream(stream, &mut streams, read_sender.clone()).await;
+            handle_outgoing_stream(stream, &mut streams, read_sender.clone()).await;
         }
         _ => (),
     }
 }
 
-async fn handle_stream(
+async fn handle_incomming_stream(
+    stream: TcpStream,
+    streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
+    read_sender: mpsc::UnboundedSender<Vec<u8>>,
+) {
+    let addr = stream.peer_addr().unwrap();
+    let (read_half, write_half) = stream.split();
+    streams.push((addr, write_half));
+    spawn_read_loop(read_half, read_sender.clone()).await;
+}
+
+async fn handle_outgoing_stream(
     stream: TcpStream,
     streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
     read_sender: mpsc::UnboundedSender<Vec<u8>>,
