@@ -136,7 +136,7 @@ mod token {
             .iter()
             .map(|(miner, (bet_per_block, _hash))| (miner.to_vec(), *bet_per_block))
             .collect();
-        bets.sort();
+        bets.sort_by(|(a, _), (b, _)| a.cmp(b));
         bets.choose_weighted(&mut rng, |(_miner, bet_per_block)| *bet_per_block)
             .map(|(miner, _bet_per_block)| miner.to_vec())
             .unwrap_or_abort()

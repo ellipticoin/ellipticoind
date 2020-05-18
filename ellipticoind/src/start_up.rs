@@ -266,7 +266,6 @@ pub async fn initialize_rocks_db(
             ))
             .unwrap()
             .unwrap();
-        println!("genesis_balance: {:?}", genesis_balance);
         db.delete(db_key(
             &TOKEN_CONTRACT,
             &[
