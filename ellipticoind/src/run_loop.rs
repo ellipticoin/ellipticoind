@@ -34,7 +34,9 @@ pub async fn run(
             println!("mined: {}", transactions
                      .clone()
                      .iter()
-                     .map(|t| t.function.clone())
+                     .map(|t|
+                          format!("{} {}", t.function.clone(), t.arguments[0])
+                        )
                      .collect::<Vec<String>>()
                      .join(", "));
             vm_state.commit();
@@ -56,7 +58,10 @@ pub async fn run(
             println!("applying: {}", transactions
                      .clone()
                      .iter()
-                     .map(|t| t.function.clone())
+                     .map(|t|
+                          format!("{} {}", t.function.clone(), t.arguments[0])
+
+                     )
                      .collect::<Vec<String>>()
                      .join(", "));
 
