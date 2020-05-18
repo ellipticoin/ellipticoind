@@ -132,6 +132,7 @@ impl<
                         handle_incomming_message(incomming_message.unwrap(), &mut incomming_sender).await;},
                     outgoing_message = outgoing_receiver.next() =>{
                         if let Some(outgoing_message) = outgoing_message {
+                        println!("{:?}", peers);
                         handle_outgoing_message(&mut streams, outgoing_message).await
                         }},
                     complete => (),
@@ -212,6 +213,7 @@ async fn handle_incomming_stream(
     peers: Vec<SocketAddr>,
     read_sender: mpsc::UnboundedSender<Vec<u8>>,
 ) {
+    println!("new connection from {:?}", stream.peer_addr());
     let (mut read_half, mut write_half) = stream.split();
     let message = receive(&mut read_half).await;
     if let Ok(Protocol::Join(_)) = serde_cbor::from_slice(&message) {
