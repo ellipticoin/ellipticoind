@@ -2,27 +2,25 @@
 extern crate ed25519_dalek;
 extern crate rand;
 pub extern crate serde;
-use async_std::net::SocketAddr;
-use async_std::net::TcpListener;
-use async_std::net::TcpStream;
-use async_std::pin::Pin;
-pub use async_std::sync;
-use async_std::task;
-use futures::channel::mpsc;
-use futures::io::WriteHalf;
-use futures::prelude::*;
+use async_std::{
+    net::{SocketAddr, TcpListener, TcpStream},
+    task,
+};
 pub use futures::{
+    channel::mpsc,
     future,
     future::FutureExt,
-    pin_mut, select,
+    io::WriteHalf,
+    pin_mut,
+    prelude::*,
+    select,
     sink::SinkExt,
     stream::StreamExt,
     task::{Context, Poll},
     AsyncRead, AsyncWrite, Sink, Stream,
 };
 use rand::seq::SliceRandom;
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::mem;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -39,8 +37,15 @@ pub struct Server<S: Clone + Serialize + std::marker::Send, D: DeserializeOwned>
     pub socket_addr: SocketAddr,
     pub external_socket_addr: SocketAddr,
     pub bootnodes: Vec<SocketAddr>,
-    pub incommming_channel: (mpsc::Sender<D>, mpsc::Receiver<D>),
+    pub incomming_channel: (mpsc::Sender<D>, mpsc::Receiver<D>),
     pub outgoing_channel: (mpsc::Sender<S>, mpsc::Receiver<S>),
+}
+
+async fn send(stream: &mut WriteHalf<TcpStream>, message: &Protocol) {
+    let outgoing_message_bytes = serde_cbor::to_vec(&message).unwrap();
+    let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
+    stream.write_all(&length_bytes).await.unwrap();
+    stream.write_all(&outgoing_message_bytes).await.unwrap();
 }
 
 pub async fn receive(read_half: &mut futures::io::ReadHalf<TcpStream>) -> Vec<u8> {
@@ -79,10 +84,11 @@ impl<
             bootnodes,
             external_socket_addr,
             socket_addr,
-            incommming_channel: mpsc::channel::<D>(1),
+            incomming_channel: mpsc::channel::<D>(1),
             outgoing_channel: mpsc::channel::<S>(1),
         }
     }
+
     pub async fn channel(self) -> (mpsc::Sender<S>, mpsc::Receiver<D>) {
         let socket_addr = self.socket_addr;
         let external_socket_addr = self.external_socket_addr;
@@ -91,7 +97,7 @@ impl<
         let (mut read_sender, mut read_receiver) = mpsc::unbounded();
         let (stream_sender, mut stream_receiver) = mpsc::channel::<TcpStream>(1);
         let (outgoing_sender, mut outgoing_receiver) = self.outgoing_channel;
-        let (mut incommming_sender, incomming_receiver) = self.incommming_channel;
+        let (mut incomming_sender, incomming_receiver) = self.incomming_channel;
         let mut streams = vec![];
         let random_bootnode = bootnodes.choose(&mut rand::thread_rng());
         if let Some(bootnode) = random_bootnode {
@@ -115,8 +121,8 @@ impl<
                             handle_incomming_stream(stream, &mut streams, read_sender.clone()).await;
                         }
                 },
-                    incommming_message = next_read_receiver_fused =>{
-                        handle_incomming_message(socket_addr, &mut streams, incommming_message.unwrap(), &mut incommming_sender, &mut read_sender).await;},
+                    incomming_message = next_read_receiver_fused =>{
+                        handle_incomming_message(socket_addr, &mut streams, incomming_message.unwrap(), &mut incomming_sender, &mut read_sender).await;},
                     outgoing_message = outgoing_receiver.next() =>{
                         if let Some(outgoing_message) = outgoing_message {
                         handle_outgoing_message(&mut streams, outgoing_message).await
@@ -160,13 +166,6 @@ async fn broadcast_new_peer(
     }
 }
 
-async fn send(stream: &mut WriteHalf<TcpStream>, message: &Protocol) {
-    let outgoing_message_bytes = serde_cbor::to_vec(&message).unwrap();
-    let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
-    stream.write_all(&length_bytes).await.unwrap();
-    stream.write_all(&outgoing_message_bytes).await.unwrap();
-}
-
 async fn handle_outgoing_message<
     S: Clone + Serialize + std::marker::Send + 'static + std::marker::Sync,
 >(
@@ -181,15 +180,15 @@ async fn handle_outgoing_message<
 
 async fn handle_incomming_message<D: DeserializeOwned + std::marker::Send + 'static>(
     socket_addr: SocketAddr,
-    mut streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
-    incommming_message: Vec<u8>,
+    streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
+    incomming_message: Vec<u8>,
     incomming_sender: &mut mpsc::Sender<D>,
     read_sender: &mut mpsc::UnboundedSender<Vec<u8>>,
 ) {
-    match serde_cbor::from_slice(&incommming_message) {
-        Ok(Protocol::Message(incommming_message)) => {
+    match serde_cbor::from_slice(&incomming_message) {
+        Ok(Protocol::Message(incomming_message)) => {
             incomming_sender
-                .send(serde_cbor::from_slice(&incommming_message).unwrap())
+                .send(serde_cbor::from_slice(&incomming_message).unwrap())
                 .await
                 .unwrap();
         }
@@ -205,7 +204,10 @@ async fn handle_incomming_message<D: DeserializeOwned + std::marker::Send + 'sta
             let stream = TcpStream::connect(address)
                 .await
                 .expect(&format!("Can't connect to {:?}", address));
-            handle_outgoing_stream(stream, &mut streams, read_sender.clone()).await;
+            let addr = stream.peer_addr().unwrap();
+            let (read_half, write_half) = stream.split();
+            streams.push((addr, write_half));
+            spawn_read_loop(read_half, read_sender.clone()).await;
         }
         _ => (),
     }
@@ -220,50 +222,6 @@ async fn handle_incomming_stream(
     let (read_half, write_half) = stream.split();
     streams.push((addr, write_half));
     spawn_read_loop(read_half, read_sender.clone()).await;
-}
-
-async fn handle_outgoing_stream(
-    stream: TcpStream,
-    streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
-    read_sender: mpsc::UnboundedSender<Vec<u8>>,
-) {
-    let addr = stream.peer_addr().unwrap();
-    let (read_half, write_half) = stream.split();
-    streams.push((addr, write_half));
-    spawn_read_loop(read_half, read_sender.clone()).await;
-}
-
-impl<
-        S: Clone + Serialize + std::marker::Send + 'static,
-        D: DeserializeOwned + std::marker::Send + 'static,
-    > Stream for Server<S, D>
-{
-    type Item = D;
-    fn poll_next(
-        mut self: Pin<&mut Self>,
-        _ctx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<std::option::Option<<Self as futures::stream::Stream>::Item>> {
-        mpsc::Receiver::poll_next(Pin::new(&mut self.incommming_channel.1), _ctx)
-    }
-}
-impl<
-        S: Clone + Serialize + std::marker::Send + 'static,
-        D: DeserializeOwned + std::marker::Send + 'static,
-    > Sink<S> for Server<S, D>
-{
-    type Error = futures::channel::mpsc::SendError;
-    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        self.outgoing_channel.0.poll_ready(cx)
-    }
-    fn start_send(mut self: Pin<&mut Self>, item: S) -> Result<(), Self::Error> {
-        self.outgoing_channel.0.start_send(item)
-    }
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
 }
 
 #[cfg(test)]
