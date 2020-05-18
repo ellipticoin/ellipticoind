@@ -98,10 +98,11 @@ pub async fn run(
     let rocksdb = Arc::new(
         start_up::initialize_rocks_db(rocksdb_path, &pg_pool.get().unwrap(), &mut redis5).await,
     );
-    let network = Server::new(keypair.to_bytes().to_vec(), socket, external_socket, bootnodes.clone());
+    let mut vm_state = vm::State::new(redis2.get_connection().unwrap(), rocksdb.clone());
     if env::var("GENISIS_NODE").is_err() {
         crate::start_up::catch_up(&mut redis7, &mut vm_state, &bootnodes).await;
     }
+    let network = Server::new(keypair.to_bytes().to_vec(), socket, external_socket, bootnodes.clone());
     let (network_sender, incomming_network_receiver) = network.channel().await;
     start_up::start_miner(
         &rocksdb,
@@ -111,7 +112,6 @@ pub async fn run(
         network_sender.clone(),
     );
     let api_state = api::State::new(redis, rocksdb.clone(), pg_pool, network_sender.clone());
-    let mut vm_state = vm::State::new(redis2.get_connection().unwrap(), rocksdb.clone());
     let (new_block_sender, new_block_receiver) = channel(1);
     async_std::task::spawn(api(api_state).listen(api_socket));
     async_std::task::spawn(network::handle_messages(
