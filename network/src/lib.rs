@@ -1,4 +1,3 @@
-#![recursion_limit = "256"]
 extern crate ed25519_dalek;
 extern crate rand;
 pub extern crate serde;
