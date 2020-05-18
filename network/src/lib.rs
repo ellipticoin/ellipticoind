@@ -25,11 +25,6 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::mem;
 
-#[derive(Clone, Debug)]
-pub struct Sender {
-    inner: sync::Sender<Vec<u8>>,
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Protocol {
     Hello(SocketAddr),
@@ -95,15 +90,16 @@ impl<
         let mut streams = vec![];
         let random_bootnode = bootnodes.choose(&mut rand::thread_rng());
         if let Some(bootnode) = random_bootnode {
-            let mut stream = TcpStream::connect(bootnode).await.unwrap();
-            let outgoing_message_bytes =
-                serde_cbor::to_vec(&Protocol::Hello(external_socket_addr)).unwrap();
-            let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
-
-            stream.write_all(&length_bytes).await.unwrap();
-            stream.write_all(&outgoing_message_bytes).await.unwrap();
+            let stream = TcpStream::connect(bootnode).await.unwrap();
+            // let outgoing_message_bytes =
+            //     serde_cbor::to_vec(&Protocol::Hello(external_socket_addr)).unwrap();
+            // let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
+            //
+            // stream.write_all(&length_bytes).await.unwrap();
+            // stream.write_all(&outgoing_message_bytes).await.unwrap();
             let addr = stream.peer_addr().unwrap();
-            let (mut read_half, write_half) = stream.split();
+            let (mut read_half, mut write_half) = stream.split();
+            send(&mut write_half, &Protocol::Hello(external_socket_addr)).await;
             streams.push((addr, write_half));
             let mut length_buf = [0u8; mem::size_of::<u32>()];
             read_half.read(&mut length_buf).await.unwrap();
@@ -165,11 +161,15 @@ async fn broadcast_new_peer(
         stream_addr.ip().clone() != _socket_addr.ip() && stream_addr.ip().clone() != peer.ip()
     });
     for (_, stream) in streams {
-        let outgoing_message_bytes = serde_cbor::to_vec(&Protocol::NewPeer(peer)).unwrap();
-        let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
-        stream.write_all(&length_bytes).await.unwrap();
-        stream.write_all(&outgoing_message_bytes).await.unwrap();
+        send(stream, &Protocol::NewPeer(peer)).await;
     }
+}
+
+async fn send(stream: &mut WriteHalf<TcpStream>, message: &Protocol) {
+    let outgoing_message_bytes = serde_cbor::to_vec(&message).unwrap();
+    let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
+    stream.write_all(&length_bytes).await.unwrap();
+    stream.write_all(&outgoing_message_bytes).await.unwrap();
 }
 
 async fn handle_outgoing_message<
@@ -179,13 +179,8 @@ async fn handle_outgoing_message<
     outgoing_message: S,
 ) {
     for (_, stream) in streams {
-        let outgoing_message_bytes = serde_cbor::to_vec(&Protocol::Message(
-            serde_cbor::to_vec(&outgoing_message).unwrap(),
-        ))
-        .unwrap();
-        let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
-        stream.write_all(&length_bytes).await.unwrap();
-        stream.write_all(&outgoing_message_bytes).await.unwrap();
+        let message = Protocol::Message(serde_cbor::to_vec(&outgoing_message).unwrap());
+        send(stream, &message).await;
     }
 }
 
@@ -207,10 +202,7 @@ async fn handle_incomming_message<D: DeserializeOwned + std::marker::Send + 'sta
             broadcast_new_peer(socket_addr, streams, address).await;
             for (stream_socket_addr, stream) in streams {
                 if stream_socket_addr.clone().ip() == address.ip() {
-                    let outgoing_message_bytes = serde_cbor::to_vec(&Protocol::Hi).unwrap();
-                    let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
-                    stream.write_all(&length_bytes).await.unwrap();
-                    stream.write_all(&outgoing_message_bytes).await.unwrap();
+                    send(stream, &Protocol::Hi).await;
                 };
             }
         }
