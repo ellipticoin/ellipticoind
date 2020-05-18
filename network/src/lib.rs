@@ -24,8 +24,8 @@ use std::mem;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Protocol {
-    Hello(SocketAddr),
-    Hi,
+    Join(SocketAddr),
+    Peers(Vec<SocketAddr>),
     NewPeer(SocketAddr),
     Message(Vec<u8>),
 }
@@ -93,7 +93,7 @@ impl<
         let external_socket_addr = self.external_socket_addr;
         let bootnodes = self.bootnodes;
         let listener = TcpListener::bind(socket_addr).await.unwrap();
-        let (mut read_sender, mut read_receiver) = mpsc::unbounded();
+        let (read_sender, mut read_receiver) = mpsc::unbounded();
         let (stream_sender, mut stream_receiver) = mpsc::channel::<TcpStream>(1);
         let (outgoing_sender, mut outgoing_receiver) = self.outgoing_channel;
         let (mut incomming_sender, incomming_receiver) = self.incomming_channel;
@@ -103,10 +103,17 @@ impl<
             let stream = TcpStream::connect(bootnode).await.unwrap();
             let addr = stream.peer_addr().unwrap();
             let (mut read_half, mut write_half) = stream.split();
-            send(&mut write_half, &Protocol::Hello(external_socket_addr)).await;
+            send(&mut write_half, &Protocol::Join(external_socket_addr)).await;
             streams.push((addr, write_half));
             let message = receive(&mut read_half).await;
-            if let Ok(Protocol::Hi) = serde_cbor::from_slice(&message) {
+            if let Ok(Protocol::Peers(peers)) = serde_cbor::from_slice(&message) {
+                connect_to_peers(
+                    external_socket_addr,
+                    &mut streams,
+                    peers,
+                    read_sender.clone(),
+                )
+                .await;
                 spawn_read_loop(read_half, read_sender.clone()).await;
             }
         };
@@ -121,7 +128,7 @@ impl<
                         }
                 },
                     incomming_message = next_read_receiver_fused =>{
-                        handle_incomming_message(socket_addr, &mut streams, incomming_message.unwrap(), &mut incomming_sender, &mut read_sender).await;},
+                        handle_incomming_message(incomming_message.unwrap(), &mut incomming_sender).await;},
                     outgoing_message = outgoing_receiver.next() =>{
                         if let Some(outgoing_message) = outgoing_message {
                         handle_outgoing_message(&mut streams, outgoing_message).await
@@ -144,24 +151,18 @@ impl<
     }
 }
 
-async fn broadcast_new_peer(
-    _socket_addr: SocketAddr,
-    all_streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
-    peer: SocketAddr,
+async fn connect_to_peers(
+    external_socket_addr: SocketAddr,
+    streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
+    peers: Vec<SocketAddr>,
+    read_sender: mpsc::UnboundedSender<Vec<u8>>,
 ) {
-    // It's non-trivial to test using multiple IP addresses
-    // This is a hack to test using only 127.0.0.1
-    #[cfg(test)]
-    let streams = all_streams
-        .iter_mut()
-        .filter(|(stream_socket_addr, _)| peer.port() == 1236 && stream_socket_addr.port() < 5000);
-
-    #[cfg(not(test))]
-    let streams = all_streams.iter_mut().filter(|(stream_addr, _)| {
-        stream_addr.ip().clone() != _socket_addr.ip() && stream_addr.ip().clone() != peer.ip()
-    });
-    for (_, stream) in streams {
-        send(stream, &Protocol::NewPeer(peer)).await;
+    for peer in peers {
+        let stream = TcpStream::connect(peer).await.unwrap();
+        let (read_half2, mut write_half2) = stream.split();
+        send(&mut write_half2, &Protocol::Join(external_socket_addr)).await;
+        spawn_read_loop(read_half2, read_sender.clone()).await;
+        streams.push((peer, write_half2));
     }
 }
 
@@ -178,11 +179,8 @@ async fn handle_outgoing_message<
 }
 
 async fn handle_incomming_message<D: DeserializeOwned + std::marker::Send + 'static>(
-    socket_addr: SocketAddr,
-    streams: &mut Vec<(SocketAddr, WriteHalf<TcpStream>)>,
     incomming_message: Vec<u8>,
     incomming_sender: &mut mpsc::Sender<D>,
-    read_sender: &mut mpsc::UnboundedSender<Vec<u8>>,
 ) {
     match serde_cbor::from_slice(&incomming_message) {
         Ok(Protocol::Message(incomming_message)) => {
@@ -190,23 +188,6 @@ async fn handle_incomming_message<D: DeserializeOwned + std::marker::Send + 'sta
                 .send(serde_cbor::from_slice(&incomming_message).unwrap())
                 .await
                 .unwrap();
-        }
-        Ok(Protocol::Hello(address)) => {
-            broadcast_new_peer(socket_addr, streams, address).await;
-            for (stream_socket_addr, stream) in streams {
-                if stream_socket_addr.clone().ip() == address.ip() {
-                    send(stream, &Protocol::Hi).await;
-                };
-            }
-        }
-        Ok(Protocol::NewPeer(address)) => {
-            let stream = TcpStream::connect(address)
-                .await
-                .expect(&format!("Can't connect to {:?}", address));
-            let addr = stream.peer_addr().unwrap();
-            let (read_half, write_half) = stream.split();
-            streams.push((addr, write_half));
-            spawn_read_loop(read_half, read_sender.clone()).await;
         }
         _ => (),
     }
@@ -218,9 +199,17 @@ async fn handle_incomming_stream(
     read_sender: mpsc::UnboundedSender<Vec<u8>>,
 ) {
     let addr = stream.peer_addr().unwrap();
-    let (read_half, write_half) = stream.split();
-    streams.push((addr, write_half));
-    spawn_read_loop(read_half, read_sender.clone()).await;
+    let (mut read_half, mut write_half) = stream.split();
+    let message = receive(&mut read_half).await;
+    if let Ok(Protocol::Join(_)) = serde_cbor::from_slice(&message) {
+        let peers = streams
+            .iter()
+            .map(|(socket_addr, _)| socket_addr.clone())
+            .collect();
+        send(&mut write_half, &Protocol::Peers(peers)).await;
+        streams.push((addr, write_half));
+        spawn_read_loop(read_half, read_sender.clone()).await;
+    }
 }
 
 #[cfg(test)]
@@ -269,14 +258,7 @@ mod tests {
             vec!["127.0.0.1:1235".parse().unwrap()],
         );
         let (mut carols_sender, _carols_receiver) = carols_server.channel().await;
-        use std::time::Duration;
-
-        use async_std::task;
-
-        task::sleep(Duration::from_millis(100)).await;
-
         carols_sender.send(message.clone()).await.unwrap();
         assert_eq!(alices_receiver.next().await.unwrap(), expected_message);
-        task::sleep(Duration::from_millis(100)).await;
     }
 }
