@@ -99,6 +99,9 @@ pub async fn run(
         start_up::initialize_rocks_db(rocksdb_path, &pg_pool.get().unwrap(), &mut redis5).await,
     );
     let network = Server::new(keypair.to_bytes().to_vec(), socket, external_socket, bootnodes.clone());
+    if env::var("GENISIS_NODE").is_err() {
+        crate::start_up::catch_up(&mut redis7, &mut vm_state, &bootnodes).await;
+    }
     let (network_sender, incomming_network_receiver) = network.channel().await;
     start_up::start_miner(
         &rocksdb,
@@ -124,9 +127,6 @@ pub async fn run(
     let manager = ConnectionManager::<PgConnection>::new(database_url);
     let pg_pool = Pool::new(manager).expect("Postgres connection pool could not be created");
 
-    if env::var("GENISIS_NODE").is_err() {
-        crate::start_up::catch_up(&mut redis7, &mut vm_state, &bootnodes).await;
-    }
     run_loop::run(
         public_key,
         websocket,
