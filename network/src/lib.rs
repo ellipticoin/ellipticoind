@@ -43,21 +43,26 @@ pub struct Server<S: Clone + Serialize + std::marker::Send, D: DeserializeOwned>
     pub outgoing_channel: (mpsc::Sender<S>, mpsc::Receiver<S>),
 }
 
+pub async fn receive(read_half: &mut futures::io::ReadHalf<TcpStream>) -> Vec<u8> {
+    let mut length_buf = [0u8; mem::size_of::<u32>()];
+    read_half.read(&mut length_buf).await.unwrap();
+    let length = u32::from_le_bytes(length_buf) as usize;
+    let mut buf = vec![0u8; length];
+    read_half.read_exact(&mut buf).await.unwrap();
+    buf
+}
+
 pub async fn spawn_read_loop(
     mut read_half: futures::io::ReadHalf<TcpStream>,
     mut sender: mpsc::UnboundedSender<Vec<u8>>,
 ) {
     task::spawn(async move {
         loop {
-            let mut length_buf = [0u8; mem::size_of::<u32>()];
-            read_half.read(&mut length_buf).await.unwrap();
-            let length = u32::from_le_bytes(length_buf) as usize;
-            let mut buf = vec![0u8; length];
-            read_half.read_exact(&mut buf).await.unwrap();
-            sender.send(buf).await.unwrap();
+            sender.send(receive(&mut read_half).await).await.unwrap();
         }
     });
 }
+
 impl<
         S: Clone + Serialize + std::marker::Send + 'static + std::marker::Sync,
         D: DeserializeOwned + std::marker::Send + 'static,
@@ -91,22 +96,12 @@ impl<
         let random_bootnode = bootnodes.choose(&mut rand::thread_rng());
         if let Some(bootnode) = random_bootnode {
             let stream = TcpStream::connect(bootnode).await.unwrap();
-            // let outgoing_message_bytes =
-            //     serde_cbor::to_vec(&Protocol::Hello(external_socket_addr)).unwrap();
-            // let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
-            //
-            // stream.write_all(&length_bytes).await.unwrap();
-            // stream.write_all(&outgoing_message_bytes).await.unwrap();
             let addr = stream.peer_addr().unwrap();
             let (mut read_half, mut write_half) = stream.split();
             send(&mut write_half, &Protocol::Hello(external_socket_addr)).await;
             streams.push((addr, write_half));
-            let mut length_buf = [0u8; mem::size_of::<u32>()];
-            read_half.read(&mut length_buf).await.unwrap();
-            let length = u32::from_le_bytes(length_buf) as usize;
-            let mut buf = vec![0u8; length];
-            read_half.read_exact(&mut buf).await.unwrap();
-            if let Ok(Protocol::Hi) = serde_cbor::from_slice(&buf) {
+            let message = receive(&mut read_half).await;
+            if let Ok(Protocol::Hi) = serde_cbor::from_slice(&message) {
                 spawn_read_loop(read_half, read_sender.clone()).await;
             }
         };
