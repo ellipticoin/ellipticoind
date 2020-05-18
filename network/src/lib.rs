@@ -158,7 +158,7 @@ async fn connect_to_peers(
     read_sender: mpsc::UnboundedSender<Vec<u8>>,
 ) {
     for peer in peers {
-        let stream = TcpStream::connect(peer).await.unwrap();
+        let stream = TcpStream::connect(peer).await.expect(&format!("Could not connect to {:?}", peer));
         let (read_half2, mut write_half2) = stream.split();
         send(&mut write_half2, &Protocol::Join(external_socket_addr)).await;
         spawn_read_loop(read_half2, read_sender.clone()).await;
