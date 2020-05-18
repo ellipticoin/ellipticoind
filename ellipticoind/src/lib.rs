@@ -70,8 +70,6 @@ pub async fn run(
     bootnodes: Vec<SocketAddr>,
 ) {
     diesel_migrations::embed_migrations!();
-    let network = Server::new(keypair.to_bytes().to_vec(), socket, external_socket, bootnodes.clone());
-    let (network_sender, incomming_network_receiver) = network.channel().await;
     let db = PgConnection::establish(&database_url)
         .expect(&format!("Error connecting to {}", database_url));
     embedded_migrations::run(&db).unwrap();
@@ -100,6 +98,8 @@ pub async fn run(
     let rocksdb = Arc::new(
         start_up::initialize_rocks_db(rocksdb_path, &pg_pool.get().unwrap(), &mut redis5).await,
     );
+    let network = Server::new(keypair.to_bytes().to_vec(), socket, external_socket, bootnodes.clone());
+    let (network_sender, incomming_network_receiver) = network.channel().await;
     start_up::start_miner(
         &rocksdb,
         &pg_pool.get().unwrap(),
