@@ -175,7 +175,7 @@ async fn connect_to_peers(
         streams.push(write_half);
         peers.push(peer.clone())
     }
-    println!("connected to peers: {:?}", peers);
+    println!("Connected to peers: {}", peers.iter().map(|peer| format!("{}", peer)).collect::<Vec<String>>().join(", "));
 }
 
 async fn handle_outgoing_message<
@@ -218,7 +218,7 @@ async fn handle_incomming_stream(
         send(&mut write_half, &Protocol::Peers(peers.clone())).await;
         streams.push(write_half);
         peers.push(peer);
-        println!("added peer: {:?}", peer);
+        println!("Peer joined: {}", peer);
         spawn_read_loop(read_half, read_sender.clone()).await;
     }
 }
