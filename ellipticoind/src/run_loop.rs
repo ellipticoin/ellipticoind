@@ -31,6 +31,12 @@ pub async fn run(
         if is_block_winner(&mut vm_state, public_key.as_bytes().to_vec()) {
             let ((new_block, transactions), mut vm_state) =
                 mine_next_block(&mut redis_connection, db2, vm_state2).await;
+            println!("mined: {}", transactions
+                     .clone()
+                     .iter()
+                     .map(|t| t.function.clone())
+                     .collect::<Vec<String>>()
+                     .join(", "));
             vm_state.commit();
             new_block.clone().insert(&db, transactions.clone());
             websocket
@@ -47,6 +53,13 @@ pub async fn run(
         let (new_block, transactions) = new_block_receiver.next().map(Option::unwrap).await;
         if is_next_block(&new_block).await {
             new_block.clone().insert(&db, transactions.clone());
+            println!("applying: {}", transactions
+                     .clone()
+                     .iter()
+                     .map(|t| t.function.clone())
+                     .collect::<Vec<String>>()
+                     .join(", "));
+
             transaction_processor::apply_block(
                 &mut redis,
                 &mut vm_state,
