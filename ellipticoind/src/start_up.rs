@@ -119,6 +119,7 @@ fn random() -> u64 {
 }
 
 async fn post_transaction(transaction: vm::Transaction, mut network_sender: mpsc::Sender<Message>) {
+    println!("posting start_miner");
     network_sender
         .send(Message::Transaction(transaction))
         .await

@@ -105,6 +105,7 @@ impl<
             send(&mut write_half, &Protocol::Join(external_socket_addr)).await;
             let message = receive(&mut read_half).await;
             if let Ok(Protocol::Peers(new_peers)) = serde_cbor::from_slice(&message) {
+                peers.push(bootnode.clone());
                 connect_to_peers(
                     external_socket_addr,
                     &mut streams,
@@ -115,7 +116,6 @@ impl<
                 .await;
                 spawn_read_loop(read_half, read_sender.clone()).await;
                 streams.push(write_half);
-                peers.push(bootnode.clone());
             }
         };
         task::spawn(async move {
@@ -125,14 +125,13 @@ impl<
                 select! {
                     stream = next_stream_receiver_fused =>{
                         if let Some(stream) = stream {
-                            handle_incomming_stream(stream, &mut streams, peers.clone(), read_sender.clone()).await;
+                            handle_incomming_stream(stream, &mut streams, &mut peers, read_sender.clone()).await;
                         }
                 },
                     incomming_message = next_read_receiver_fused =>{
                         handle_incomming_message(incomming_message.unwrap(), &mut incomming_sender).await;},
                     outgoing_message = outgoing_receiver.next() =>{
                         if let Some(outgoing_message) = outgoing_message {
-                        println!("{:?}", peers);
                         handle_outgoing_message(&mut streams, outgoing_message).await
                         }},
                     complete => (),
@@ -176,6 +175,7 @@ async fn connect_to_peers(
         streams.push(write_half);
         peers.push(peer.clone())
     }
+    println!("connected to peers: {:?}", peers);
 }
 
 async fn handle_outgoing_message<
@@ -185,7 +185,6 @@ async fn handle_outgoing_message<
     outgoing_message: S,
 ) {
     for stream in streams {
-        println!("sending to {:?}", stream);
         let message = Protocol::Message(serde_cbor::to_vec(&outgoing_message).unwrap());
         send(stream, &message).await;
     }
@@ -195,7 +194,6 @@ async fn handle_incomming_message<D: DeserializeOwned + std::marker::Send + 'sta
     incomming_message: Vec<u8>,
     incomming_sender: &mut mpsc::Sender<D>,
 ) {
-    println!("receiveing");
     match serde_cbor::from_slice(&incomming_message) {
         Ok(Protocol::Message(incomming_message)) => {
             incomming_sender
@@ -210,15 +208,17 @@ async fn handle_incomming_message<D: DeserializeOwned + std::marker::Send + 'sta
 async fn handle_incomming_stream(
     stream: TcpStream,
     streams: &mut Vec<WriteHalf<TcpStream>>,
-    peers: Vec<SocketAddr>,
+    peers: &mut Vec<SocketAddr>,
     read_sender: mpsc::UnboundedSender<Vec<u8>>,
 ) {
-    println!("new connection from {:?}", stream.peer_addr());
+    // let peer = stream.peer_addr().unwrap();
     let (mut read_half, mut write_half) = stream.split();
     let message = receive(&mut read_half).await;
-    if let Ok(Protocol::Join(_)) = serde_cbor::from_slice(&message) {
-        send(&mut write_half, &Protocol::Peers(peers)).await;
+    if let Ok(Protocol::Join(peer)) = serde_cbor::from_slice(&message) {
+        send(&mut write_half, &Protocol::Peers(peers.clone())).await;
         streams.push(write_half);
+        peers.push(peer);
+        println!("added peer: {:?}", peer);
         spawn_read_loop(read_half, read_sender.clone()).await;
     }
 }
@@ -270,7 +270,7 @@ mod tests {
         );
         let (mut carols_sender, _carols_receiver) = carols_server.channel().await;
         carols_sender.send(message.clone()).await.unwrap();
-        assert_eq!(bobs_receiver.next().await.unwrap(), expected_message);
         assert_eq!(alices_receiver.next().await.unwrap(), expected_message);
+        assert_eq!(bobs_receiver.next().await.unwrap(), expected_message);
     }
 }
