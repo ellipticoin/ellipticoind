@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "ellipticoind",
-    // "token",
     "network",
     "vm",
 ]
