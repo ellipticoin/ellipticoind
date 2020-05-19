@@ -25,6 +25,7 @@ pub async fn handle_messages(
                     .await;
             }
             Some(Message::Transaction(transaction)) => {
+                println!("received tx");
                 redis
                     .rpush::<&str, Vec<u8>, ()>(
                         "transactions::pending",
