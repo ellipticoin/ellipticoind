@@ -136,6 +136,7 @@ fn process_transaction(transaction: vm::Transaction, redis: &mut vm::Client) {
         .unwrap();
 }
 pub async fn catch_up(
+    db: &PooledConnection<ConnectionManager<PgConnection>>,
     con: &mut vm::Client,
     vm_state: &mut vm::State, bootnodes: &Vec<SocketAddr>) {
     let mut bootnode = bootnodes[0];
@@ -159,14 +160,17 @@ pub async fn catch_up(
                      .clone()
                      .iter()
                      .map(|t|
-                          format!("{} {}", t.function.clone(), t.arguments[0])
+                          format!("{} {:?}", t.function.clone(),
+                          serde_cbor::from_slice::<serde_cbor::Value>(&t.arguments).unwrap()
+                          )
 
                      )
                      .collect::<Vec<String>>()
                      .join(", "));
 
-            crate::transaction_processor::apply_block(con, vm_state, block.clone(), transactions).await;
+            crate::transaction_processor::apply_block(con, vm_state, block.clone(), transactions.clone()).await;
             vm_state.commit();
+            block.clone().insert(&db, transactions.clone());
             *crate::BEST_BLOCK.lock().await = Some(block.clone());
             println!("random seed {}", base64::encode(
             &vm_state.get_storage(&[[0;32].to_vec(), "Ellipticoin".as_bytes().to_vec()].concat(), &vec![Namespace::RandomSeed as u8])));

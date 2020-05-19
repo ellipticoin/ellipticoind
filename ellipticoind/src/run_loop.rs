@@ -65,6 +65,7 @@ pub async fn run(
                 transactions.clone(),
             ).await;
             vm_state.commit();
+            new_block.clone().insert(&db, transactions.clone());
             websocket
                 .send::<api::Block>((&new_block, &transactions).into())
                 .await;
