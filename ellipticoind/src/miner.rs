@@ -48,17 +48,20 @@ pub async fn mine_next_block(
     let mut transactions = run_transactions(con, &mut vm_state, &block).await;
 
     let sender_nonce = random();
-    let skin: Vec<u8> = hash_onion
+    let skin: Vec<Value> = hash_onion
         .select(layer)
         .order(id.desc())
-        .first(&pg_db)
-        .unwrap();
+        .first::<Vec<u8>>(&pg_db)
+        .unwrap()
+        .into_iter()
+        .map(|n| n.into())
+        .collect();
     let reveal_transaction = vm::Transaction {
         contract_address: TOKEN_CONTRACT.to_vec(),
         sender: PUBLIC_KEY.to_vec(),
         nonce: sender_nonce,
         function: "reveal".to_string(),
-        arguments: vec![Value::Bytes(skin.clone().into())],
+        arguments: vec![skin.into()],
         gas_limit: 10000000,
     };
     let reveal_result = run_transaction(&mut vm_state, &reveal_transaction, &block);

@@ -8,7 +8,7 @@ use ellipticoin::{
 use errors;
 use ethereum;
 use hashing::sha256;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 enum Namespace {
     Allowences,
     Balances,
@@ -129,31 +129,31 @@ mod token {
             .unwrap()
     }
 
-    fn get_next_winner(miners: &HashMap<Vec<u8>, (u64, Vec<u8>)>) -> Vec<u8> {
+    fn get_next_winner(miners: &BTreeMap<Vec<u8>, (u64, Vec<u8>)>) -> Vec<u8> {
         let random_seed: [u8; 16] = get_random_seed();
         let mut rng = SmallRng::from_seed(random_seed);
         let mut bets: Vec<(Vec<u8>, u64)> = miners
             .iter()
             .map(|(miner, (bet_per_block, _hash))| (miner.to_vec(), *bet_per_block))
             .collect();
-        bets.sort_by(|(a, _), (b, _)| a.cmp(b));
+        bets.sort();//_by(|(a, _), (b, _)| a.cmp(b));
         bets.choose_weighted(&mut rng, |(_miner, bet_per_block)| *bet_per_block)
             .map(|(miner, _bet_per_block)| miner.to_vec())
             .unwrap_or_abort()
     }
 
-    fn get_miners() -> HashMap<Vec<u8>, (u64, Vec<u8>)> {
-        from_value(ellipticoin::get_storage(Namespace::Miners as u8)).unwrap_or(HashMap::new())
+    fn get_miners() -> BTreeMap<Vec<u8>, (u64, Vec<u8>)> {
+        from_value(ellipticoin::get_storage(Namespace::Miners as u8)).unwrap_or(BTreeMap::new())
     }
 
-    fn set_miners(miners: &HashMap<Vec<u8>, (u64, Vec<u8>)>) {
+    fn set_miners(miners: &BTreeMap<Vec<u8>, (u64, Vec<u8>)>) {
         ellipticoin::set_storage(
             Namespace::Miners as u8,
             to_value(miners).unwrap_or(Value::Null),
         );
     }
 
-    fn settle_block_rewards(winner: Vec<u8>, miners: &HashMap<Vec<u8>, (u64, Vec<u8>)>) {
+    fn settle_block_rewards(winner: Vec<u8>, miners: &BTreeMap<Vec<u8>, (u64, Vec<u8>)>) {
         for (miner, (bet_per_block, _hash)) in miners {
             if miner.to_vec() != winner.to_vec() {
                 credit(winner.to_vec(), *bet_per_block);

@@ -3,9 +3,8 @@ use crate::network::Message;
 use futures_util::sink::SinkExt;
 use indicatif::ProgressBar;
 use rand::Rng;
-use serde_bytes::ByteBuf;
-use serde_cbor::to_vec;
-use std::collections::HashMap;
+use serde_cbor::{to_vec, Value};
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::BufRead;
 use std::io::Read;
@@ -69,12 +68,12 @@ pub fn start_miner(
             .expect("BURN_PER_BLOCK no set")
             .parse()
             .unwrap();
-        let miners: HashMap<ByteBuf, (u64, ByteBuf)> = serde_cbor::from_slice(
+        let miners: BTreeMap<Vec<u8>, (u64, Vec<u8>)> = serde_cbor::from_slice(
             &db.get(db_key(&TOKEN_CONTRACT, &vec![Namespace::Miners as u8]))
                 .unwrap_or(Some(vec![]))
                 .unwrap_or(vec![]),
         )
-        .unwrap_or(HashMap::new());
+        .unwrap_or(BTreeMap::new());
         task::block_on(async {
             let skin: Vec<u8> = hash_onion
                 .select(layer)
@@ -88,7 +87,10 @@ pub fn start_miner(
                 function: "start_mining".to_string(),
                 arguments: vec![
                     serde_cbor::Value::Integer(burn_per_block),
-                    serde_cbor::Value::Bytes(skin.into()),
+                    skin
+            .into_iter()
+            .map(|n| n.into())
+            .collect::<Vec<serde_cbor::Value>>().into()
                 ],
                 gas_limit: 10000000,
             };
@@ -104,7 +106,7 @@ pub fn start_miner(
                 process_transaction(start_mining_transaction, redis);
             } else {
                 let current_burn_per_block =
-                    miners.get(&ByteBuf::from(public_key.as_bytes().to_vec()));
+                    miners.get(&public_key.as_bytes().to_vec());
                 if current_burn_per_block.is_none() {
                     post_transaction(start_mining_transaction, network_sender).await;
                 }
@@ -153,9 +155,21 @@ pub async fn catch_up(
                 transaction.set_hash();
                 transaction.block_hash = block.hash.clone();
             });
+            println!("applying: {}", transactions
+                     .clone()
+                     .iter()
+                     .map(|t|
+                          format!("{} {}", t.function.clone(), t.arguments[0])
+
+                     )
+                     .collect::<Vec<String>>()
+                     .join(", "));
+
             crate::transaction_processor::apply_block(con, vm_state, block.clone(), transactions).await;
             vm_state.commit();
             *crate::BEST_BLOCK.lock().await = Some(block.clone());
+            println!("random seed {}", base64::encode(
+            &vm_state.get_storage(&[[0;32].to_vec(), "Ellipticoin".as_bytes().to_vec()].concat(), &vec![Namespace::RandomSeed as u8])));
             println!("Applied block #{}", &block.number);
         } else {
             println!("Syncing complete");
@@ -300,16 +314,23 @@ pub async fn initialize_rocks_db(
         db.put(db_key(&TOKEN_CONTRACT, &vec![]), &token_wasm)
             .unwrap();
         generate_hash_onion(pg_db);
-        let skin: Vec<u8> = hash_onion
+        let skin: Vec<Value> = hash_onion
             .select(layer)
             .order(id.desc())
-            .first(pg_db)
-            .unwrap();
-        let mut miners: HashMap<ByteBuf, (u64, ByteBuf)> = HashMap::new();
+            .first::<Vec<u8>>(pg_db)
+            .unwrap()
+            .into_iter()
+            .map(|n| n.into())
+            .collect();
+        let mut miners: BTreeMap<Vec<Value>, (u64, Vec<Value>)> = BTreeMap::new();
         miners.insert(
-            ByteBuf::from(GENISIS_ADRESS.to_vec()),
-            (100 as u64, ByteBuf::from(skin.clone())),
+            GENISIS_ADRESS.to_vec()
+            .into_iter()
+            .map(|n| n.into())
+            .collect(),
+            (100 as u64, skin.clone()),
         );
+
         sql_query(
             "delete from hash_onion where id in (
         select id from hash_onion order by id desc limit 1
