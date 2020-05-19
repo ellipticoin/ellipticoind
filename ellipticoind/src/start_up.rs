@@ -166,7 +166,7 @@ pub async fn catch_up(
                     std::cmp::Ordering::Equal
                 }
             });
-            crate::transaction_processor::apply_block(con, vm_state, block.clone(), transactions.clone()).await;
+            crate::transaction_processor::apply_block(con, vm_state, block.clone(), ordered_transactions).await;
             vm_state.commit();
             block.clone().insert(&db, transactions.clone());
             *crate::BEST_BLOCK.lock().await = Some(block.clone());
@@ -227,7 +227,7 @@ pub async fn initialize_rocks_db(
         let db = vm::rocksdb::DB::open_default(path).unwrap();
         // let file = File::open("dist/ethereum-balances-9858734.bin").unwrap();
         let file = File::open("dist/development-balances.bin").unwrap();
-        let metadata = std::fs::metadata("dist/ethereum-balances-9858734.bin").unwrap();
+        let metadata = std::fs::metadata("dist/ethereum-balances-10054080.bin").unwrap();
         let pb = ProgressBar::new(metadata.len() / 24);
         println!("Importing Ethereum Balances");
         pb.set_style(
