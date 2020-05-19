@@ -12,14 +12,6 @@ use futures::channel::mpsc;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use futures_util::sink::SinkExt;
-pub enum Namespace {
-    _Allowences,
-    Balances,
-    CurrentMiner,
-    Miners,
-    RandomSeed,
-    EthereumBalances,
-}
 
 pub async fn run(
     public_key: std::sync::Arc<PublicKey>,
@@ -48,8 +40,6 @@ pub async fn run(
                 .send(Message::Block((new_block.clone(), transactions.clone())))
                 .await
                 .unwrap();
-            println!("random seed {}", base64::encode(
-            &vm_state.get_storage(&[[0;32].to_vec(), "Ellipticoin".as_bytes().to_vec()].concat(), &vec![Namespace::RandomSeed as u8])));
             println!("Mined block #{}", &new_block.number);
             *BEST_BLOCK.lock().await = Some(new_block.clone());
             continue;

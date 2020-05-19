@@ -156,17 +156,6 @@ pub async fn catch_up(
                 transaction.set_hash();
                 transaction.block_hash = block.hash.clone();
             });
-            // println!("applying: {}", transactions
-            //          .clone()
-            //          .iter()
-            //          .map(|t|
-            //               format!("{}", t.function.clone()
-            //               // serde_cbor::from_slice::<serde_cbor::Value>(&t.arguments).unwrap()
-            //               )
-            //
-            //          )
-            //          .collect::<Vec<String>>()
-            //          .join(", "));
             let mut ordered_transactions = transactions.clone();
             ordered_transactions.sort_by(|a, b|
                 if a.function == "start_miner" {
@@ -181,8 +170,6 @@ pub async fn catch_up(
             vm_state.commit();
             block.clone().insert(&db, transactions.clone());
             *crate::BEST_BLOCK.lock().await = Some(block.clone());
-            println!("random seed {}", base64::encode(
-            &vm_state.get_storage(&[[0;32].to_vec(), "Ellipticoin".as_bytes().to_vec()].concat(), &vec![Namespace::RandomSeed as u8])));
             println!("Applied block #{}", &block.number);
         } else {
             println!("Syncing complete");
