@@ -157,15 +157,15 @@ pub async fn catch_up(
                 transaction.block_hash = block.hash.clone();
             });
             let mut ordered_transactions = transactions.clone();
-            ordered_transactions.sort_by(|a, b|
-                if a.function == "start_miner" {
-                    std::cmp::Ordering::Greater
-                } else if b.function == "start_miner" {
+            ordered_transactions.sort_by(|a, b| {
+                if a.function == "start_mining" {
                     std::cmp::Ordering::Less
+                } else if b.function == "start_mining" {
+                    std::cmp::Ordering::Greater
                 } else {
                     std::cmp::Ordering::Equal
                 }
-            );
+            });
             crate::transaction_processor::apply_block(con, vm_state, block.clone(), transactions.clone()).await;
             vm_state.commit();
             block.clone().insert(&db, transactions.clone());
