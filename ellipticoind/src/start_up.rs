@@ -167,7 +167,16 @@ pub async fn catch_up(
             //          )
             //          .collect::<Vec<String>>()
             //          .join(", "));
-
+            let mut ordered_transactions = transactions.clone();
+            ordered_transactions.sort_by(|a, b|
+                if a.function == "start_miner" {
+                    std::cmp::Ordering::Greater
+                } else if b.function == "start_miner" {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            );
             crate::transaction_processor::apply_block(con, vm_state, block.clone(), transactions.clone()).await;
             vm_state.commit();
             block.clone().insert(&db, transactions.clone());
