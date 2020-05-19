@@ -56,8 +56,6 @@ pub async fn run(
         }
         let (new_block, transactions) = new_block_receiver.next().map(Option::unwrap).await;
         if is_next_block(&new_block).await {
-            new_block.clone().insert(&db, transactions.clone());
-
             transaction_processor::apply_block(
                 &mut redis,
                 &mut vm_state,
@@ -70,7 +68,6 @@ pub async fn run(
                 .send::<api::Block>((&new_block, &transactions).into())
                 .await;
             println!("Applied block #{}", &new_block.number);
-        println!("here");
             *BEST_BLOCK.lock().await = Some(new_block.clone());
         }
     }
