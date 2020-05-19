@@ -101,7 +101,7 @@ pub async fn run(
     );
     let mut vm_state = vm::State::new(redis2.get_connection().unwrap(), rocksdb.clone());
     if env::var("GENISIS_NODE").is_err() {
-        crate::start_up::catch_up(&mut redis7, &mut vm_state, &bootnodes).await;
+        crate::start_up::catch_up(&pg_pool.get().unwrap(), &mut redis7, &mut vm_state, &bootnodes).await;
     }
     let network = Server::new(keypair.to_bytes().to_vec(), socket, external_socket, bootnodes.clone());
     let (network_sender, incomming_network_receiver) = network.channel().await;
