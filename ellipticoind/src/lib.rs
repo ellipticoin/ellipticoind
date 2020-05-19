@@ -43,8 +43,6 @@ use rand::rngs::OsRng;
 use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
-use async_std::task;
 
 lazy_static! {
     static ref BEST_BLOCK: async_std::sync::Arc<Mutex<Option<Block>>> =
@@ -107,7 +105,7 @@ pub async fn run(
     }
     let network = Server::new(keypair.to_bytes().to_vec(), socket, external_socket, bootnodes.clone());
     let (network_sender, incomming_network_receiver) = network.channel().await;
-    task::sleep(Duration::from_secs(5)).await;
+    // task::sleep(Duration::from_secs(5)).await;
     start_up::start_miner(
         &rocksdb,
         &pg_pool.get().unwrap(),

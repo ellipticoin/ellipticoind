@@ -12,6 +12,14 @@ use futures::channel::mpsc;
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use futures_util::sink::SinkExt;
+pub enum Namespace {
+    _Allowences,
+    Balances,
+    CurrentMiner,
+    Miners,
+    RandomSeed,
+    EthereumBalances,
+}
 
 pub async fn run(
     public_key: std::sync::Arc<PublicKey>,
@@ -31,14 +39,6 @@ pub async fn run(
         if is_block_winner(&mut vm_state, public_key.as_bytes().to_vec()) {
             let ((new_block, transactions), mut vm_state) =
                 mine_next_block(&mut redis_connection, db2, vm_state2).await;
-            println!("mined: {}", transactions
-                     .clone()
-                     .iter()
-                     .map(|t|
-                          format!("{} {}", t.function.clone(), t.arguments[0])
-                        )
-                     .collect::<Vec<String>>()
-                     .join(", "));
             vm_state.commit();
             new_block.clone().insert(&db, transactions.clone());
             websocket
@@ -48,6 +48,8 @@ pub async fn run(
                 .send(Message::Block((new_block.clone(), transactions.clone())))
                 .await
                 .unwrap();
+            println!("random seed {}", base64::encode(
+            &vm_state.get_storage(&[[0;32].to_vec(), "Ellipticoin".as_bytes().to_vec()].concat(), &vec![Namespace::RandomSeed as u8])));
             println!("Mined block #{}", &new_block.number);
             *BEST_BLOCK.lock().await = Some(new_block.clone());
             continue;
@@ -55,15 +57,6 @@ pub async fn run(
         let (new_block, transactions) = new_block_receiver.next().map(Option::unwrap).await;
         if is_next_block(&new_block).await {
             new_block.clone().insert(&db, transactions.clone());
-            println!("applying: {}", transactions
-                     .clone()
-                     .iter()
-                     .map(|t|
-                          format!("{} {}", t.function.clone(), t.arguments[0])
-
-                     )
-                     .collect::<Vec<String>>()
-                     .join(", "));
 
             transaction_processor::apply_block(
                 &mut redis,
@@ -76,6 +69,7 @@ pub async fn run(
                 .send::<api::Block>((&new_block, &transactions).into())
                 .await;
             println!("Applied block #{}", &new_block.number);
+        println!("here");
             *BEST_BLOCK.lock().await = Some(new_block.clone());
         }
     }
