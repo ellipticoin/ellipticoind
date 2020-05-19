@@ -22,7 +22,8 @@ pub async fn apply_block(
     con: &mut vm::Client,
     mut vm_state: &mut vm::State, block: Block, transactions: Vec<Transaction>) {
     for transaction in transactions.into_iter() {
-        run_transaction(&mut vm_state, &transaction.clone().into(), &block);
+        let completed_transaction = run_transaction(&mut vm_state, &transaction.clone().into(), &block);
+        println!("result: {:?}", serde_cbor::from_slice::<serde_cbor::Value>(&completed_transaction.return_value));
         remove_from_pending(&mut con.get_connection().unwrap(), &transaction.into()).await;
     }
 }
@@ -37,6 +38,7 @@ pub async fn run_transactions(
     while now.elapsed() < *TRANSACTION_PROCESSING_TIME {
         if let Some(transaction) = get_next_transaction(con).await {
             let completed_transaction = run_transaction(&mut vm_state, &transaction, &block);
+            println!("result: {:?}", serde_cbor::from_slice::<serde_cbor::Value>(&completed_transaction.return_value));
             remove_from_processing(con, &transaction).await;
             completed_transactions.push(completed_transaction);
         } else {

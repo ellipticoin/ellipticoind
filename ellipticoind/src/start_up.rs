@@ -156,17 +156,17 @@ pub async fn catch_up(
                 transaction.set_hash();
                 transaction.block_hash = block.hash.clone();
             });
-            println!("applying: {}", transactions
-                     .clone()
-                     .iter()
-                     .map(|t|
-                          format!("{} {:?}", t.function.clone(),
-                          serde_cbor::from_slice::<serde_cbor::Value>(&t.arguments).unwrap()
-                          )
-
-                     )
-                     .collect::<Vec<String>>()
-                     .join(", "));
+            // println!("applying: {}", transactions
+            //          .clone()
+            //          .iter()
+            //          .map(|t|
+            //               format!("{}", t.function.clone()
+            //               // serde_cbor::from_slice::<serde_cbor::Value>(&t.arguments).unwrap()
+            //               )
+            //
+            //          )
+            //          .collect::<Vec<String>>()
+            //          .join(", "));
 
             crate::transaction_processor::apply_block(con, vm_state, block.clone(), transactions.clone()).await;
             vm_state.commit();
