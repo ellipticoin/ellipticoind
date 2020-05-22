@@ -9,6 +9,7 @@ mod addresses;
 pub mod app;
 mod blocks;
 mod memory;
+mod storage;
 mod transactions;
 pub mod views;
 pub mod websocket;
