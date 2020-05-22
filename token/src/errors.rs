@@ -9,7 +9,13 @@ pub const INVALID_VALUE: Error = Error {
     code: 2,
     message: "Invalid value",
 };
+
 pub const INSUFFICIENT_FUNDS: Error = Error {
     code: 3,
     message: "Insufficient funds",
+};
+
+pub const BALANCE_ALREADY_UNLOCKED: Error = Error {
+    code: 4,
+    message: "Balance has already been unlocked",
 };

@@ -10,7 +10,7 @@ use std::io::BufRead;
 use std::io::Read;
 use std::path::Path;
 
-use crate::constants::{GENISIS_ADRESS, TOKEN_CONTRACT};
+use crate::constants::{GENISIS_ADRESS, TOKEN_CONTRACT, Namespace};
 use crate::diesel::ExpressionMethods;
 use crate::diesel::QueryDsl;
 use crate::diesel::RunQueryDsl;
@@ -28,24 +28,16 @@ use std::net::SocketAddr;
 use vm::state::db_key;
 use vm::Commands;
 
-pub enum Namespace {
-    _Allowences,
-    Balances,
-    CurrentMiner,
-    Miners,
-    RandomSeed,
-    EthereumBalances,
-}
 // Mason's Ethereum Address
 pub const GENISIS_ETHEREUM_ADRESS: [u8; 20] = hex!("3073ac44aA1b95f2fe71Bb2eb36b9CE27892F8ee");
 // First 16 bytes of the block hash of block #10054080
 pub const RANDOM_SEED: [u8; 16] = hex!("da466bf1ce3c69dbef918817305cf989");
-lazy_static! {
-    pub static ref RANDOM_SEED_ENUM: Vec<u8> = vec![4];
-    pub static ref ETHEREUM_BALANCE_ENUM: Vec<u8> = vec![5];
-    pub static ref BALANCES_ENUM: Vec<u8> = vec![1];
-    pub static ref CURRENT_MINER_ENUM: Vec<u8> = vec![2];
-}
+// lazy_static! {
+//     pub static ref RANDOM_SEED_ENUM: Vec<u8> = vec![4];
+//     pub static ref ETHEREUM_BALANCE_ENUM: Vec<u8> = vec![5];
+//     pub static ref BALANCES_ENUM: Vec<u8> = vec![1];
+//     pub static ref CURRENT_MINER_ENUM: Vec<u8> = vec![2];
+// }
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct Transaction {
@@ -250,7 +242,7 @@ pub async fn initialize_rocks_db(
                     batch.put(
                         db_key(
                             &TOKEN_CONTRACT,
-                            &[ETHEREUM_BALANCE_ENUM.to_vec(), chunk[0..20].to_vec()].concat(),
+                            &[vec![Namespace::EthereumBalances as u8], chunk[0..20].to_vec()].concat(),
                         ),
                         (u64::from_le_bytes(
                             [chunk[20..24].to_vec(), [0; 4].to_vec()].concat()[..]

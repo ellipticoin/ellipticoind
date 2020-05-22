@@ -13,9 +13,10 @@ enum Namespace {
     Allowences,
     Balances,
     CurrentMiner,
+    EthereumBalances,
     Miners,
     RandomSeed,
-    EthereumBalances,
+    UnlockedEthereumBalances,
 }
 
 use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
@@ -73,8 +74,13 @@ mod token {
         let encoded_ellipticoin_adress = base64::encode_config(&ellipticoin_address, base64::URL_SAFE_NO_PAD);
         let message = format!("Unlock Ellipticoin at address: {}", encoded_ellipticoin_adress);
         let address = ethereum::ecrecover_address(message.as_bytes(), &unlock_signature);
+        if get_storage(Namespace::UnlockedEthereumBalances, address.clone()) {
+            return Err(errors::BALANCE_ALREADY_UNLOCKED)
+        };
         let balance: u64 = get_storage::<_, u64>(Namespace::EthereumBalances, address.clone()) * 10;
-        credit(sender(), balance);
+
+        credit(ellipticoin_address, balance);
+        set_storage(Namespace::UnlockedEthereumBalances, address.clone() , true);
         Ok(balance.into())
     }
 
@@ -182,6 +188,11 @@ mod token {
     fn get_storage<K: ToBytes, V: FromBytes>(namespace: Namespace, key: K) -> V {
         ellipticoin::get_storage([vec![namespace as u8], key.to_bytes()].concat())
     }
+
+    fn set_storage<K: ToBytes, V: ToBytes>(namespace: Namespace, key: K, value: V) {
+        ellipticoin::set_storage([vec![namespace as u8], key.to_bytes()].concat(), value);
+    }
+
 }
 
 #[cfg(test)]
@@ -239,16 +250,31 @@ mod tests {
 
     #[test]
     fn test_unlock_ether() {
-        let ethereum_address = "ab521188aa30ccc4a88ec9ea6bc55541b72ed1d3";
+        let ethereum_address = "adfe2b5beac83382c047d977db1df977fd9a7e41";
         set_sender(ALICE.to_vec());
-        set_memory(
+        set_storage(
             Namespace::EthereumBalances,
             hex::decode(ethereum_address).unwrap(),
             1000 as u64,
         );
-        unlock_ether(hex::decode(&"8abd62d3b576b1783f0eced4c039fecfa12e3c053c63fcfeaa55228772fd1fc130d8dd1df6bce2a8b6eaefdad815c87248af054619a373715ad6698ce686f4a71b").unwrap());
+        unlock_ether(hex::decode(&"e8fe080305be6153dda25cd046f022fe93fce9e9abf7443cb602236317769ea3007922a1ee66a8dc64caae93bd7073af95633bb64389b61679c83c05590d1fbf1c").unwrap(), ALICE.to_vec()).unwrap();
         let alices_balance = balance_of(ALICE.to_vec());
-        assert_eq!(alices_balance, 1000);
+        assert_eq!(alices_balance, 10000);
+    }
+
+    #[test]
+    fn test_unlock_ether_twice() {
+        let ethereum_address = "adfe2b5beac83382c047d977db1df977fd9a7e41";
+        set_sender(ALICE.to_vec());
+        set_storage(
+            Namespace::EthereumBalances,
+            hex::decode(ethereum_address).unwrap(),
+            1000 as u64,
+        );
+        unlock_ether(hex::decode(&"e8fe080305be6153dda25cd046f022fe93fce9e9abf7443cb602236317769ea3007922a1ee66a8dc64caae93bd7073af95633bb64389b61679c83c05590d1fbf1c").unwrap(), ALICE.to_vec()).unwrap();
+        assert!(unlock_ether(hex::decode(&"e8fe080305be6153dda25cd046f022fe93fce9e9abf7443cb602236317769ea3007922a1ee66a8dc64caae93bd7073af95633bb64389b61679c83c05590d1fbf1c").unwrap(), ALICE.to_vec()).is_err());
+        let alices_balance = balance_of(ALICE.to_vec());
+        assert_eq!(alices_balance, 10000);
     }
 
     #[test]
