@@ -11,12 +11,16 @@ pub fn wasm_trap(trap: metered_wasmi::Trap) -> Result {
     (1, format!("WebAssembly Trap: {:?}", trap.kind()).into())
 }
 
+pub fn function_does_not_exist(function: &str) -> Result {
+    (2, format!("Function {} doesn't exist on contract", function.to_string()).into())
+}
+
 pub fn contract_not_found(_transaction: &Transaction) -> Result {
-    (2, "Contract not found".to_string().into())
+    (3, "Contract not found".to_string().into())
 }
 
 pub fn invalid_wasm() -> Result {
-    (3, "Invalid WebAssembly Code".to_string().into())
+    (4, "Invalid WebAssembly Code".to_string().into())
 }
 
 pub fn to_bytes(result: Result) -> Vec<u8> {

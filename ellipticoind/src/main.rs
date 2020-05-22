@@ -79,7 +79,6 @@ async fn main() {
                     })
                     .collect::<Vec<SocketAddr>>();
             }
-            println!("{:?}", &base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap().len());
             let private_key =
                 Keypair::from_bytes(&base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap())
                     .unwrap();

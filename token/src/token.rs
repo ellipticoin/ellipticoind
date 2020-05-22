@@ -69,19 +69,18 @@ mod token {
         );
     }
 
-    pub fn unlock(unlock_signature: Vec<u8>) {
-        let message = "unlock_ellipticoin";
+    pub fn unlock_ether(unlock_signature: Vec<u8>, ellipticoin_address: Vec<u8>) -> Result<Value, Error> {
+        let encoded_ellipticoin_adress = base64::encode_config(&ellipticoin_address, base64::URL_SAFE_NO_PAD);
+        let message = format!("Unlock Ellipticoin at address: {}", encoded_ellipticoin_adress);
         let address = ethereum::ecrecover_address(message.as_bytes(), &unlock_signature);
-        let balance = get_memory(Namespace::EthereumBalances, address);
+        let balance: u64 = get_storage::<_, u64>(Namespace::EthereumBalances, address.clone()) * 10;
         credit(sender(), balance);
+        Ok(balance.into())
     }
 
     pub fn start_mining(bet_per_block: u64, hash_onion: Vec<u8>) -> Result<Value, Error> {
         let mut miners = get_miners();
-        miners.insert(
-            sender(),
-            (bet_per_block, hash_onion.clone().to_vec()),
-        );
+        miners.insert(sender(), (bet_per_block, hash_onion.clone().to_vec()));
         set_miners(&miners);
         Ok(Value::Null)
     }
@@ -136,7 +135,7 @@ mod token {
             .iter()
             .map(|(miner, (bet_per_block, _hash))| (miner.to_vec(), *bet_per_block))
             .collect();
-        bets.sort();//_by(|(a, _), (b, _)| a.cmp(b));
+        bets.sort(); //_by(|(a, _), (b, _)| a.cmp(b));
         bets.choose_weighted(&mut rng, |(_miner, bet_per_block)| *bet_per_block)
             .map(|(miner, _bet_per_block)| miner.to_vec())
             .unwrap_or_abort()
@@ -178,6 +177,10 @@ mod token {
 
     fn get_memory<K: ToBytes, V: FromBytes>(namespace: Namespace, key: K) -> V {
         ellipticoin::get_memory([vec![namespace as u8], key.to_bytes()].concat())
+    }
+
+    fn get_storage<K: ToBytes, V: FromBytes>(namespace: Namespace, key: K) -> V {
+        ellipticoin::get_storage([vec![namespace as u8], key.to_bytes()].concat())
     }
 }
 
@@ -235,15 +238,15 @@ mod tests {
     }
 
     #[test]
-    fn test_unlock_coins() {
-        let ethereum_address = "43c01ab76d50c59e3893858ace624df81a14a596";
+    fn test_unlock_ether() {
+        let ethereum_address = "ab521188aa30ccc4a88ec9ea6bc55541b72ed1d3";
         set_sender(ALICE.to_vec());
         set_memory(
             Namespace::EthereumBalances,
             hex::decode(ethereum_address).unwrap(),
             1000 as u64,
         );
-        unlock(hex::decode(&"4171741d3dbe24e2b4220b0be8be36b1f2dbc84be581137c43901fdb424ca8d22e325f518de61170706dac9dcd40eb9202f6623f234b22edd27cf4cdbd0eb7161c").unwrap());
+        unlock_ether(hex::decode(&"8abd62d3b576b1783f0eced4c039fecfa12e3c053c63fcfeaa55228772fd1fc130d8dd1df6bce2a8b6eaefdad815c87248af054619a373715ad6698ce686f4a71b").unwrap());
         let alices_balance = balance_of(ALICE.to_vec());
         assert_eq!(alices_balance, 1000);
     }
