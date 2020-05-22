@@ -1,4 +1,3 @@
-use vm::zero_pad_vec;
 pub const SYSTEM_ADDRESS: [u8; 32] = [0; 32];
 // vQMn3JvS3ATITteQ+gOYfuVSn2buuAH+4e8NY/CvtwA= in hex
 pub const GENISIS_ADRESS: [u8; 32] =
