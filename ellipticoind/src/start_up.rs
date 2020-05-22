@@ -36,8 +36,10 @@ pub enum Namespace {
     RandomSeed,
     EthereumBalances,
 }
-pub const GENISIS_ETHEREUM_ADRESS: [u8; 20] = hex!("Adfe2B5BeAc83382C047d977db1df977FD9a7e41");
-pub const RANDOM_SEED: [u8; 16] = hex!("46c621ec8e2478445018fb92ba7cc555");
+// Mason's Ethereum Address
+pub const GENISIS_ETHEREUM_ADRESS: [u8; 20] = hex!("3073ac44aA1b95f2fe71Bb2eb36b9CE27892F8ee");
+// First 16 bytes of the block hash of block #10054080
+pub const RANDOM_SEED: [u8; 16] = hex!("da466bf1ce3c69dbef918817305cf989");
 lazy_static! {
     pub static ref RANDOM_SEED_ENUM: Vec<u8> = vec![4];
     pub static ref ETHEREUM_BALANCE_ENUM: Vec<u8> = vec![5];
@@ -225,8 +227,8 @@ pub async fn initialize_rocks_db(
         vm::rocksdb::DB::open_default(path).unwrap()
     } else {
         let db = vm::rocksdb::DB::open_default(path).unwrap();
-        // let file = File::open("dist/ethereum-balances-9858734.bin").unwrap();
-        let file = File::open("dist/development-balances.bin").unwrap();
+        let file = File::open("dist/ethereum-balances-10054080.bin").unwrap();
+        // let file = File::open("dist/development-balances.bin").unwrap();
         let metadata = std::fs::metadata("dist/ethereum-balances-10054080.bin").unwrap();
         let pb = ProgressBar::new(metadata.len() / 24);
         println!("Importing Ethereum Balances");
@@ -238,11 +240,13 @@ pub async fn initialize_rocks_db(
         let mut batch = rocksdb::WriteBatch::default();
         const CAP: usize = 24 * 1000;
         let mut reader = std::io::BufReader::with_capacity(CAP, file);
+        let mut total: u64 = 0;
 
         loop {
             let length = {
                 let buffer = reader.fill_buf().unwrap();
                 for chunk in buffer.chunks(24) {
+                    total += u32::from_le_bytes(chunk[20..24].try_into().unwrap()) as u64;
                     batch.put(
                         db_key(
                             &TOKEN_CONTRACT,
@@ -252,7 +256,7 @@ pub async fn initialize_rocks_db(
                             [chunk[20..24].to_vec(), [0; 4].to_vec()].concat()[..]
                                 .try_into()
                                 .unwrap(),
-                        ) * 10)
+                        ))
                             .to_le_bytes()
                             .to_vec(),
                     );
@@ -268,6 +272,7 @@ pub async fn initialize_rocks_db(
             reader.consume(length);
         }
         pb.finish();
+        println!("Total EC in ever: {}", total);
 
         let genesis_balance = db
             .get(db_key(

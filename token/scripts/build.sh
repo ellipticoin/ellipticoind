@@ -15,9 +15,9 @@ if ! command -v  wasm-snip > /dev/null; then
   cargo install wasm-snip
 fi
 
-wasm-snip --snip-rust-fmt-code --snip-rust-panicking-code $FILE_NAME -o $FILE_NAME
-wasm-gc $FILE_NAME
-wasm-opt -Oz --strip-debug --strip-producers $FILE_NAME -o $FILE_NAME
+#wasm-snip --snip-rust-fmt-code --snip-rust-panicking-code $FILE_NAME -o $FILE_NAME
+#wasm-gc $FILE_NAME
+#wasm-opt -Oz --strip-debug --strip-producers $FILE_NAME -o $FILE_NAME
 
 mkdir -p $DIST_DIR
 
