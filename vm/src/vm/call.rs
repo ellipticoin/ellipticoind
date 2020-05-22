@@ -19,7 +19,7 @@ impl<'a> VM<'a> {
                 (result::from_bytes(self.read_pointer(value)), self.gas)
             }
             Err(metered_wasmi::Error::Trap(trap)) => (result::wasm_trap(trap), self.gas),
-            Err(error) => (result::function_does_not_exist(func), self.gas),
+            Err(_) => (result::function_does_not_exist(func), self.gas),
             _ => panic!("vm error"),
         }
     }
