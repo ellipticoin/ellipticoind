@@ -106,6 +106,12 @@ pub async fn run(
     let network = Server::new(keypair.to_bytes().to_vec(), socket, external_socket, bootnodes.clone());
     let (network_sender, incomming_network_receiver) = network.channel().await;
     // task::sleep(Duration::from_secs(5)).await;
+    use std::io::Read;
+    let mut token_file = std::fs::File::open("../token/dist/token.wasm").unwrap();
+    let mut token_wasm = Vec::new();
+    token_file.read_to_end(&mut token_wasm).unwrap();
+    rocksdb.put(vm::state::db_key(&crate::constants::TOKEN_CONTRACT, &vec![]), &token_wasm)
+        .unwrap();
     start_up::start_miner(
         &rocksdb,
         &pg_pool.get().unwrap(),
