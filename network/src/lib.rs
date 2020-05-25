@@ -42,16 +42,16 @@ pub struct Server<S: Clone + Serialize + std::marker::Send, D: DeserializeOwned>
 async fn send(stream: &mut WriteHalf<TcpStream>, message: &Protocol) {
     let outgoing_message_bytes = serde_cbor::to_vec(&message).unwrap();
     let length_bytes = u32::to_le_bytes(outgoing_message_bytes.len() as u32);
-    stream.write_all(&length_bytes).await.unwrap();
-    stream.write_all(&outgoing_message_bytes).await.unwrap();
+    let _ = stream.write_all(&length_bytes).await;
+    let _ = stream.write_all(&outgoing_message_bytes).await;
 }
 
 pub async fn receive(read_half: &mut futures::io::ReadHalf<TcpStream>) -> Vec<u8> {
     let mut length_buf = [0u8; mem::size_of::<u32>()];
-    read_half.read(&mut length_buf).await.unwrap();
+    let _ = read_half.read(&mut length_buf).await;
     let length = u32::from_le_bytes(length_buf) as usize;
     let mut buf = vec![0u8; length];
-    read_half.read_exact(&mut buf).await.unwrap();
+    let _ = read_half.read_exact(&mut buf).await;
     buf
 }
 
@@ -61,7 +61,7 @@ pub async fn spawn_read_loop(
 ) {
     task::spawn(async move {
         loop {
-            sender.send(receive(&mut read_half).await).await.unwrap();
+            let _ = sender.send(receive(&mut read_half).await).await;
         }
     });
 }
@@ -196,10 +196,9 @@ async fn handle_incomming_message<D: DeserializeOwned + std::marker::Send + 'sta
 ) {
     match serde_cbor::from_slice(&incomming_message) {
         Ok(Protocol::Message(incomming_message)) => {
-            incomming_sender
+            let _ = incomming_sender
                 .send(serde_cbor::from_slice(&incomming_message).unwrap())
-                .await
-                .unwrap();
+                .await;
         }
         _ => (),
     }
@@ -211,7 +210,6 @@ async fn handle_incomming_stream(
     peers: &mut Vec<SocketAddr>,
     read_sender: mpsc::UnboundedSender<Vec<u8>>,
 ) {
-    // let peer = stream.peer_addr().unwrap();
     let (mut read_half, mut write_half) = stream.split();
     let message = receive(&mut read_half).await;
     if let Ok(Protocol::Join(peer)) = serde_cbor::from_slice(&message) {
