@@ -6,7 +6,6 @@ extern crate rocksdb;
 extern crate serde;
 extern crate serde_cbor;
 extern crate sha2;
-extern crate tokio;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
@@ -46,13 +45,16 @@ use std::sync::Arc;
 
 lazy_static! {
     static ref BEST_BLOCK: async_std::sync::Arc<Mutex<Option<Block>>> =
-         async_std::sync::Arc::new(Mutex::new(None)) ;
+        async_std::sync::Arc::new(Mutex::new(None));
 }
 
 pub fn generate_keypair() {
     let mut csprng = OsRng {};
     let keypair: Keypair = Keypair::generate(&mut csprng);
-    println!("Public Key (Address): {}", base64::encode(&keypair.public.to_bytes()));
+    println!(
+        "Public Key (Address): {}",
+        base64::encode(&keypair.public.to_bytes())
+    );
     println!(
         "Private Key: {}",
         base64::encode(&keypair.to_bytes().to_vec())
@@ -101,16 +103,31 @@ pub async fn run(
     );
     let mut vm_state = vm::State::new(redis2.get_connection().unwrap(), rocksdb.clone());
     if env::var("GENISIS_NODE").is_err() {
-        crate::start_up::catch_up(&pg_pool.get().unwrap(), &mut redis7, &mut vm_state, &bootnodes).await;
+        crate::start_up::catch_up(
+            &pg_pool.get().unwrap(),
+            &mut redis7,
+            &mut vm_state,
+            &bootnodes,
+        )
+        .await;
     }
-    let network = Server::new(keypair.to_bytes().to_vec(), socket, external_socket, bootnodes.clone());
+    let network = Server::new(
+        keypair.to_bytes().to_vec(),
+        socket,
+        external_socket,
+        bootnodes.clone(),
+    );
     let (network_sender, incomming_network_receiver) = network.channel().await;
     // task::sleep(Duration::from_secs(5)).await;
     use std::io::Read;
     let mut token_file = std::fs::File::open("../token/dist/token.wasm").unwrap();
     let mut token_wasm = Vec::new();
     token_file.read_to_end(&mut token_wasm).unwrap();
-    rocksdb.put(vm::state::db_key(&crate::constants::TOKEN_CONTRACT, &vec![]), &token_wasm)
+    rocksdb
+        .put(
+            vm::state::db_key(&crate::constants::TOKEN_CONTRACT, &vec![]),
+            &token_wasm,
+        )
         .unwrap();
     start_up::start_miner(
         &rocksdb,
@@ -118,7 +135,8 @@ pub async fn run(
         &mut redis6,
         keypair.public,
         network_sender.clone(),
-    );
+    )
+    .await;
     let api_state = api::State::new(redis, rocksdb.clone(), pg_pool, network_sender.clone());
     let (new_block_sender, new_block_receiver) = channel(1);
     async_std::task::spawn(api(api_state).listen(api_socket));

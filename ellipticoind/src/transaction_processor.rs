@@ -20,7 +20,10 @@ lazy_static! {
 }
 pub async fn apply_block(
     con: &mut vm::Client,
-    mut vm_state: &mut vm::State, block: Block, transactions: Vec<Transaction>) {
+    mut vm_state: &mut vm::State,
+    block: Block,
+    transactions: Vec<Transaction>,
+) {
     for transaction in transactions.into_iter() {
         run_transaction(&mut vm_state, &transaction.clone().into(), &block);
         remove_from_pending(&mut con.get_connection().unwrap(), &transaction.into()).await;
