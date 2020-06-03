@@ -232,13 +232,11 @@ pub async fn initialize_rocks_db(
         let mut batch = rocksdb::WriteBatch::default();
         const CAP: usize = 24 * 1000;
         let mut reader = std::io::BufReader::with_capacity(CAP, file);
-        let mut total: u64 = 0;
 
         loop {
             let length = {
                 let buffer = reader.fill_buf().unwrap();
                 for chunk in buffer.chunks(24) {
-                    total += u32::from_le_bytes(chunk[20..24].try_into().unwrap()) as u64;
                     batch.put(
                         db_key(
                             &TOKEN_CONTRACT,
@@ -264,9 +262,8 @@ pub async fn initialize_rocks_db(
             reader.consume(length);
         }
         pb.finish();
-        println!("Total EC in ever: {}", total);
 
-        let genesis_balance = db
+        let genesis_balance = (u64::from_le_bytes(db
             .get(db_key(
                 &TOKEN_CONTRACT,
                 &[
@@ -276,7 +273,7 @@ pub async fn initialize_rocks_db(
                 .concat(),
             ))
             .unwrap()
-            .unwrap();
+            .unwrap()[..8].try_into().unwrap()) * 10000).to_le_bytes().to_vec();
         db.delete(db_key(
             &TOKEN_CONTRACT,
             &[
