@@ -752,7 +752,6 @@ dependencies = [
  "surf",
  "tar",
  "tide",
- "tokio 0.2.18",
  "tokio-test",
  "tungstenite 0.10.1",
  "url",

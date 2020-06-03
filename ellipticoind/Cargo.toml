@@ -39,7 +39,6 @@ serde_cbor = { git = "https://github.com/pyfisch/cbor" }
 sha2 = "0.8.0"
 tar = "0.4.26"
 tide = { git = "https://github.com/masonforest/tide" }
-tokio = "0.2.6"
 tungstenite = { version = "0.10.0", default-features = false}
 url = "*"
 vm = { path = "../vm" }
