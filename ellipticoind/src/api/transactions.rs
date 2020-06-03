@@ -39,7 +39,10 @@ pub async fn create(mut req: tide::Request<State>) -> Response {
         .unwrap();
     let mut redis = req.state().redis.get_connection().unwrap();
     redis
-        .rpush::<&str, Vec<u8>, ()>("transactions::pending", serde_cbor::to_vec(&transaction).unwrap())
+        .rpush::<&str, Vec<u8>, ()>(
+            "transactions::pending",
+            serde_cbor::to_vec(&transaction).unwrap(),
+        )
         .unwrap();
 
     Response::new(201)

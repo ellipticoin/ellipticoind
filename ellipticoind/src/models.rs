@@ -1,4 +1,4 @@
-use crate::constants::{TOKEN_CONTRACT, Namespace};
+use crate::constants::{Namespace, TOKEN_CONTRACT};
 use crate::diesel::ExpressionMethods;
 use crate::diesel::RunQueryDsl;
 use crate::helpers::sha256;
@@ -53,8 +53,7 @@ pub async fn is_next_block(block: &Block) -> bool {
 }
 
 pub fn is_block_winner(vm_state: &mut vm::State, public_key: Vec<u8>) -> bool {
-    let winner = vm_state
-        .get_storage(&TOKEN_CONTRACT, &vec![Namespace::CurrentMiner as u8]);
+    let winner = vm_state.get_storage(&TOKEN_CONTRACT, &vec![Namespace::CurrentMiner as u8]);
     // println!("winner {}", base64::encode(&winner));
     winner.eq(&public_key)
 }
@@ -127,7 +126,13 @@ impl Block {
         insert_into(transactions::dsl::transactions)
             .values(&transactions)
             .execute(db)
-            .expect(&format!("{:?}", transactions.iter().map(|t| (t.function.clone(), base64::encode(&t.sender.clone()))).collect::<Vec<(String, String)>>()));
+            .expect(&format!(
+                "{:?}",
+                transactions
+                    .iter()
+                    .map(|t| (t.function.clone(), base64::encode(&t.sender.clone())))
+                    .collect::<Vec<(String, String)>>()
+            ));
     }
 }
 
