@@ -44,7 +44,7 @@ impl<'a> VM<'a> {
             .caller
             .clone()
             .map(|v| v.to_vec())
-            .unwrap_or(vec![])
+            .unwrap_or(self.transaction.sender.to_vec())
     }
 
     pub fn get_memory(&mut self, key_pointer: i32) -> Result<Vec<u8>, metered_wasmi::TrapKind> {
@@ -129,7 +129,7 @@ impl<'a> VM<'a> {
         let (result, gas_left) = vm.call(function_name, arguments);
         let gas_used = self.gas.unwrap() - gas_left.expect("no gas left");
         self.use_gas(gas_used)?;
-        Ok(result::to_bytes(result))
+        Ok(to_vec(&result.1).unwrap())
     }
 
     pub fn namespaced_key(&self, key: Vec<u8>) -> Vec<u8> {
