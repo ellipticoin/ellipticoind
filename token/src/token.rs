@@ -1,7 +1,6 @@
-use ellipticoin::abort::{AbortOptionExt, AbortResultExt};
 use ellipticoin::{
     error::Error,
-    export, sender,
+    export, caller,
     value::{from_value, to_value},
     FromBytes, ToBytes, Value,
 };
@@ -27,7 +26,7 @@ mod token {
     pub fn approve(spender: Vec<u8>, amount: u64) {
         set_memory(
             Namespace::Allowences,
-            [sender(), spender.to_vec()].concat(),
+            [caller(), spender.to_vec()].concat(),
             amount,
         );
     }
@@ -35,11 +34,11 @@ mod token {
     pub fn transfer_from(from: Vec<u8>, to: Vec<u8>, amount: u64) -> Result<Value, Error> {
         let allowance: u64 = get_memory(
             Namespace::Allowences,
-            [from.clone().to_vec(), sender()].concat(),
+            [from.clone().to_vec(), caller()].concat(),
         );
 
         if allowance >= amount {
-            debit_allowance(from.clone().to_vec(), sender(), amount);
+            debit_allowance(from.clone().to_vec(), caller(), amount);
             debit(from.to_vec(), amount);
             credit(to.to_vec(), amount);
             Ok(Value::Null)
@@ -49,8 +48,8 @@ mod token {
     }
 
     pub fn transfer(to: Vec<u8>, amount: u64) -> Result<Value, Error> {
-        if get_memory::<_, u64>(Namespace::Balances, sender()) >= amount {
-            debit(sender(), amount);
+        if get_memory::<_, u64>(Namespace::Balances, caller()) >= amount {
+            debit(caller(), amount);
             credit(to.to_vec(), amount);
             Ok(Value::Null)
         } else {
@@ -86,21 +85,21 @@ mod token {
 
     pub fn start_mining(bet_per_block: u64, hash_onion: Vec<u8>) -> Result<Value, Error> {
         let mut miners = get_miners();
-        miners.insert(sender(), (bet_per_block, hash_onion.clone().to_vec()));
+        miners.insert(caller(), (bet_per_block, hash_onion.clone().to_vec()));
         set_miners(&miners);
         Ok(Value::Null)
     }
 
     pub fn reveal(value: Vec<u8>) -> Result<Value, Error> {
         let mut miners = get_miners();
-        if sender() != get_current_miner() {
+        if caller() != get_current_miner() {
             return Err(errors::SENDER_IS_NOT_THE_WINNER);
         }
-        let (bet_per_block, hash) = miners.get(&sender()).unwrap_or_abort();
+        let (bet_per_block, hash) = miners.get(&caller()).unwrap();
         if !hash.to_vec().eq(&sha256(value.clone().to_vec())) {
             return Err(errors::INVALID_VALUE);
         }
-        *miners.get_mut(&sender()).unwrap() = (*bet_per_block, value.clone());
+        *miners.get_mut(&caller()).unwrap() = (*bet_per_block, value.clone());
         settle_block_rewards(get_current_miner(), &miners);
         let random_seed = get_random_seed();
         set_random_seed(
@@ -144,7 +143,7 @@ mod token {
         bets.sort(); //_by(|(a, _), (b, _)| a.cmp(b));
         bets.choose_weighted(&mut rng, |(_miner, bet_per_block)| *bet_per_block)
             .map(|(miner, _bet_per_block)| miner.to_vec())
-            .unwrap_or_abort()
+            .unwrap()
     }
 
     fn get_miners() -> BTreeMap<Vec<u8>, (u64, Vec<u8>)> {
@@ -198,14 +197,14 @@ mod token {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ellipticoin::{set_block_number, set_sender};
+    use ellipticoin::{set_block_number, set_caller};
     use ellipticoin_test_framework::{
         generate_hash_onion, random_bytes, sha256, ALICE, BOB, CAROL,
     };
 
     #[test]
     fn test_transfer() {
-        set_sender(ALICE.to_vec());
+        set_caller(ALICE.to_vec());
         set_balance(ALICE.to_vec(), 100);
         transfer(BOB.to_vec(), 20).unwrap();
         let alices_balance = balance_of(ALICE.to_vec());
@@ -216,17 +215,17 @@ mod tests {
 
     #[test]
     fn test_transfer_insufficient_funds() {
-        set_sender(ALICE.to_vec());
+        set_caller(ALICE.to_vec());
         set_balance(ALICE.to_vec(), 100);
         assert!(transfer(BOB.to_vec(), 120).is_err());
     }
 
     #[test]
     fn test_transfer_from() {
-        set_sender(ALICE.to_vec());
+        set_caller(ALICE.to_vec());
         set_balance(ALICE.to_vec(), 100);
         approve(BOB.to_vec(), 50);
-        set_sender(BOB.to_vec());
+        set_caller(BOB.to_vec());
         transfer_from(ALICE.to_vec(), CAROL.to_vec(), 20).unwrap();
         let alices_balance = balance_of(ALICE.to_vec());
         assert_eq!(alices_balance, 80);
@@ -251,7 +250,7 @@ mod tests {
     #[test]
     fn test_unlock_ether() {
         let ethereum_address = "adfe2b5beac83382c047d977db1df977fd9a7e41";
-        set_sender(ALICE.to_vec());
+        set_caller(ALICE.to_vec());
         set_storage(
             Namespace::EthereumBalances,
             hex::decode(ethereum_address).unwrap(),
@@ -265,7 +264,7 @@ mod tests {
     #[test]
     fn test_unlock_ether_twice() {
         let ethereum_address = "adfe2b5beac83382c047d977db1df977fd9a7e41";
-        set_sender(ALICE.to_vec());
+        set_caller(ALICE.to_vec());
         set_storage(
             Namespace::EthereumBalances,
             hex::decode(ethereum_address).unwrap(),
@@ -287,18 +286,18 @@ mod tests {
         let bobs_center = [1; 32].to_vec();
         let mut alices_onion = generate_hash_onion(3, alices_center.clone());
         let mut bobs_onion = generate_hash_onion(3, bobs_center.clone());
-        set_sender(ALICE.to_vec());
+        set_caller(ALICE.to_vec());
         start_mining(1, alices_onion.last().unwrap().to_vec()).unwrap();
-        set_sender(BOB.to_vec());
+        set_caller(BOB.to_vec());
         start_mining(1, bobs_onion.last().unwrap().to_vec()).unwrap();
 
         // With this random seed the winners are Alice, Alice, Bob in that order
-        set_sender(ALICE.to_vec());
+        set_caller(ALICE.to_vec());
         alices_onion.pop();
         assert!(reveal(alices_onion.last().unwrap().to_vec()).is_ok());
         alices_onion.pop();
         assert!(reveal(alices_onion.last().unwrap().to_vec()).is_ok());
-        set_sender(BOB.to_vec());
+        set_caller(BOB.to_vec());
         bobs_onion.pop();
         assert!(reveal(bobs_onion.last().unwrap().to_vec()).is_ok());
 
@@ -312,7 +311,7 @@ mod tests {
         let value = random_bytes(32);
         let hash = sha256(value.clone());
         let invalid_value = random_bytes(32);
-        set_sender(ALICE.to_vec());
+        set_caller(ALICE.to_vec());
 
         start_mining(1, hash).unwrap();
         set_block_number(1);
