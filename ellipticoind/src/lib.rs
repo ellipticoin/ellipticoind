@@ -16,11 +16,12 @@ extern crate diesel_migrations;
 extern crate hex_literal;
 
 mod api;
+mod broadcaster;
+pub mod config;
 mod constants;
 mod helpers;
 mod miner;
 pub mod models;
-mod network;
 mod run_loop;
 pub mod schema;
 mod start_up;
@@ -29,10 +30,11 @@ mod transaction_processor;
 
 use crate::miner::get_best_block;
 use crate::models::Block;
-use ::network::Server;
 use api::app::app as api;
 use async_std::sync::channel;
 use async_std::sync::Mutex;
+use async_std::task::sleep;
+use broadcaster::broadcast;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, Pool};
@@ -42,6 +44,10 @@ use rand::rngs::OsRng;
 use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
+
+use vm::{r2d2, redis, RedisConnectionManager};
+// use r2d2_redis::{r2d2, RedisConnectionManager};
+use vm::redis::Commands;
 
 lazy_static! {
     static ref BEST_BLOCK: async_std::sync::Arc<Mutex<Option<Block>>> =
@@ -62,15 +68,13 @@ pub fn generate_keypair() {
 }
 
 pub async fn run(
-    api_socket: SocketAddr,
-    websocket_socket: SocketAddr,
     database_url: String,
     rocksdb_path: &str,
     redis_url: &str,
     socket: SocketAddr,
-    external_socket: SocketAddr,
+    websocket_port: u16,
     keypair: Keypair,
-    bootnodes: Vec<SocketAddr>,
+    bootnodes: Vec<crate::config::Bootnode>,
 ) {
     diesel_migrations::embed_migrations!();
     let db = PgConnection::establish(&database_url)
@@ -79,46 +83,29 @@ pub async fn run(
     let manager = ConnectionManager::<PgConnection>::new(database_url.clone());
     let pg_pool = Pool::new(manager).expect("Postgres connection pool could not be created");
 
-    let redis =
-        vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
-    let redis2 =
-        vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
-    let mut redis3 =
-        vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
-    let redis4 =
-        vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
-    let mut redis5 =
-        vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
-    let mut redis6 =
-        vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
-    let mut redis7 =
-        vm::redis::Client::open::<&str>(redis_url.into()).expect("Failed to connect to Redis");
-    diesel::sql_query("TRUNCATE blocks CASCADE")
-        .execute(&db)
+    let redis_manager = RedisConnectionManager::new(redis_url).unwrap();
+    let redis_pool = vm::r2d2_redis::r2d2::Pool::builder()
+        .build(redis_manager)
         .unwrap();
-    let _: () = redis::cmd("FLUSHALL").query(&mut redis3).unwrap();
+
+    let _: () = redis::cmd("FLUSHALL")
+        .query(&mut *redis_pool.get().unwrap())
+        .unwrap();
 
     let rocksdb = Arc::new(
-        start_up::initialize_rocks_db(rocksdb_path, &pg_pool.get().unwrap(), &mut redis5).await,
+        start_up::initialize_rocks_db(rocksdb_path, &pg_pool.get().unwrap(), redis_pool.clone())
+            .await,
     );
-    let mut vm_state = vm::State::new(redis2.get_connection().unwrap(), rocksdb.clone());
+    let mut vm_state = vm::State::new(redis_pool.get().unwrap(), rocksdb.clone());
     if env::var("GENISIS_NODE").is_err() {
         crate::start_up::catch_up(
             &pg_pool.get().unwrap(),
-            &mut redis7,
+            redis_pool.clone(),
             &mut vm_state,
             &bootnodes,
         )
         .await;
     }
-    let network = Server::new(
-        keypair.to_bytes().to_vec(),
-        socket,
-        external_socket,
-        bootnodes.clone(),
-    );
-    let (network_sender, incomming_network_receiver) = network.channel().await;
-    // task::sleep(Duration::from_secs(5)).await;
     use std::io::Read;
     let mut token_file = std::fs::File::open("../token/dist/token.wasm").unwrap();
     let mut token_wasm = Vec::new();
@@ -132,20 +119,18 @@ pub async fn run(
     start_up::start_miner(
         &rocksdb,
         &pg_pool.get().unwrap(),
-        &mut redis6,
+        redis_pool.clone(),
         keypair.public,
-        network_sender.clone(),
     )
     .await;
-    let api_state = api::State::new(redis, rocksdb.clone(), pg_pool, network_sender.clone());
-    let (new_block_sender, new_block_receiver) = channel(1);
-    async_std::task::spawn(api(api_state).listen(api_socket));
-    async_std::task::spawn(network::handle_messages(
-        redis4.get_connection().unwrap(),
-        incomming_network_receiver,
-        new_block_sender,
-    ));
+    let api_state = api::State::new(redis_pool.clone(), rocksdb.clone(), pg_pool);
+    let (block_sender_in, block_receiver_in) = channel(1);
+    let (block_sender_out, block_receiver_out) = channel(1);
+    async_std::task::spawn(api(api_state).listen(socket));
+    async_std::task::spawn(broadcast(block_receiver_out, vm_state));
     let websocket = api::websocket::Websocket::new();
+    let mut websocket_socket = socket.clone();
+    websocket_socket.set_port(websocket_port);
     async_std::task::spawn(websocket.clone().bind(websocket_socket));
     *BEST_BLOCK.lock().await = get_best_block(&db);
     // let public = private_key.public.to_bytes();
@@ -156,11 +141,11 @@ pub async fn run(
     run_loop::run(
         public_key,
         websocket,
-        network_sender,
-        redis2,
+        redis_pool.clone(),
         rocksdb,
         pg_pool,
-        new_block_receiver,
+        block_receiver_in,
+        block_sender_out,
     )
     .await
 }

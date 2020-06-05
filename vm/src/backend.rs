@@ -1,4 +1,5 @@
 use state::Changeset;
+use r2d2_redis::redis;
 
 pub trait Backend {
     fn set(&mut self, key: Vec<u8>, value: Vec<u8>);

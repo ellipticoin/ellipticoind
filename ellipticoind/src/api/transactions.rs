@@ -2,7 +2,6 @@ use super::views::Transaction;
 use super::State;
 use crate::diesel::OptionalExtension;
 use crate::models;
-use crate::network::Message;
 use crate::schema::transactions::dsl::transactions;
 use diesel::QueryDsl;
 use diesel::RunQueryDsl;
@@ -32,12 +31,12 @@ pub async fn show(req: tide::Request<State>) -> Response {
 pub async fn create(mut req: tide::Request<State>) -> Response {
     let transaction_bytes = req.body_bytes().await.unwrap();
     let transaction: vm::Transaction = from_slice(&transaction_bytes).unwrap();
-    let mut network_sender = req.state().network_sender.clone();
-    network_sender
-        .send(Message::Transaction(transaction.clone()))
-        .await
-        .unwrap();
-    let mut redis = req.state().redis.get_connection().unwrap();
+    // let mut network_sender = req.state().network_sender.clone();
+    // network_sender
+    //     .send(Message::Transaction(transaction.clone()))
+    //     .await
+    //     .unwrap();
+    let mut redis = req.state().redis.get().unwrap();
     redis
         .rpush::<&str, Vec<u8>, ()>(
             "transactions::pending",

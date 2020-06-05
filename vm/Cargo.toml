@@ -6,13 +6,11 @@ authors = []
 [dependencies]
 heck = "0.3.0"
 sha3 = "0.7.3"
-#redis = { git = "https://github.com/Marwes/redis-rs", rev= "7cbf90f" }
-redis = { git = "https://github.com/Marwes/redis-rs", branch = "async_await_api" }
+r2d2_redis = "0.13.0"
 base64 = "0.10.1"
 time = "*"
 rocksdb = { git = "https://github.com/rust-rocksdb/rust-rocksdb" }
 metered_wasmi = "0.5.4"
-#metered_wasmi = { path = "../../metered_wasmi" }
 serde = { version = "1.0.90", features = ["derive"] }
 serde_bytes = "0.11.1"
 serde_cbor = { git = "https://github.com/pyfisch/cbor" }
