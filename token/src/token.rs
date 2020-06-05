@@ -83,9 +83,9 @@ mod token {
         Ok(balance.into())
     }
 
-    pub fn start_mining(bet_per_block: u64, hash_onion: Vec<u8>) -> Result<Value, Error> {
+    pub fn start_mining(host: String, bet_per_block: u64, hash_onion: Vec<u8>) -> Result<Value, Error> {
         let mut miners = get_miners();
-        miners.insert(caller(), (bet_per_block, hash_onion.clone().to_vec()));
+        miners.insert(caller(), (host, bet_per_block, hash_onion.clone().to_vec()));
         set_miners(&miners);
         Ok(Value::Null)
     }
@@ -95,11 +95,11 @@ mod token {
         if caller() != get_current_miner() {
             return Err(errors::SENDER_IS_NOT_THE_WINNER);
         }
-        let (bet_per_block, hash) = miners.get(&caller()).unwrap();
+        let (host, bet_per_block, hash) = miners.get(&caller()).unwrap();
         if !hash.to_vec().eq(&sha256(value.clone().to_vec())) {
             return Err(errors::INVALID_VALUE);
         }
-        *miners.get_mut(&caller()).unwrap() = (*bet_per_block, value.clone());
+        *miners.get_mut(&caller()).unwrap() = (host.clone(), *bet_per_block, value.clone());
         settle_block_rewards(get_current_miner(), &miners);
         let random_seed = get_random_seed();
         set_random_seed(
@@ -133,32 +133,32 @@ mod token {
             .unwrap()
     }
 
-    fn get_next_winner(miners: &BTreeMap<Vec<u8>, (u64, Vec<u8>)>) -> Vec<u8> {
+    fn get_next_winner(miners: &BTreeMap<Vec<u8>, (String, u64, Vec<u8>)>) -> Vec<u8> {
         let random_seed: [u8; 16] = get_random_seed();
         let mut rng = SmallRng::from_seed(random_seed);
         let mut bets: Vec<(Vec<u8>, u64)> = miners
             .iter()
-            .map(|(miner, (bet_per_block, _hash))| (miner.to_vec(), *bet_per_block))
+            .map(|(miner, (_host, bet_per_block, _hash))| (miner.to_vec(), *bet_per_block))
             .collect();
-        bets.sort(); //_by(|(a, _), (b, _)| a.cmp(b));
+        bets.sort();
         bets.choose_weighted(&mut rng, |(_miner, bet_per_block)| *bet_per_block)
             .map(|(miner, _bet_per_block)| miner.to_vec())
             .unwrap()
     }
 
-    fn get_miners() -> BTreeMap<Vec<u8>, (u64, Vec<u8>)> {
+    fn get_miners() -> BTreeMap<Vec<u8>, (String, u64, Vec<u8>)> {
         from_value(ellipticoin::get_storage(Namespace::Miners as u8)).unwrap_or(BTreeMap::new())
     }
 
-    fn set_miners(miners: &BTreeMap<Vec<u8>, (u64, Vec<u8>)>) {
+    fn set_miners(miners: &BTreeMap<Vec<u8>, (String, u64, Vec<u8>)>) {
         ellipticoin::set_storage(
             Namespace::Miners as u8,
             to_value(miners).unwrap_or(Value::Null),
         );
     }
 
-    fn settle_block_rewards(winner: Vec<u8>, miners: &BTreeMap<Vec<u8>, (u64, Vec<u8>)>) {
-        for (miner, (bet_per_block, _hash)) in miners {
+    fn settle_block_rewards(winner: Vec<u8>, miners: &BTreeMap<Vec<u8>, (String, u64, Vec<u8>)>) {
+        for (miner, (_host, bet_per_block, _hash)) in miners {
             if miner.to_vec() != winner.to_vec() {
                 credit(winner.to_vec(), *bet_per_block);
                 debit(miner.to_vec(), *bet_per_block);
@@ -196,6 +196,7 @@ mod token {
 
 #[cfg(test)]
 mod tests {
+    const HOST: &'static str = "localhost";
     use super::*;
     use ellipticoin::{set_block_number, set_caller};
     use ellipticoin_test_framework::{
@@ -287,9 +288,9 @@ mod tests {
         let mut alices_onion = generate_hash_onion(3, alices_center.clone());
         let mut bobs_onion = generate_hash_onion(3, bobs_center.clone());
         set_caller(ALICE.to_vec());
-        start_mining(1, alices_onion.last().unwrap().to_vec()).unwrap();
+        start_mining(HOST.to_string(), 1, alices_onion.last().unwrap().to_vec()).unwrap();
         set_caller(BOB.to_vec());
-        start_mining(1, bobs_onion.last().unwrap().to_vec()).unwrap();
+        start_mining(HOST.to_string(), 1, bobs_onion.last().unwrap().to_vec()).unwrap();
 
         // With this random seed the winners are Alice, Alice, Bob in that order
         set_caller(ALICE.to_vec());
@@ -313,7 +314,7 @@ mod tests {
         let invalid_value = random_bytes(32);
         set_caller(ALICE.to_vec());
 
-        start_mining(1, hash).unwrap();
+        start_mining(HOST.to_string(), 1, hash).unwrap();
         set_block_number(1);
         assert!(reveal(invalid_value).is_err());
     }

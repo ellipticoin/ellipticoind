@@ -1,9 +1,12 @@
 use crate::models::{Block, Transaction};
 use crate::system_contracts;
+use async_std::task;
+use async_std::task::sleep;
 use dotenv::dotenv;
+use futures::{future::FutureExt, pin_mut, select};
 use serde_cbor::{from_slice, to_vec};
 use std::env;
-use std::thread::sleep;
+use std::ops::DerefMut;
 use std::time::{Duration, Instant};
 use vm::Env;
 
@@ -19,32 +22,36 @@ lazy_static! {
     };
 }
 pub async fn apply_block(
-    con: &mut vm::Client,
+    mut redis: vm::r2d2_redis::r2d2::PooledConnection<vm::r2d2_redis::RedisConnectionManager>,
     mut vm_state: &mut vm::State,
     block: Block,
     transactions: Vec<Transaction>,
 ) {
     for transaction in transactions.into_iter() {
         run_transaction(&mut vm_state, &transaction.clone().into(), &block);
-        remove_from_pending(&mut con.get_connection().unwrap(), &transaction.into()).await;
+        remove_from_pending(&mut redis, &transaction.into()).await;
     }
 }
 
 pub async fn run_transactions(
-    con: &mut vm::Connection,
+    con: vm::r2d2_redis::r2d2::PooledConnection<vm::r2d2_redis::RedisConnectionManager>,
     mut vm_state: &mut vm::State,
     block: &Block,
 ) -> Vec<Transaction> {
-    let now = Instant::now();
     let mut completed_transactions: Vec<Transaction> = Default::default();
-    while now.elapsed() < *TRANSACTION_PROCESSING_TIME {
-        if let Some(transaction) = get_next_transaction(con).await {
-            let completed_transaction = run_transaction(&mut vm_state, &transaction, &block);
-            remove_from_processing(con, &transaction).await;
-            completed_transactions.push(completed_transaction);
-        } else {
-            sleep(Duration::from_millis(1));
-        }
+    let timer = task::sleep(*TRANSACTION_PROCESSING_TIME).fuse();
+    pin_mut!(timer);
+    loop {
+        // let get_next_transaction_fused = get_next_transaction(con).fuse();
+        // pin_mut!(get_next_transaction_fused);
+        select! {
+            // transaction = get_next_transaction_fused => {
+            //     let completed_transaction = run_transaction(&mut vm_state, &transaction, &block);
+            //     remove_from_processing(con, &transaction).await;
+            //     completed_transactions.push(completed_transaction);
+            // },
+            _ = timer => break,
+        };
     }
     completed_transactions
 }
@@ -85,36 +92,40 @@ fn env_from_block(block: &Block) -> Env {
         ..Default::default()
     }
 }
-async fn get_next_transaction(conn: &mut vm::Connection) -> Option<vm::Transaction> {
-    let transaction_bytes: Vec<u8> = vm::redis::cmd("RPOPLPUSH")
+async fn get_next_transaction(
+    redis: &mut vm::r2d2_redis::r2d2::PooledConnection<vm::r2d2_redis::RedisConnectionManager>,
+) -> vm::Transaction {
+    let transaction_bytes: Vec<u8> = vm::redis::cmd("BRPOPLPUSH")
         .arg("transactions::pending")
         .arg("transactions::processing")
-        .query(conn)
+        .arg("0")
+        .query(redis.deref_mut())
         .unwrap();
-
-    if transaction_bytes.len() == 0 {
-        None
-    } else {
-        Some(from_slice::<vm::Transaction>(&transaction_bytes).unwrap())
-    }
+    from_slice::<vm::Transaction>(&transaction_bytes).unwrap()
 }
 
-async fn remove_from_processing(redis: &mut vm::Connection, transaction: &vm::Transaction) {
+async fn remove_from_processing(
+    redis: &mut vm::r2d2_redis::r2d2::PooledConnection<vm::r2d2_redis::RedisConnectionManager>,
+    transaction: &vm::Transaction,
+) {
     let transaction_bytes = to_vec(&transaction).unwrap();
     vm::redis::cmd("LREM")
         .arg("transactions::processing")
         .arg(0)
         .arg(transaction_bytes.as_slice())
-        .query(redis)
+        .query(redis.deref_mut())
         .unwrap()
 }
 
-async fn remove_from_pending(redis: &mut vm::Connection, transaction: &vm::Transaction) {
+async fn remove_from_pending(
+    redis: &mut vm::r2d2_redis::r2d2::PooledConnection<vm::r2d2_redis::RedisConnectionManager>,
+    transaction: &vm::Transaction,
+) {
     let transaction_bytes = to_vec(&transaction).unwrap();
     vm::redis::cmd("LREM")
         .arg("transactions::pending")
         .arg(0)
         .arg(transaction_bytes.as_slice())
-        .query::<u64>(redis)
+        .query::<u64>(redis.deref_mut())
         .unwrap();
 }
