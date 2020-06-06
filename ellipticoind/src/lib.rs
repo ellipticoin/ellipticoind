@@ -31,7 +31,7 @@ mod transaction_processor;
 use crate::config::Bootnode;
 use crate::miner::get_best_block;
 use crate::models::Block;
-use crate::network::Message;
+
 use api::app::app as api;
 use async_std::sync::channel;
 use async_std::sync::Mutex;

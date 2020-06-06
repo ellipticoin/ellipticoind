@@ -1,7 +1,7 @@
 use crate::api;
 use crate::miner::mine_next_block;
 use crate::models::{is_block_winner, is_next_block};
-use crate::models::{Block, Transaction};
+
 use crate::network::Message;
 use crate::transaction_processor;
 use crate::BEST_BLOCK;

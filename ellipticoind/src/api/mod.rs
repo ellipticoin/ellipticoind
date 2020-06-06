@@ -14,7 +14,7 @@ mod memory;
 mod storage;
 mod transactions;
 pub mod views;
-use crate::models;
+
 pub mod websocket;
 
 pub struct State {
