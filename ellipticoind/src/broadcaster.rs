@@ -1,24 +1,36 @@
+use crate::api::views;
 use crate::constants::{Namespace, TOKEN_CONTRACT};
 use crate::models::{Block, Transaction};
-use crate::api::views;
+use crate::network::Message;
 use async_std::sync::Receiver;
 use futures::stream::StreamExt;
 use serde_cbor::Value;
 use std::collections::BTreeMap;
 use std::env;
 
-pub async fn broadcast(
-    mut block_receiver_out: Receiver<(Block, Vec<Transaction>)>,
-    mut vm_state: vm::State,
-) {
+pub async fn broadcast(mut block_receiver_out: Receiver<Message>, mut vm_state: vm::State) {
     loop {
-        let block: views::Block = block_receiver_out.next().await.unwrap().into();
-        for peer in get_peers(&mut vm_state).await {
-            let uri = format!("http://{}/blocks", peer);
-            let _res = surf::post(uri)
-                .body_bytes(serde_cbor::to_vec(&block).unwrap())
-                .await
-                .unwrap();
+        match block_receiver_out.next().await.unwrap() {
+            Message::Block((block, transactions)) => {
+                let block: views::Block = (block, transactions).into();
+                for peer in get_peers(&mut vm_state).await {
+                    let uri = format!("http://{}/blocks", peer);
+                    let _res = surf::post(uri)
+                        .body_bytes(serde_cbor::to_vec(&block).unwrap())
+                        .await
+                        .unwrap();
+                }
+            }
+            Message::Transaction(transaction) => {
+                let transaction: vm::Transaction = transaction.into();
+                for peer in get_peers(&mut vm_state).await {
+                    let uri = format!("http://{}/transactions", peer);
+                    let _res = surf::post(uri)
+                        .body_bytes(serde_cbor::to_vec(&transaction).unwrap())
+                        .await
+                        .unwrap();
+                }
+            }
         }
     }
 }
