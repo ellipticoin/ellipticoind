@@ -22,7 +22,7 @@ pub async fn show(req: tide::Request<State>) -> Response {
 
     if let Some(transaction) = transaction {
         Response::new(200).body(Body::from(
-            serde_cbor::to_vec(&Transaction::from(&transaction)).unwrap(),
+            serde_cbor::to_vec(&Transaction::from(transaction)).unwrap(),
         ))
     } else {
         Response::new(404)

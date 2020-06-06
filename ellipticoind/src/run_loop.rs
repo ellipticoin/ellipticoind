@@ -35,7 +35,7 @@ pub async fn run(
             vm_state.commit();
             new_block.clone().insert(&db, transactions.clone());
             websocket
-                .send::<api::Block>((&new_block, &transactions).into())
+                .send::<api::Block>((new_block.clone(), transactions.clone()).into())
                 .await;
             block_sender_out
                 .send((new_block.clone(), transactions.clone()))
@@ -56,7 +56,7 @@ pub async fn run(
             vm_state.commit();
             new_block.clone().insert(&db, transactions.clone());
             websocket
-                .send::<api::Block>((&new_block, &transactions).into())
+                .send::<api::Block>((new_block.clone(), transactions).into())
                 .await;
             println!("Applied block #{}", &new_block.number);
             *BEST_BLOCK.lock().await = Some(new_block.clone());
