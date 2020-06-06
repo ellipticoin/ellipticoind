@@ -45,7 +45,7 @@ pub async fn mine_next_block(
 ) -> ((Block, Vec<Transaction>), vm::State) {
     let mut block = next_block_template().await;
     block.winner = PUBLIC_KEY.to_vec();
-    let mut transactions = run_transactions(con.get().unwrap(), &mut vm_state, &block).await;
+    let mut transactions = run_transactions(con.clone(), &mut vm_state, &block).await;
 
     let sender_nonce = random();
     let skin: Vec<Value> = hash_onion

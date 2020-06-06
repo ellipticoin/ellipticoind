@@ -32,8 +32,8 @@ pub struct Transaction {
     pub sender: Vec<u8>,
 }
 
-impl From<(&crate::models::Block, &Vec<crate::models::Transaction>)> for Block {
-    fn from(block: (&crate::models::Block, &Vec<crate::models::Transaction>)) -> Self {
+impl From<(crate::models::Block, Vec<crate::models::Transaction>)> for Block {
+    fn from(block: (crate::models::Block, Vec<crate::models::Transaction>)) -> Self {
         Self {
             hash: block.0.hash.clone(),
             parent_hash: block.0.parent_hash.clone(),
@@ -51,8 +51,8 @@ impl From<(&crate::models::Block, &Vec<crate::models::Transaction>)> for Block {
     }
 }
 
-impl From<&crate::models::Transaction> for Transaction {
-    fn from(transaction: &crate::models::Transaction) -> Self {
+impl From<crate::models::Transaction> for Transaction {
+    fn from(transaction: crate::models::Transaction) -> Self {
         Self {
             contract_address: transaction.contract_address.clone(),
             block_hash: transaction.block_hash.clone(),

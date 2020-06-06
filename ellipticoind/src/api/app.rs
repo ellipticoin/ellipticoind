@@ -5,6 +5,7 @@ use tide::middleware::Cors;
 pub fn app(state: State) -> tide::server::Server<State> {
     let mut app = tide::with_state(state);
     app.middleware(Cors::new());
+    app.at("/blocks").post(blocks::create);
     app.at("/blocks").get(blocks::index);
     app.at("/blocks/:block_hash").get(blocks::show);
     app.at("/transactions/:transaction_hash")

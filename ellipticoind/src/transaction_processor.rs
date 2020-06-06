@@ -34,7 +34,7 @@ pub async fn apply_block(
 }
 
 pub async fn run_transactions(
-    con: vm::r2d2_redis::r2d2::PooledConnection<vm::r2d2_redis::RedisConnectionManager>,
+    pool: vm::r2d2_redis::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
     mut vm_state: &mut vm::State,
     block: &Block,
 ) -> Vec<Transaction> {
@@ -42,14 +42,16 @@ pub async fn run_transactions(
     let timer = task::sleep(*TRANSACTION_PROCESSING_TIME).fuse();
     pin_mut!(timer);
     loop {
-        // let get_next_transaction_fused = get_next_transaction(con).fuse();
-        // pin_mut!(get_next_transaction_fused);
+        let mut con = pool.get().unwrap();
+        let get_next_transaction_fused = get_next_transaction(&mut con).fuse();
+        pin_mut!(get_next_transaction_fused);
         select! {
-            // transaction = get_next_transaction_fused => {
-            //     let completed_transaction = run_transaction(&mut vm_state, &transaction, &block);
-            //     remove_from_processing(con, &transaction).await;
-            //     completed_transactions.push(completed_transaction);
-            // },
+            transaction = get_next_transaction_fused => {
+                    let mut con = pool.get().unwrap();
+                    let completed_transaction = run_transaction(&mut vm_state, &transaction, &block);
+                    remove_from_processing(&mut con, &transaction).await;
+                    completed_transactions.push(completed_transaction);
+            },
             _ = timer => break,
         };
     }
@@ -95,13 +97,17 @@ fn env_from_block(block: &Block) -> Env {
 async fn get_next_transaction(
     redis: &mut vm::r2d2_redis::r2d2::PooledConnection<vm::r2d2_redis::RedisConnectionManager>,
 ) -> vm::Transaction {
-    let transaction_bytes: Vec<u8> = vm::redis::cmd("BRPOPLPUSH")
-        .arg("transactions::pending")
-        .arg("transactions::processing")
-        .arg("0")
-        .query(redis.deref_mut())
-        .unwrap();
-    from_slice::<vm::Transaction>(&transaction_bytes).unwrap()
+    loop {
+        let transaction_bytes: Vec<u8> = vm::redis::cmd("RPOPLPUSH")
+            .arg("transactions::pending")
+            .arg("transactions::processing")
+            .query(redis.deref_mut())
+            .unwrap();
+        if transaction_bytes.len() > 0 {
+            return from_slice::<vm::Transaction>(&transaction_bytes).unwrap();
+        }
+        task::sleep(Duration::from_millis(50)).await;
+    }
 }
 
 async fn remove_from_processing(

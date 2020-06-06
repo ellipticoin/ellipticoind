@@ -55,6 +55,7 @@ pub async fn start_miner(
     pg_db: &PooledConnection<ConnectionManager<PgConnection>>,
     redis: vm::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
     public_key: ed25519_dalek::PublicKey,
+    bootnodes: &Vec<Bootnode>,
 ) {
     if env::var("ENABLE_MINER").is_ok() {
         let burn_per_block: i128 = env::var("BURN_PER_BLOCK")
@@ -95,24 +96,39 @@ pub async fn start_miner(
         .execute(pg_db)
         .unwrap();
 
-        if !env::var("GENISIS_NODE").is_ok() {
+        if env::var("GENISIS_NODE").is_ok() {
+            process_transaction(start_mining_transaction, &mut redis.get().unwrap());
+        } else {
             let current_burn_per_block = miners.get(&public_key.as_bytes().to_vec());
             if current_burn_per_block.is_none() {
-                post_transaction(start_mining_transaction).await;
+                let mut bootnode = bootnodes.get(0).unwrap();
+                post_transaction(bootnode, start_mining_transaction).await;
             }
         }
     }
+}
+fn process_transaction(
+    transaction: vm::Transaction,
+    redis: &mut vm::r2d2_redis::r2d2::PooledConnection<vm::r2d2_redis::RedisConnectionManager>,
+) {
+    redis
+        .rpush::<&str, Vec<u8>, ()>(
+            "transactions::pending",
+            serde_cbor::to_vec(&transaction).unwrap(),
+        )
+        .unwrap();
 }
 fn random() -> u64 {
     let mut rng = rand::thread_rng();
     rng.gen_range(0, u32::max_value() as u64)
 }
 
-async fn post_transaction(transaction: vm::Transaction) {
-    // network_sender
-    //     .send(Message::Transaction(transaction))
-    //     .await
-    //     .unwrap();
+async fn post_transaction(bootnode: &Bootnode, transaction: vm::Transaction) {
+    let uri = format!("http://{}/transactions", bootnode.host);
+    let res = surf::post(uri)
+        .body_bytes(serde_cbor::to_vec(&transaction).unwrap())
+        .await
+        .unwrap();
 }
 
 pub async fn catch_up(
@@ -128,82 +144,83 @@ pub async fn catch_up(
             .await
             .unwrap();
         if res.status() == 200 {
-            // let block_view: crate::api::views::Block = serde_cbor::value::from_value(
-            //     serde_cbor::from_slice::<serde_cbor::Value>(&res.body_bytes().await.unwrap())
-            //         .unwrap(),
-            // )
-            // .unwrap();
-            // let (block, mut transactions) = block_view.into();
-            // transactions.iter_mut().for_each(|transaction| {
-            //     transaction.set_hash();
-            //     transaction.block_hash = block.hash.clone();
-            // });
-            // let mut ordered_transactions = transactions.clone();
-            // ordered_transactions.sort_by(|a, b| {
-            //     if a.function == "start_mining" {
-            //         std::cmp::Ordering::Less
-            //     } else if b.function == "start_mining" {
-            //         std::cmp::Ordering::Greater
-            //     } else {
-            //         std::cmp::Ordering::Equal
-            //     }
-            // });
-            // crate::transaction_processor::apply_block(
-            //     redis_pool.get().unwrap(),
-            //     vm_state,
-            //     block.clone(),
-            //     ordered_transactions,
-            // )
-            // .await;
-            // vm_state.commit();
-            // block.clone().insert(&db, transactions.clone());
-            // *crate::BEST_BLOCK.lock().await = Some(block.clone());
-            // println!("Applied block #{}", &block.number);
+            let block_view: crate::api::views::Block = serde_cbor::value::from_value(
+                serde_cbor::from_slice::<serde_cbor::Value>(&res.body_bytes().await.unwrap())
+                    .unwrap(),
+            )
+            .unwrap();
+            let (block, mut transactions) = block_view.into();
+            transactions.iter_mut().for_each(|transaction| {
+                transaction.set_hash();
+                transaction.block_hash = block.hash.clone();
+            });
+            let mut ordered_transactions = transactions.clone();
+            ordered_transactions.sort_by(|a, b| {
+                if a.function == "start_mining" {
+                    std::cmp::Ordering::Less
+                } else if b.function == "start_mining" {
+                    std::cmp::Ordering::Greater
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            });
+            crate::transaction_processor::apply_block(
+                redis_pool.get().unwrap(),
+                vm_state,
+                block.clone(),
+                ordered_transactions,
+            )
+            .await;
+            vm_state.commit();
+            block.clone().insert(&db, transactions.clone());
+            *crate::BEST_BLOCK.lock().await = Some(block.clone());
+            println!("Applied block #{}", &block.number);
         } else {
             println!("Syncing complete");
             break;
         }
     }
 }
-// pub fn generate_hash_onion(db: &PooledConnection<ConnectionManager<PgConnection>>) {
-//     let hash_onion_size = 65534;
-//     // let hash_onion_size = 100;
-//     let center: Vec<u8> = rand::thread_rng()
-//         .sample_iter(&rand::distributions::Standard)
-//         .take(32)
-//         .collect();
-//     let mut onion = vec![center];
-//     let pb = ProgressBar::new(hash_onion_size);
-//     pb.set_style(
-//         indicatif::ProgressStyle::default_bar()
-//             .template("[{elapsed_precise}] [{bar}] {pos}/{len} ({percent}%)")
-//             .progress_chars("=> "),
-//     );
-//     let mut i = 0;
-//     for _ in 1..(hash_onion_size) {
-//         onion.push(sha256(onion.last().unwrap().to_vec()));
-//         if i % 1000 == 0 {
-//             pb.inc(1000);
-//         }
-//         i += 1
-//     }
-//     pb.finish();
-//     let values: Vec<HashOnion> = onion
-//         .iter()
-//         .map(|hash| HashOnion {
-//             layer: hash.to_vec(),
-//         })
-//         .collect();
-//     let query = insert_into(hash_onion).values(&values);
-//     query.execute(db).unwrap();
-// }
-//
-// pub fn sha256(value: Vec<u8>) -> Vec<u8> {
-//     let mut hasher = Sha256::new();
-//     hasher.input(value);
-//     hasher.result().to_vec()
-// }
-//
+
+pub fn generate_hash_onion(db: &PooledConnection<ConnectionManager<PgConnection>>) {
+    let hash_onion_size = 65534;
+    // let hash_onion_size = 100;
+    let center: Vec<u8> = rand::thread_rng()
+        .sample_iter(&rand::distributions::Standard)
+        .take(32)
+        .collect();
+    let mut onion = vec![center];
+    let pb = ProgressBar::new(hash_onion_size);
+    pb.set_style(
+        indicatif::ProgressStyle::default_bar()
+            .template("[{elapsed_precise}] [{bar}] {pos}/{len} ({percent}%)")
+            .progress_chars("=> "),
+    );
+    let mut i = 0;
+    for _ in 1..(hash_onion_size) {
+        onion.push(sha256(onion.last().unwrap().to_vec()));
+        if i % 1000 == 0 {
+            pb.inc(1000);
+        }
+        i += 1
+    }
+    pb.finish();
+    let values: Vec<HashOnion> = onion
+        .iter()
+        .map(|hash| HashOnion {
+            layer: hash.to_vec(),
+        })
+        .collect();
+    let query = insert_into(hash_onion).values(&values);
+    query.execute(db).unwrap();
+}
+
+pub fn sha256(value: Vec<u8>) -> Vec<u8> {
+    let mut hasher = Sha256::new();
+    hasher.input(value);
+    hasher.result().to_vec()
+}
+
 pub async fn initialize_rocks_db(
     path: &str,
     pg_db: &PooledConnection<ConnectionManager<PgConnection>>,
@@ -311,7 +328,7 @@ pub async fn initialize_rocks_db(
         token_file.read_to_end(&mut token_wasm).unwrap();
         db.put(db_key(&TOKEN_CONTRACT, &vec![]), &token_wasm)
             .unwrap();
-        // generate_hash_onion(pg_db);
+        generate_hash_onion(pg_db);
         let skin: Vec<Value> = hash_onion
             .select(layer)
             .order(id.desc())
@@ -321,18 +338,14 @@ pub async fn initialize_rocks_db(
             .map(|n| n.into())
             .collect();
         let mut miners: BTreeMap<Vec<Value>, (String, u64, Vec<Value>)> = BTreeMap::new();
-        // miners.insert(
-        //     GENISIS_ADRESS
-        //         .to_vec()
-        //         .into_iter()
-        //         .map(|n| n.into())
-        //         .collect(),
-        //     (
-        //         env::var("HOST").unwrap(),
-        //         100 as u64,
-        //         skin.clone()
-        //     ),
-        // );
+        miners.insert(
+            GENISIS_ADRESS
+                .to_vec()
+                .into_iter()
+                .map(|n| n.into())
+                .collect(),
+            (env::var("HOST").unwrap(), 100 as u64, skin.clone()),
+        );
 
         sql_query(
             "delete from hash_onion where id in (
