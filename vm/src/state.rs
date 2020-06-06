@@ -2,8 +2,6 @@ use backend::Backend;
 use helpers::zero_pad_vec;
 use std::collections::HashMap;
 use std::sync::Arc;
-use r2d2_redis::redis;
-use r2d2_redis::redis::Commands;
 
 pub type Changeset = HashMap<Vec<u8>, Vec<u8>>;
 pub struct State {

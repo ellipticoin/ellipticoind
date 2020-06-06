@@ -7,7 +7,7 @@ use futures::{future::FutureExt, pin_mut, select};
 use serde_cbor::{from_slice, to_vec};
 use std::env;
 use std::ops::DerefMut;
-use std::time::{Duration};
+use std::time::Duration;
 use vm::Env;
 
 lazy_static! {
