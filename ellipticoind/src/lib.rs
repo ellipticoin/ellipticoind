@@ -91,7 +91,7 @@ pub async fn run(
     let mut vm_state = vm::State::new(redis_pool.get().unwrap(), rocksdb.clone());
     if env::var("GENISIS_NODE").is_err() {
         start_up::catch_up(
-            &pg_pool.get().unwrap(),
+            pg_pool.clone(),
             redis_pool.clone(),
             &mut vm_state,
             &bootnodes,

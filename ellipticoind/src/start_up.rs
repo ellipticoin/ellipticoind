@@ -132,7 +132,7 @@ async fn post_transaction(bootnode: &Bootnode, transaction: vm::Transaction) {
 }
 
 pub async fn catch_up(
-    db: &PooledConnection<ConnectionManager<PgConnection>>,
+    db_pool: diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<diesel::PgConnection>>,
     redis_pool: vm::r2d2_redis::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
     vm_state: &mut vm::State,
     bootnodes: &Vec<Bootnode>,
@@ -169,10 +169,9 @@ pub async fn catch_up(
                 vm_state,
                 block.clone(),
                 ordered_transactions,
+                db_pool.get().unwrap(),
             )
             .await;
-            vm_state.commit();
-            block.clone().insert(&db, transactions.clone());
             *crate::BEST_BLOCK.lock().await = Some(block.clone());
             println!("Applied block #{}", &block.number);
         } else {
