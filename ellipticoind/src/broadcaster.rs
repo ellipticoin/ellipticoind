@@ -1,5 +1,6 @@
 use crate::constants::{Namespace, TOKEN_CONTRACT};
 use crate::models::{Block, Transaction};
+use crate::api::views;
 use async_std::sync::Receiver;
 use futures::stream::StreamExt;
 use serde_cbor::Value;
@@ -11,7 +12,7 @@ pub async fn broadcast(
     mut vm_state: vm::State,
 ) {
     loop {
-        let block: crate::api::views::Block  = block_receiver_out.next().await.unwrap().into();
+        let block: views::Block = block_receiver_out.next().await.unwrap().into();
         for peer in get_peers(&mut vm_state).await {
             let uri = format!("http://{}/blocks", peer);
             let _res = surf::post(uri)

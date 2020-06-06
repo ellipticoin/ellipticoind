@@ -3,7 +3,6 @@ use crate::clap::Clap;
 use dotenv::dotenv;
 use ed25519_dalek::Keypair;
 
-
 use std::env;
 use std::net::IpAddr;
 
