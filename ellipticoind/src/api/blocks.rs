@@ -6,6 +6,7 @@ use crate::diesel::OptionalExtension;
 use crate::diesel::QueryDsl;
 use crate::diesel::RunQueryDsl;
 use crate::models;
+use crate::network::Message;
 use crate::schema::blocks;
 use crate::schema::blocks::columns::number;
 use diesel::BelongingToDsl;
@@ -42,8 +43,8 @@ pub async fn create(mut req: tide::Request<State>) -> Response {
         }
     });
 
-    let block_sender_in = &req.state().block_sender_in;
-    block_sender_in.send((block, transactions)).await;
+    let sender_in = &req.state().sender_in;
+    sender_in.send(Message::Block((block, transactions))).await;
     Response::new(201)
 }
 
