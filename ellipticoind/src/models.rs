@@ -193,12 +193,6 @@ impl Transaction {
     }
 }
 
-pub fn next_nonce(
-    con: &PooledConnection<ConnectionManager<PgConnection>>,
-    address: Vec<u8>,
-) -> u64 {
-    (highest_nonce(&con, address).unwrap_or(-1) + 1) as u64
-}
 pub fn highest_nonce(
     con: &PooledConnection<ConnectionManager<PgConnection>>,
     address: Vec<u8>,

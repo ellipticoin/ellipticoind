@@ -5,14 +5,11 @@ use crate::models::{Block, Transaction};
 use crate::transaction_processor;
 use crate::BEST_BLOCK;
 use async_std::sync;
-use r2d2_redis::redis::Commands;
-
 
 use ed25519_dalek::PublicKey;
 
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
-use futures_util::sink::SinkExt;
 
 pub async fn run(
     public_key: std::sync::Arc<PublicKey>,
