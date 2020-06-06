@@ -1,6 +1,6 @@
 use crate::api::views;
 use crate::constants::{Namespace, TOKEN_CONTRACT};
-use crate::models::{Block, Transaction};
+
 use crate::network::Message;
 use async_std::sync::Receiver;
 use futures::stream::StreamExt;
