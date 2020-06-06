@@ -41,8 +41,9 @@ pub async fn next_block_template() -> Block {
 pub async fn mine_next_block(
     con: vm::r2d2_redis::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
     pg_db: PooledConnection<ConnectionManager<PgConnection>>,
-    mut vm_state: vm::State,
-) -> ((Block, Vec<Transaction>), vm::State) {
+    rocksdb: std::sync::Arc<rocksdb::DB>,
+) -> (Block, Vec<Transaction>) {
+    let mut vm_state = vm::State::new(con.get().unwrap(), rocksdb);
     let mut block = next_block_template().await;
     block.winner = PUBLIC_KEY.to_vec();
     let mut transactions = run_transactions(con.clone(), &mut vm_state, &block).await;
@@ -78,7 +79,9 @@ pub async fn mine_next_block(
         transaction.set_hash();
         transaction.block_hash = block.hash.clone();
     });
-    ((block, transactions), vm_state)
+    vm_state.commit();
+    block.clone().insert(&pg_db, transactions.clone());
+    (block, transactions)
 }
 
 fn random() -> u64 {
