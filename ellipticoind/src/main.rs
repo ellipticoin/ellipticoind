@@ -2,8 +2,8 @@ extern crate clap;
 use crate::clap::Clap;
 use dotenv::dotenv;
 use ed25519_dalek::Keypair;
-use serde::Deserialize;
-use serde::Serialize;
+
+
 use std::env;
 use std::net::IpAddr;
 

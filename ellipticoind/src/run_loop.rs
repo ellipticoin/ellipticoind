@@ -6,10 +6,10 @@ use crate::transaction_processor;
 use crate::BEST_BLOCK;
 use async_std::sync;
 use r2d2_redis::redis::Commands;
-use r2d2_redis::{r2d2, RedisConnectionManager};
+
 
 use ed25519_dalek::PublicKey;
-use futures::channel::mpsc;
+
 use futures::future::FutureExt;
 use futures::stream::StreamExt;
 use futures_util::sink::SinkExt;
@@ -17,18 +17,18 @@ use futures_util::sink::SinkExt;
 pub async fn run(
     public_key: std::sync::Arc<PublicKey>,
     mut websocket: api::websocket::Websocket,
-    mut redis: vm::r2d2_redis::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
+    redis: vm::r2d2_redis::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
     rocksdb: std::sync::Arc<rocksdb::DB>,
     db_pool: diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<diesel::PgConnection>>,
     mut block_receiver_in: sync::Receiver<(Block, Vec<Transaction>)>,
-    mut block_sender_out: sync::Sender<(Block, Vec<Transaction>)>,
+    block_sender_out: sync::Sender<(Block, Vec<Transaction>)>,
 ) {
     let db = db_pool.get().unwrap();
     loop {
         let db2 = db_pool.get().unwrap();
         let mut vm_state = vm::State::new(redis.clone().get().unwrap(), rocksdb.clone());
         let vm_state2 = vm::State::new(redis.get().unwrap(), rocksdb.clone());
-        let mut redis_connection = redis.get().unwrap();
+        let _redis_connection = redis.get().unwrap();
         if is_block_winner(&mut vm_state, public_key.as_bytes().to_vec()) {
             let ((new_block, transactions), mut vm_state) =
                 mine_next_block(redis.clone(), db2, vm_state2).await;

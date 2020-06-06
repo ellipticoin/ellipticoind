@@ -11,7 +11,7 @@ use crate::schema::blocks::columns::number;
 use diesel::BelongingToDsl;
 use http_service::Body;
 use serde::Deserialize;
-use serde_cbor::from_slice;
+
 use serde_cbor::ser::to_vec;
 use tide::Response;
 
