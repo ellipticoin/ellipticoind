@@ -1,5 +1,5 @@
 use crate::models::HashOnion;
-use futures_util::sink::SinkExt;
+
 use indicatif::ProgressBar;
 use rand::Rng;
 use serde_cbor::{to_vec, Value};
@@ -18,12 +18,12 @@ use crate::schema::hash_onion::dsl::*;
 use diesel::dsl::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use diesel::PgConnection;
-use futures::channel::mpsc;
+
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::convert::TryInto;
 use std::env;
-use std::net::SocketAddr;
+
 use vm::state::db_key;
 use vm::Commands;
 
@@ -101,7 +101,7 @@ pub async fn start_miner(
         } else {
             let current_burn_per_block = miners.get(&public_key.as_bytes().to_vec());
             if current_burn_per_block.is_none() {
-                let mut bootnode = bootnodes.get(0).unwrap();
+                let bootnode = bootnodes.get(0).unwrap();
                 post_transaction(bootnode, start_mining_transaction).await;
             }
         }
@@ -125,7 +125,7 @@ fn random() -> u64 {
 
 async fn post_transaction(bootnode: &Bootnode, transaction: vm::Transaction) {
     let uri = format!("http://{}/transactions", bootnode.host);
-    let res = surf::post(uri)
+    let _res = surf::post(uri)
         .body_bytes(serde_cbor::to_vec(&transaction).unwrap())
         .await
         .unwrap();
@@ -137,7 +137,7 @@ pub async fn catch_up(
     vm_state: &mut vm::State,
     bootnodes: &Vec<Bootnode>,
 ) {
-    let mut bootnode = bootnodes.get(0).unwrap();
+    let bootnode = bootnodes.get(0).unwrap();
     // bootnode.set_port(4461);
     for block_number in 0.. {
         let mut res = surf::get(format!("http://{}/blocks/{}", bootnode.host, block_number))

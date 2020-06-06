@@ -1,13 +1,13 @@
 use crate::models::{Block, Transaction};
 use crate::system_contracts;
 use async_std::task;
-use async_std::task::sleep;
+
 use dotenv::dotenv;
 use futures::{future::FutureExt, pin_mut, select};
 use serde_cbor::{from_slice, to_vec};
 use std::env;
 use std::ops::DerefMut;
-use std::time::{Duration, Instant};
+use std::time::{Duration};
 use vm::Env;
 
 lazy_static! {
