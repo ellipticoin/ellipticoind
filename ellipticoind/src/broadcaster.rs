@@ -14,7 +14,7 @@ pub async fn broadcast(
         let block: crate::api::views::Block  = block_receiver_out.next().await.unwrap().into();
         for peer in get_peers(&mut vm_state).await {
             let uri = format!("http://{}/blocks", peer);
-            let res = surf::post(uri)
+            let _res = surf::post(uri)
                 .body_bytes(serde_cbor::to_vec(&block).unwrap())
                 .await
                 .unwrap();

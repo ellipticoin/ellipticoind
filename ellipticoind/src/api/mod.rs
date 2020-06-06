@@ -1,6 +1,6 @@
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
-use futures::channel::mpsc;
+
 use async_std::sync::Sender;
 use futures::channel::mpsc::UnboundedSender;
 use std::sync::{Arc, Mutex};

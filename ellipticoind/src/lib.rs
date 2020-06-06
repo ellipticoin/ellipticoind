@@ -33,7 +33,7 @@ use crate::models::Block;
 use api::app::app as api;
 use async_std::sync::channel;
 use async_std::sync::Mutex;
-use async_std::task::sleep;
+
 use broadcaster::broadcast;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
@@ -45,7 +45,7 @@ use std::env;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use vm::{r2d2, redis, RedisConnectionManager};
+use vm::{redis, RedisConnectionManager};
 // use r2d2_redis::{r2d2, RedisConnectionManager};
 use vm::redis::Commands;
 

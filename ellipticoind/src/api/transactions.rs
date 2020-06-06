@@ -5,7 +5,7 @@ use crate::models;
 use crate::schema::transactions::dsl::transactions;
 use diesel::QueryDsl;
 use diesel::RunQueryDsl;
-use futures::sink::SinkExt;
+
 use http_service::Body;
 use serde_cbor::from_slice;
 use tide::Response;
