@@ -83,6 +83,7 @@ pub async fn run(
     let manager = ConnectionManager::<PgConnection>::new(database_url.clone());
     let pg_pool = Pool::new(manager).expect("Postgres connection pool could not be created");
 
+    diesel::sql_query("TRUNCATE blocks CASCADE").execute(&db);
     let redis_manager = RedisConnectionManager::new(redis_url).unwrap();
     let redis_pool = vm::r2d2_redis::r2d2::Pool::builder()
         .build(redis_manager)
@@ -121,11 +122,12 @@ pub async fn run(
         &pg_pool.get().unwrap(),
         redis_pool.clone(),
         keypair.public,
+        &bootnodes,
     )
     .await;
-    let api_state = api::State::new(redis_pool.clone(), rocksdb.clone(), pg_pool);
     let (block_sender_in, block_receiver_in) = channel(1);
     let (block_sender_out, block_receiver_out) = channel(1);
+    let api_state = api::State::new(redis_pool.clone(), rocksdb.clone(), pg_pool, block_sender_in);
     async_std::task::spawn(api(api_state).listen(socket));
     async_std::task::spawn(broadcast(block_receiver_out, vm_state));
     let websocket = api::websocket::Websocket::new();
