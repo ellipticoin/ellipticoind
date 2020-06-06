@@ -21,6 +21,7 @@ mod constants;
 mod helpers;
 mod miner;
 mod models;
+mod network;
 mod run_loop;
 mod schema;
 mod start_up;
@@ -30,6 +31,7 @@ mod transaction_processor;
 use crate::config::Bootnode;
 use crate::miner::get_best_block;
 use crate::models::Block;
+use crate::network::Message;
 use api::app::app as api;
 use async_std::sync::channel;
 use async_std::sync::Mutex;
@@ -104,16 +106,11 @@ pub async fn run(
         &bootnodes,
     )
     .await;
-    let (block_sender_in, block_receiver_in) = channel(1);
-    let (block_sender_out, block_receiver_out) = channel(1);
-    let api_state = api::State::new(
-        redis_pool.clone(),
-        rocksdb.clone(),
-        pg_pool,
-        block_sender_in,
-    );
+    let (sender_in, receiver_in) = channel(1);
+    let (sender_out, receiver_out) = channel(1);
+    let api_state = api::State::new(redis_pool.clone(), rocksdb.clone(), pg_pool, sender_in);
     async_std::task::spawn(api(api_state).listen(socket));
-    async_std::task::spawn(broadcast(block_receiver_out, vm_state));
+    async_std::task::spawn(broadcast(receiver_out, vm_state));
     let websocket = api::websocket::Websocket::new();
     let mut websocket_socket = socket.clone();
     websocket_socket.set_port(websocket_port);
@@ -128,8 +125,8 @@ pub async fn run(
         redis_pool.clone(),
         rocksdb,
         pg_pool,
-        block_receiver_in,
-        block_sender_out,
+        receiver_in,
+        sender_out,
     )
     .await
 }

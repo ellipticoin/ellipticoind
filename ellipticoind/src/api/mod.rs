@@ -1,6 +1,7 @@
 use diesel::r2d2::{ConnectionManager, Pool};
 use diesel::PgConnection;
 
+use crate::network;
 use async_std::sync::Sender;
 use futures::channel::mpsc::UnboundedSender;
 use std::sync::{Arc, Mutex};
@@ -21,7 +22,7 @@ pub struct State {
     pub redis: vm::r2d2_redis::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
     pub rocksdb: Arc<rocksdb::DB>,
     pub db: Pool<ConnectionManager<PgConnection>>,
-    pub block_sender_in: Sender<(models::Block, std::vec::Vec<models::Transaction>)>,
+    pub sender_in: Sender<network::Message>,
 }
 
 impl State {
@@ -29,14 +30,14 @@ impl State {
         redis: vm::r2d2_redis::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
         rocksdb: Arc<rocksdb::DB>,
         db: Pool<ConnectionManager<PgConnection>>,
-        block_sender_in: Sender<(models::Block, std::vec::Vec<models::Transaction>)>,
+        sender_in: Sender<network::Message>,
     ) -> Self {
         Self {
             websockets: Arc::new(Mutex::new(Vec::new())),
             redis,
             rocksdb,
             db,
-            block_sender_in,
+            sender_in,
         }
     }
 }
