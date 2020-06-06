@@ -2,6 +2,8 @@ use crate::models::{Block, Transaction};
 use crate::system_contracts;
 use async_std::task;
 
+use diesel::pg::PgConnection;
+use diesel::r2d2::{ConnectionManager, PooledConnection};
 use dotenv::dotenv;
 use futures::{future::FutureExt, pin_mut, select};
 use serde_cbor::{from_slice, to_vec};
@@ -26,11 +28,14 @@ pub async fn apply_block(
     mut vm_state: &mut vm::State,
     block: Block,
     transactions: Vec<Transaction>,
+    db: PooledConnection<ConnectionManager<PgConnection>>,
 ) {
-    for transaction in transactions.into_iter() {
+    for transaction in transactions.clone().into_iter() {
         run_transaction(&mut vm_state, &transaction.clone().into(), &block);
         remove_from_pending(&mut redis, &transaction.into()).await;
     }
+    vm_state.commit();
+    block.insert(&db, transactions);
 }
 
 pub async fn run_transactions(
