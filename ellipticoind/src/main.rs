@@ -8,13 +8,11 @@ use std::net::IpAddr;
 
 #[derive(Clap, Debug)]
 struct Opts {
-    #[clap(short = "p", long = "port", default_value = "4460")]
+    #[clap(short = "p", long = "port", default_value = "80")]
     port: u16,
     #[clap(short = "a", long = "bind-address", default_value = "0.0.0.0")]
     bind_address: String,
-    #[clap(short = "e", long = "external-ip", default_value = "0.0.0.0")]
-    external_ip: String,
-    #[clap(long = "websocket-port", default_value = "4462")]
+    #[clap(long = "websocket-port", default_value = "81")]
     websocket_port: u16,
     #[clap(long = "rocksdb-path", default_value = "./db")]
     rocksdb_path: String,
