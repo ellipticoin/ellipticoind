@@ -12,7 +12,10 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(redis: r2d2_redis::r2d2::PooledConnection<r2d2_redis::RedisConnectionManager>, rocksdb: Arc<rocksdb::DB>) -> Self {
+    pub fn new(
+        redis: r2d2_redis::r2d2::PooledConnection<r2d2_redis::RedisConnectionManager>,
+        rocksdb: Arc<rocksdb::DB>,
+    ) -> Self {
         let vm_state = Self {
             redis,
             rocksdb,
@@ -33,7 +36,10 @@ impl State {
     pub fn get_memory(&mut self, contract_address: &[u8], key: &[u8]) -> Vec<u8> {
         self.memory_changeset
             .get(&db_key(contract_address, key))
-            .unwrap_or(&r2d2_redis::redis::Commands::get(&mut *self.redis,db_key(contract_address, key)).unwrap())
+            .unwrap_or(
+                &r2d2_redis::redis::Commands::get(&mut *self.redis, db_key(contract_address, key))
+                    .unwrap(),
+            )
             .to_vec()
     }
 

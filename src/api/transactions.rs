@@ -6,10 +6,10 @@ use crate::schema::transactions::dsl::transactions;
 use diesel::QueryDsl;
 use diesel::RunQueryDsl;
 
+use crate::vm::redis::Commands;
 use http_service::Body;
 use serde_cbor::from_slice;
 use tide::Response;
-use crate::vm::redis::Commands;
 
 pub async fn show(req: tide::Request<State>) -> Response {
     let con = req.state().db.get().unwrap();

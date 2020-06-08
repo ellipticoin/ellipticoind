@@ -1,18 +1,18 @@
-use serde_cbor::Value;
 use crate::vm::{Env, State, Transaction};
+use serde_cbor::Value;
 
 pub fn is_system_contract(transaction: &Transaction) -> bool {
     transaction.contract_address == [[0; 32].to_vec(), "System".as_bytes().to_vec()].concat()
 }
 
-pub fn run(transaction: &Transaction, state: &mut State, env: &Env) -> (u32, Value) {
+pub fn run(transaction: &Transaction, state: &mut State, env: &Env) -> Value {
     match transaction.function.as_str() {
         "create_contract" => create_contract(transaction, state, env),
-        _ => (0, Value::Null),
+        _ => Value::Null,
     }
 }
 
-pub fn create_contract(transaction: &Transaction, state: &mut State, env: &Env) -> (u32, Value) {
+pub fn create_contract(transaction: &Transaction, state: &mut State, env: &Env) -> Value {
     if let [Value::Text(contract_name), serde_cbor::Value::Bytes(code), serde_cbor::Value::Array(arguments)] =
         &transaction.arguments[..]
     {
@@ -21,7 +21,7 @@ pub fn create_contract(transaction: &Transaction, state: &mut State, env: &Env) 
         let result = run_constuctor(transaction, state, env, contract_name, arguments);
         result
     } else {
-        (0, Value::Null)
+        Value::Null
     }
 }
 fn run_constuctor(
@@ -30,7 +30,7 @@ fn run_constuctor(
     env: &Env,
     contract_name: &str,
     arguments: &Vec<Value>,
-) -> (u32, Value) {
+) -> Value {
     let (result, _gas_left) = Transaction {
         function: "constructor".to_string(),
         arguments: arguments.to_vec(),
@@ -47,14 +47,9 @@ fn run_constuctor(
     result
 }
 
-pub fn transfer(
-    transaction: &Transaction,
-    amount: u32,
-    from: Vec<u8>,
-    to: Vec<u8>,
-) -> (u32, Value) {
+pub fn transfer(transaction: &Transaction, amount: u32, from: Vec<u8>, to: Vec<u8>) {
     let arguments = vec![Value::Bytes(to), Value::Integer(amount as i128)];
-    let transaction = Transaction {
+    let _transaction = Transaction {
         function: "transfer".to_string(),
         nonce: 0,
         gas_limit: transaction.gas_limit,
@@ -62,6 +57,4 @@ pub fn transfer(
         sender: from.clone(),
         arguments: arguments.clone(),
     };
-
-    crate::vm::result::contract_not_found(&transaction)
 }

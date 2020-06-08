@@ -26,7 +26,6 @@ pub struct Transaction {
     pub function: String,
     pub gas_limit: u64,
     pub nonce: u64,
-    return_code: u64,
     return_value: serde_cbor::Value,
     #[serde(with = "serde_bytes")]
     pub sender: Vec<u8>,
@@ -62,7 +61,6 @@ impl From<crate::models::Transaction> for Transaction {
             function: transaction.function.clone(),
             arguments: serde_cbor::from_slice(&transaction.arguments).unwrap(),
             return_value: serde_cbor::from_slice(&transaction.return_value).unwrap(),
-            return_code: transaction.return_code as u64,
         }
     }
 }
@@ -100,7 +98,6 @@ impl From<Transaction> for crate::models::Transaction {
             function: transaction.function.clone(),
             arguments: serde_cbor::to_vec(&transaction.arguments).unwrap(),
             return_value: serde_cbor::to_vec(&transaction.return_value).unwrap(),
-            return_code: transaction.return_code as i64,
         }
     }
 }

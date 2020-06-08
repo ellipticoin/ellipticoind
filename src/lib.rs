@@ -33,6 +33,7 @@ use crate::config::Bootnode;
 use crate::miner::get_best_block;
 use crate::models::Block;
 
+use crate::vm::{redis, RedisConnectionManager};
 use api::app::app as api;
 use async_std::sync::channel;
 use async_std::sync::Mutex;
@@ -43,7 +44,6 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use ed25519_dalek::Keypair;
 use rand::rngs::OsRng;
 use std::{env, net::SocketAddr, sync::Arc};
-use crate::vm::{redis, RedisConnectionManager};
 
 lazy_static! {
     static ref BEST_BLOCK: async_std::sync::Arc<Mutex<Option<Block>>> =

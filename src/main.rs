@@ -20,6 +20,8 @@ struct Opts {
     redis_url: String,
     #[clap(short = "d", long = "database-url")]
     database_url: Option<String>,
+    #[clap(short = "b", long = "bootnodes")]
+    bootnodes: Option<String>,
     #[clap(subcommand)]
     subcmd: Option<SubCommand>,
 }
@@ -53,7 +55,7 @@ async fn main() {
                 socket,
                 websocket_port,
                 private_key,
-                ellipticoind::config::bootnodes(),
+                ellipticoind::config::bootnodes(opts.bootnodes),
             )
             .await
         }

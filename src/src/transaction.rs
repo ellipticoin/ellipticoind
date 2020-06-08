@@ -31,7 +31,6 @@ pub struct CompletedTransaction {
     pub function: String,
     pub arguments: Vec<Value>,
     pub return_value: Value,
-    pub return_code: u32,
 }
 
 pub struct _State {
