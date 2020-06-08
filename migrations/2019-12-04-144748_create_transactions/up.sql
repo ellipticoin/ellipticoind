@@ -7,7 +7,6 @@ CREATE TABLE "transactions" (
   "nonce" BIGINT NOT NULL,
   "function" VARCHAR NOT NULL,
   "arguments" BYTEA NOT NULL,
-  "return_code" BIGINT NOT NULL,
   "return_value" BYTEA NOT NULL,
   PRIMARY KEY ("hash")
 );

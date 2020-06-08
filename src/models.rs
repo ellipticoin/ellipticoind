@@ -82,7 +82,6 @@ impl From<crate::vm::CompletedTransaction> for Transaction {
             nonce: transaction.nonce as i64,
             function: transaction.function,
             arguments: to_vec(&transaction.arguments).unwrap(),
-            return_code: transaction.return_code as i64,
             return_value: to_vec(&transaction.return_value).unwrap(),
         }
     }
@@ -158,7 +157,6 @@ pub struct Transaction {
     pub nonce: i64,
     pub function: String,
     pub arguments: Vec<u8>,
-    pub return_code: i64,
     pub return_value: Vec<u8>,
 }
 

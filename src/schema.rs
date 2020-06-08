@@ -27,7 +27,6 @@ table! {
         nonce -> Int8,
         function -> Varchar,
         arguments -> Bytea,
-        return_code -> Int8,
         return_value -> Bytea,
     }
 }
