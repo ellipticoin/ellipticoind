@@ -8,7 +8,7 @@ use serde_cbor::Value;
 use std::collections::BTreeMap;
 use std::env;
 
-pub async fn broadcast(mut block_receiver_out: Receiver<Message>, mut vm_state: vm::State) {
+pub async fn broadcast(mut block_receiver_out: Receiver<Message>, mut vm_state: crate::vm::State) {
     loop {
         match block_receiver_out.next().await.unwrap() {
             Message::Block((block, transactions)) => {
@@ -22,7 +22,7 @@ pub async fn broadcast(mut block_receiver_out: Receiver<Message>, mut vm_state: 
                 }
             }
             Message::Transaction(transaction) => {
-                let transaction: vm::Transaction = transaction.into();
+                let transaction: crate::vm::Transaction = transaction.into();
                 for peer in get_peers(&mut vm_state).await {
                     let uri = format!("http://{}/transactions", peer);
                     let _res = surf::post(uri)
@@ -35,7 +35,7 @@ pub async fn broadcast(mut block_receiver_out: Receiver<Message>, mut vm_state: 
     }
 }
 
-pub async fn get_peers(vm_state: &mut vm::State) -> Vec<String> {
+pub async fn get_peers(vm_state: &mut crate::vm::State) -> Vec<String> {
     let miners: BTreeMap<Vec<Value>, (String, u64, Vec<Value>)> = serde_cbor::from_slice(
         &vm_state.get_storage(&TOKEN_CONTRACT, &vec![Namespace::Miners as u8]),
     )

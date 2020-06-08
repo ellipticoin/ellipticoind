@@ -19,7 +19,7 @@ pub mod websocket;
 
 pub struct State {
     pub websockets: Arc<Mutex<Vec<UnboundedSender<Message>>>>,
-    pub redis: vm::r2d2_redis::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
+    pub redis: crate::vm::r2d2_redis::r2d2::Pool<crate::vm::r2d2_redis::RedisConnectionManager>,
     pub rocksdb: Arc<rocksdb::DB>,
     pub db: Pool<ConnectionManager<PgConnection>>,
     pub sender_in: Sender<network::Message>,
@@ -27,7 +27,7 @@ pub struct State {
 
 impl State {
     pub fn new(
-        redis: vm::r2d2_redis::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
+        redis: crate::vm::r2d2_redis::r2d2::Pool<crate::vm::r2d2_redis::RedisConnectionManager>,
         rocksdb: Arc<rocksdb::DB>,
         db: Pool<ConnectionManager<PgConnection>>,
         sender_in: Sender<network::Message>,

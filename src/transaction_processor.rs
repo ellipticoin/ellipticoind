@@ -10,7 +10,7 @@ use serde_cbor::{from_slice, to_vec};
 use std::env;
 use std::ops::DerefMut;
 use std::time::Duration;
-use vm::Env;
+use crate::vm::Env;
 
 lazy_static! {
     static ref TRANSACTION_PROCESSING_TIME: Duration = Duration::from_secs(4);
@@ -24,8 +24,8 @@ lazy_static! {
     };
 }
 pub async fn apply_block(
-    mut redis: vm::r2d2_redis::r2d2::PooledConnection<vm::r2d2_redis::RedisConnectionManager>,
-    mut vm_state: &mut vm::State,
+    mut redis: crate::vm::r2d2_redis::r2d2::PooledConnection<crate::vm::r2d2_redis::RedisConnectionManager>,
+    mut vm_state: &mut crate::vm::State,
     block: Block,
     transactions: Vec<Transaction>,
     db: PooledConnection<ConnectionManager<PgConnection>>,
@@ -39,8 +39,8 @@ pub async fn apply_block(
 }
 
 pub async fn run_transactions(
-    pool: vm::r2d2_redis::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
-    mut vm_state: &mut vm::State,
+    pool: crate::vm::r2d2_redis::r2d2::Pool<crate::vm::r2d2_redis::RedisConnectionManager>,
+    mut vm_state: &mut crate::vm::State,
     block: &Block,
 ) -> Vec<Transaction> {
     let mut completed_transactions: Vec<Transaction> = Default::default();
@@ -64,8 +64,8 @@ pub async fn run_transactions(
 }
 
 pub fn run_transaction(
-    mut state: &mut vm::State,
-    transaction: &vm::Transaction,
+    mut state: &mut crate::vm::State,
+    transaction: &crate::vm::Transaction,
     block: &Block,
 ) -> Transaction {
     let env = env_from_block(block);
@@ -76,7 +76,7 @@ pub fn run_transaction(
         let (result, gas_left) = transaction.run(&mut state, &env);
         let gas_used = transaction.gas_limit - gas_left.expect("no gas left") as u64;
 
-        let env = vm::Env {
+        let env = crate::vm::Env {
             caller: None,
             block_winner: PUBLIC_KEY.to_vec(),
             block_number: 0,
@@ -93,34 +93,34 @@ pub fn run_transaction(
 }
 
 fn env_from_block(block: &Block) -> Env {
-    vm::Env {
+    crate::vm::Env {
         block_number: block.number as u64,
         block_winner: block.winner.clone(),
         ..Default::default()
     }
 }
 async fn get_next_transaction(
-    redis: &mut vm::r2d2_redis::r2d2::PooledConnection<vm::r2d2_redis::RedisConnectionManager>,
-) -> vm::Transaction {
+    redis: &mut crate::vm::r2d2_redis::r2d2::PooledConnection<crate::vm::r2d2_redis::RedisConnectionManager>,
+) -> crate::vm::Transaction {
     loop {
-        let transaction_bytes: Vec<u8> = vm::redis::cmd("RPOPLPUSH")
+        let transaction_bytes: Vec<u8> = crate::vm::redis::cmd("RPOPLPUSH")
             .arg("transactions::pending")
             .arg("transactions::processing")
             .query(redis.deref_mut())
             .unwrap();
         if transaction_bytes.len() > 0 {
-            return from_slice::<vm::Transaction>(&transaction_bytes).unwrap();
+            return from_slice::<crate::vm::Transaction>(&transaction_bytes).unwrap();
         }
         task::sleep(Duration::from_millis(50)).await;
     }
 }
 
 async fn remove_from_processing(
-    redis: &mut vm::r2d2_redis::r2d2::PooledConnection<vm::r2d2_redis::RedisConnectionManager>,
-    transaction: &vm::Transaction,
+    redis: &mut crate::vm::r2d2_redis::r2d2::PooledConnection<crate::vm::r2d2_redis::RedisConnectionManager>,
+    transaction: &crate::vm::Transaction,
 ) {
     let transaction_bytes = to_vec(&transaction).unwrap();
-    vm::redis::cmd("LREM")
+    crate::vm::redis::cmd("LREM")
         .arg("transactions::processing")
         .arg(0)
         .arg(transaction_bytes.as_slice())
@@ -129,11 +129,11 @@ async fn remove_from_processing(
 }
 
 async fn remove_from_pending(
-    redis: &mut vm::r2d2_redis::r2d2::PooledConnection<vm::r2d2_redis::RedisConnectionManager>,
-    transaction: &vm::Transaction,
+    redis: &mut crate::vm::r2d2_redis::r2d2::PooledConnection<crate::vm::r2d2_redis::RedisConnectionManager>,
+    transaction: &crate::vm::Transaction,
 ) {
     let transaction_bytes = to_vec(&transaction).unwrap();
-    vm::redis::cmd("LREM")
+    crate::vm::redis::cmd("LREM")
         .arg("transactions::pending")
         .arg(0)
         .arg(transaction_bytes.as_slice())
