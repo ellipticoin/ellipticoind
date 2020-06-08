@@ -22,10 +22,6 @@ pub fn invalid_wasm() -> Result {
     (4, "Invalid WebAssembly Code".to_string().into())
 }
 
-pub fn to_bytes(result: Result) -> Vec<u8> {
-    let return_bytes = serde_cbor::to_vec(&result.1).unwrap();
-    [u32::to_le_bytes(result.0).to_vec(), return_bytes].concat()
-}
 pub fn from_bytes(bytes: Vec<u8>) -> Result {
     if bytes.len() == 0 {
         vm_panic()
