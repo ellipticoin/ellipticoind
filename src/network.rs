@@ -1,7 +1,7 @@
 use crate::models::{Block, Transaction};
 
 pub use futures::stream::StreamExt;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Message {

@@ -2,6 +2,7 @@ use crate::models::{Block, Transaction};
 use crate::system_contracts;
 use async_std::task;
 
+use crate::vm::Env;
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use dotenv::dotenv;
@@ -10,7 +11,6 @@ use serde_cbor::{from_slice, to_vec};
 use std::env;
 use std::ops::DerefMut;
 use std::time::Duration;
-use crate::vm::Env;
 
 lazy_static! {
     static ref TRANSACTION_PROCESSING_TIME: Duration = Duration::from_secs(4);
@@ -24,7 +24,9 @@ lazy_static! {
     };
 }
 pub async fn apply_block(
-    mut redis: crate::vm::r2d2_redis::r2d2::PooledConnection<crate::vm::r2d2_redis::RedisConnectionManager>,
+    mut redis: crate::vm::r2d2_redis::r2d2::PooledConnection<
+        crate::vm::r2d2_redis::RedisConnectionManager,
+    >,
     mut vm_state: &mut crate::vm::State,
     block: Block,
     transactions: Vec<Transaction>,
@@ -100,7 +102,9 @@ fn env_from_block(block: &Block) -> Env {
     }
 }
 async fn get_next_transaction(
-    redis: &mut crate::vm::r2d2_redis::r2d2::PooledConnection<crate::vm::r2d2_redis::RedisConnectionManager>,
+    redis: &mut crate::vm::r2d2_redis::r2d2::PooledConnection<
+        crate::vm::r2d2_redis::RedisConnectionManager,
+    >,
 ) -> crate::vm::Transaction {
     loop {
         let transaction_bytes: Vec<u8> = crate::vm::redis::cmd("RPOPLPUSH")
@@ -116,7 +120,9 @@ async fn get_next_transaction(
 }
 
 async fn remove_from_processing(
-    redis: &mut crate::vm::r2d2_redis::r2d2::PooledConnection<crate::vm::r2d2_redis::RedisConnectionManager>,
+    redis: &mut crate::vm::r2d2_redis::r2d2::PooledConnection<
+        crate::vm::r2d2_redis::RedisConnectionManager,
+    >,
     transaction: &crate::vm::Transaction,
 ) {
     let transaction_bytes = to_vec(&transaction).unwrap();
@@ -129,7 +135,9 @@ async fn remove_from_processing(
 }
 
 async fn remove_from_pending(
-    redis: &mut crate::vm::r2d2_redis::r2d2::PooledConnection<crate::vm::r2d2_redis::RedisConnectionManager>,
+    redis: &mut crate::vm::r2d2_redis::r2d2::PooledConnection<
+        crate::vm::r2d2_redis::RedisConnectionManager,
+    >,
     transaction: &crate::vm::Transaction,
 ) {
     let transaction_bytes = to_vec(&transaction).unwrap();

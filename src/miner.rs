@@ -1,10 +1,7 @@
-extern crate rocksdb;
-extern crate serde;
-extern crate serde_cbor;
-
 use crate::constants::TOKEN_CONTRACT;
 use crate::diesel::QueryDsl;
 use crate::models::*;
+use crate::schema;
 use crate::schema::blocks::dsl::blocks;
 use crate::schema::hash_onion::dsl::*;
 use crate::transaction_processor::{run_transaction, run_transactions, PUBLIC_KEY};
@@ -17,7 +14,7 @@ use serde_cbor::Value;
 
 pub fn get_best_block(db: &PgConnection) -> Option<Block> {
     blocks
-        .order(crate::schema::blocks::dsl::number.desc())
+        .order(schema::blocks::dsl::number.desc())
         .first(db)
         .optional()
         .unwrap()

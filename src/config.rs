@@ -18,6 +18,8 @@ where
         .and_then(|string| base64::decode(&string).map_err(|err| Error::custom(err.to_string())))
 }
 
-pub fn bootnodes() -> Vec<Bootnode> {
-    serde_yaml::from_str(&include_str!("bootnodes.yaml")).unwrap()
+pub fn bootnodes(path: Option<String>) -> Vec<Bootnode> {
+    let path = path.unwrap_or("dist/bootnodes.yaml".to_string());
+    let string = std::fs::read_to_string(path).unwrap();
+    serde_yaml::from_str(&string).unwrap()
 }

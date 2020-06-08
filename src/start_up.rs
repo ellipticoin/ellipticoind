@@ -109,7 +109,9 @@ pub async fn start_miner(
 }
 fn process_transaction(
     transaction: crate::vm::Transaction,
-    redis: &mut crate::vm::r2d2_redis::r2d2::PooledConnection<crate::vm::r2d2_redis::RedisConnectionManager>,
+    redis: &mut crate::vm::r2d2_redis::r2d2::PooledConnection<
+        crate::vm::r2d2_redis::RedisConnectionManager,
+    >,
 ) {
     redis
         .rpush::<&str, Vec<u8>, ()>(

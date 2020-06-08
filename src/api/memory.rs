@@ -1,7 +1,7 @@
 use super::State;
+use crate::vm::redis::Commands;
 use http_service::Body;
 use tide::Response;
-use crate::vm::redis::Commands;
 
 pub async fn show(req: tide::Request<State>) -> Response {
     let key: String = req.param("key").unwrap();
