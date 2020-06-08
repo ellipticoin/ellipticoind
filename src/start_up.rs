@@ -24,8 +24,8 @@ use sha2::{Digest, Sha256};
 use std::convert::TryInto;
 use std::env;
 
-use vm::state::db_key;
-use vm::Commands;
+use crate::vm::state::db_key;
+use crate::vm::Commands;
 
 // Mason's Ethereum Address
 pub const GENISIS_ETHEREUM_ADRESS: [u8; 20] = hex!("3073ac44aA1b95f2fe71Bb2eb36b9CE27892F8ee");
@@ -53,7 +53,7 @@ pub struct Transaction {
 pub async fn start_miner(
     db: &std::sync::Arc<rocksdb::DB>,
     pg_db: &PooledConnection<ConnectionManager<PgConnection>>,
-    redis: vm::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
+    redis: crate::vm::r2d2::Pool<crate::vm::r2d2_redis::RedisConnectionManager>,
     public_key: ed25519_dalek::PublicKey,
     bootnodes: &Vec<Bootnode>,
 ) {
@@ -73,7 +73,7 @@ pub async fn start_miner(
             .order(id.desc())
             .first(pg_db)
             .unwrap();
-        let start_mining_transaction = vm::Transaction {
+        let start_mining_transaction = crate::vm::Transaction {
             contract_address: TOKEN_CONTRACT.to_vec(),
             sender: public_key.to_bytes().to_vec(),
             nonce: random(),
@@ -108,8 +108,8 @@ pub async fn start_miner(
     }
 }
 fn process_transaction(
-    transaction: vm::Transaction,
-    redis: &mut vm::r2d2_redis::r2d2::PooledConnection<vm::r2d2_redis::RedisConnectionManager>,
+    transaction: crate::vm::Transaction,
+    redis: &mut crate::vm::r2d2_redis::r2d2::PooledConnection<crate::vm::r2d2_redis::RedisConnectionManager>,
 ) {
     redis
         .rpush::<&str, Vec<u8>, ()>(
@@ -123,7 +123,7 @@ fn random() -> u64 {
     rng.gen_range(0, u32::max_value() as u64)
 }
 
-async fn post_transaction(bootnode: &Bootnode, transaction: vm::Transaction) {
+async fn post_transaction(bootnode: &Bootnode, transaction: crate::vm::Transaction) {
     let uri = format!("http://{}/transactions", bootnode.host);
     let _res = surf::post(uri)
         .body_bytes(serde_cbor::to_vec(&transaction).unwrap())
@@ -133,8 +133,8 @@ async fn post_transaction(bootnode: &Bootnode, transaction: vm::Transaction) {
 
 pub async fn catch_up(
     db_pool: diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<diesel::PgConnection>>,
-    redis_pool: vm::r2d2_redis::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
-    vm_state: &mut vm::State,
+    redis_pool: crate::vm::r2d2_redis::r2d2::Pool<crate::vm::r2d2_redis::RedisConnectionManager>,
+    vm_state: &mut crate::vm::State,
     bootnodes: &Vec<Bootnode>,
 ) {
     let bootnode = bootnodes.get(0).unwrap();
@@ -223,15 +223,15 @@ pub fn sha256(value: Vec<u8>) -> Vec<u8> {
 pub async fn initialize_rocks_db(
     path: &str,
     pg_db: &PooledConnection<ConnectionManager<PgConnection>>,
-    redis_pool: vm::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
-) -> vm::rocksdb::DB {
+    redis_pool: crate::vm::r2d2::Pool<crate::vm::r2d2_redis::RedisConnectionManager>,
+) -> crate::vm::rocksdb::DB {
     if Path::new(path).exists() {
-        vm::rocksdb::DB::open_default(path).unwrap()
+        crate::vm::rocksdb::DB::open_default(path).unwrap()
     } else {
-        let db = vm::rocksdb::DB::open_default(path).unwrap();
-        let file = File::open("dist/ethereum-balances-10054080.bin").unwrap();
+        let db = crate::vm::rocksdb::DB::open_default(path).unwrap();
+        // let file = File::open("dist/ethereum-balances-10054080.bin").unwrap();
 
-        //let file = File::open("dist/development-balances.bin").unwrap();
+        let file = File::open("dist/development-balances.bin").unwrap();
         let metadata = std::fs::metadata("dist/ethereum-balances-10054080.bin").unwrap();
         let pb = ProgressBar::new(metadata.len() / 24);
         println!("Importing Ethereum Balances");
@@ -322,7 +322,7 @@ pub async fn initialize_rocks_db(
             GENISIS_ADRESS.to_vec(),
         )
         .unwrap();
-        let mut token_file = File::open("../token/dist/token.wasm").unwrap();
+        let mut token_file = File::open("./contracts/token/dist/token.wasm").unwrap();
         let mut token_wasm = Vec::new();
         token_file.read_to_end(&mut token_wasm).unwrap();
         db.put(db_key(&TOKEN_CONTRACT, &vec![]), &token_wasm)

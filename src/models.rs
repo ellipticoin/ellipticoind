@@ -52,15 +52,15 @@ pub async fn is_next_block(block: &Block) -> bool {
     }
 }
 
-pub fn is_block_winner(vm_state: &mut vm::State, public_key: Vec<u8>) -> bool {
+pub fn is_block_winner(vm_state: &mut crate::vm::State, public_key: Vec<u8>) -> bool {
     let winner = vm_state.get_storage(&TOKEN_CONTRACT, &vec![Namespace::CurrentMiner as u8]);
     // println!("winner {}", base64::encode(&winner));
     winner.eq(&public_key)
 }
 
-impl From<Transaction> for vm::Transaction {
-    fn from(transaction: Transaction) -> vm::Transaction {
-        vm::Transaction {
+impl From<Transaction> for crate::vm::Transaction {
+    fn from(transaction: Transaction) -> crate::vm::Transaction {
+        crate::vm::Transaction {
             sender: transaction.sender,
             arguments: from_slice(&transaction.arguments).unwrap(),
             contract_address: transaction.contract_address,
@@ -71,8 +71,8 @@ impl From<Transaction> for vm::Transaction {
     }
 }
 
-impl From<vm::CompletedTransaction> for Transaction {
-    fn from(transaction: vm::CompletedTransaction) -> Self {
+impl From<crate::vm::CompletedTransaction> for Transaction {
+    fn from(transaction: crate::vm::CompletedTransaction) -> Self {
         Self {
             hash: vec![],
             block_hash: vec![],
