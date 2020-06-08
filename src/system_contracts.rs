@@ -1,5 +1,5 @@
 use serde_cbor::Value;
-use vm::{Env, State, Transaction};
+use crate::vm::{Env, State, Transaction};
 
 pub fn is_system_contract(transaction: &Transaction) -> bool {
     transaction.contract_address == [[0; 32].to_vec(), "System".as_bytes().to_vec()].concat()
@@ -63,5 +63,5 @@ pub fn transfer(
         arguments: arguments.clone(),
     };
 
-    vm::result::contract_not_found(&transaction)
+    crate::vm::result::contract_not_found(&transaction)
 }

@@ -5,6 +5,6 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Message {
-    Transaction(vm::Transaction),
+    Transaction(crate::vm::Transaction),
     Block((Block, Vec<Transaction>)),
 }

@@ -27,6 +27,7 @@ mod schema;
 mod start_up;
 mod system_contracts;
 mod transaction_processor;
+mod vm;
 
 use crate::config::Bootnode;
 use crate::miner::get_best_block;
@@ -42,7 +43,7 @@ use diesel::r2d2::{ConnectionManager, Pool};
 use ed25519_dalek::Keypair;
 use rand::rngs::OsRng;
 use std::{env, net::SocketAddr, sync::Arc};
-use vm::{redis, RedisConnectionManager};
+use crate::vm::{redis, RedisConnectionManager};
 
 lazy_static! {
     static ref BEST_BLOCK: async_std::sync::Arc<Mutex<Option<Block>>> =
@@ -77,7 +78,7 @@ pub async fn run(
         .execute(&db)
         .unwrap();
     let redis_manager = RedisConnectionManager::new(redis_url).unwrap();
-    let redis_pool = vm::r2d2_redis::r2d2::Pool::builder()
+    let redis_pool = crate::vm::r2d2_redis::r2d2::Pool::builder()
         .build(redis_manager)
         .unwrap();
     let _: () = redis::cmd("FLUSHALL")
@@ -88,7 +89,7 @@ pub async fn run(
         start_up::initialize_rocks_db(rocksdb_path, &pg_pool.get().unwrap(), redis_pool.clone())
             .await,
     );
-    let mut vm_state = vm::State::new(redis_pool.get().unwrap(), rocksdb.clone());
+    let mut vm_state = crate::vm::State::new(redis_pool.get().unwrap(), rocksdb.clone());
     if env::var("GENISIS_NODE").is_err() {
         start_up::catch_up(
             pg_pool.clone(),

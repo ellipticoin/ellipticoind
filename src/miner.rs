@@ -1,7 +1,6 @@
 extern crate rocksdb;
 extern crate serde;
 extern crate serde_cbor;
-extern crate vm;
 
 use crate::constants::TOKEN_CONTRACT;
 use crate::diesel::QueryDsl;
@@ -39,11 +38,11 @@ pub async fn next_block_template() -> Block {
 }
 
 pub async fn mine_next_block(
-    con: vm::r2d2_redis::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
+    con: crate::vm::r2d2_redis::r2d2::Pool<crate::vm::r2d2_redis::RedisConnectionManager>,
     pg_db: PooledConnection<ConnectionManager<PgConnection>>,
     rocksdb: std::sync::Arc<rocksdb::DB>,
 ) -> (Block, Vec<Transaction>) {
-    let mut vm_state = vm::State::new(con.get().unwrap(), rocksdb);
+    let mut vm_state = crate::vm::State::new(con.get().unwrap(), rocksdb);
     let mut block = next_block_template().await;
     block.winner = PUBLIC_KEY.to_vec();
     let mut transactions = run_transactions(con.clone(), &mut vm_state, &block).await;
@@ -57,7 +56,7 @@ pub async fn mine_next_block(
         .into_iter()
         .map(|n| n.into())
         .collect();
-    let reveal_transaction = vm::Transaction {
+    let reveal_transaction = crate::vm::Transaction {
         contract_address: TOKEN_CONTRACT.to_vec(),
         sender: PUBLIC_KEY.to_vec(),
         nonce: sender_nonce,
