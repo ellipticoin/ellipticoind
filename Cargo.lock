@@ -735,6 +735,7 @@ checksum = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
 name = "ellipticoin"
 version = "0.0.2"
 dependencies = [
+ "lazy_static",
  "wasm-rpc 0.2.13",
  "wasm-rpc-macros 0.2.13",
 ]
@@ -807,7 +808,6 @@ dependencies = [
  "indicatif",
  "lazy_static",
  "mime 0.3.16",
- "network",
  "r2d2_redis 0.13.1-alpha.0",
  "rand 0.7.3",
  "reqwest",
@@ -1929,20 +1929,6 @@ dependencies = [
  "cfg-if",
  "libc",
  "winapi 0.3.8",
-]
-
-[[package]]
-name = "network"
-version = "0.1.0"
-dependencies = [
- "async-std",
- "ed25519-dalek",
- "futures 0.3.5",
- "futures-timer 2.0.2",
- "lazy_static",
- "rand 0.7.3",
- "serde",
- "serde_cbor 0.11.1 (git+https://github.com/pyfisch/cbor)",
 ]
 
 [[package]]
