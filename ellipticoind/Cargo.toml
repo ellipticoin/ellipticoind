@@ -29,7 +29,6 @@ hex = "0.4.0"
 http-service = "*"
 lazy_static = "1.4.0"
 mime = "0.3"
-network = { path = "../network" }
 rand = "*"
 r2d2_redis = { git = "https://github.com/sorccu/r2d2-redis" }
 rocksdb = { git = "https://github.com/rust-rocksdb/rust-rocksdb"}
