@@ -40,10 +40,8 @@ impl Websocket {
 }
 
 async fn accept_connection(stream: TcpStream, receiver: UnboundedReceiver<Message>) {
-    let ws_stream = async_tungstenite::accept_async(stream)
-        .await
-        .expect("Error during the websocket handshake occurred");
-
-    let (write, _read) = ws_stream.split();
-    let _ = receiver.map(Ok).forward(write).await;
+    if let Ok(ws_stream) = async_tungstenite::accept_async(stream).await {
+        let (write, _read) = ws_stream.split();
+        let _ = receiver.map(Ok).forward(write).await;
+    }
 }
