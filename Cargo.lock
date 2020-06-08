@@ -735,7 +735,6 @@ checksum = "bb1f6b1ce1c140482ea30ddd3335fc0024ac7ee112895426e0a629a6c20adfe3"
 name = "ellipticoin"
 version = "0.0.2"
 dependencies = [
- "lazy_static",
  "wasm-rpc 0.2.13",
  "wasm-rpc-macros 0.2.13",
 ]
