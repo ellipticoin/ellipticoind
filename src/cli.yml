@@ -1,12 +1,12 @@
 name: ellipticoind
 args:
-    - port:
-        help: Port
-        long: port
-        short: p
-        takes_value: true
-    - bind_address:
-        help: Bind Address
-        long: bind
-        short: b
-        takes_value: true
+  - port:
+      help: Port
+      long: port
+      short: p
+      takes_value: true
+  - bind_address:
+      help: Bind Address
+      long: bind
+      short: b
+      takes_value: true

@@ -107,11 +107,21 @@ pub async fn run(
         &bootnodes,
     )
     .await;
-    let (sender_in, receiver_in) = channel(1);
-    let (sender_out, receiver_out) = channel(1);
-    let api_state = api::State::new(redis_pool.clone(), rocksdb.clone(), pg_pool, sender_in);
+    let (miner_sender, miner_receiver) = channel(1);
+    let (broadcast_sender, broadcast_receiver) = channel(1);
+    let api_state = api::State::new(
+        redis_pool.clone(),
+        rocksdb.clone(),
+        pg_pool,
+        broadcast_sender.clone(),
+        miner_sender,
+    );
     async_std::task::spawn(api(api_state).listen(socket));
-    async_std::task::spawn(broadcast(receiver_out, vm_state));
+    async_std::task::spawn(broadcast(
+        broadcast_receiver,
+        redis_pool.clone(),
+        rocksdb.clone(),
+    ));
     let websocket = api::websocket::Websocket::new();
     let mut websocket_socket = socket.clone();
     websocket_socket.set_port(websocket_port);
@@ -126,8 +136,8 @@ pub async fn run(
         redis_pool.clone(),
         rocksdb,
         pg_pool,
-        receiver_in,
-        sender_out,
+        miner_receiver,
+        broadcast_sender,
     )
     .await
 }
