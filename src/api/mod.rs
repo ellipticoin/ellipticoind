@@ -22,7 +22,8 @@ pub struct State {
     pub redis: crate::vm::r2d2_redis::r2d2::Pool<crate::vm::r2d2_redis::RedisConnectionManager>,
     pub rocksdb: Arc<rocksdb::DB>,
     pub db: Pool<ConnectionManager<PgConnection>>,
-    pub sender_in: Sender<network::Message>,
+    pub broadcast_sender: Sender<network::Message>,
+    pub miner_sender: Sender<network::Message>,
 }
 
 impl State {
@@ -30,14 +31,16 @@ impl State {
         redis: crate::vm::r2d2_redis::r2d2::Pool<crate::vm::r2d2_redis::RedisConnectionManager>,
         rocksdb: Arc<rocksdb::DB>,
         db: Pool<ConnectionManager<PgConnection>>,
-        sender_in: Sender<network::Message>,
+        broadcast_sender: Sender<network::Message>,
+        miner_sender: Sender<network::Message>,
     ) -> Self {
         Self {
             websockets: Arc::new(Mutex::new(Vec::new())),
             redis,
             rocksdb,
             db,
-            sender_in,
+            miner_sender,
+            broadcast_sender,
         }
     }
 }

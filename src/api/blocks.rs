@@ -43,8 +43,10 @@ pub async fn create(mut req: tide::Request<State>) -> Response {
         }
     });
 
-    let sender_in = &req.state().sender_in;
-    sender_in.send(Message::Block((block, transactions))).await;
+    let miner_sender = &req.state().miner_sender;
+    miner_sender
+        .send(Message::Block((block, transactions)))
+        .await;
     Response::new(201)
 }
 
