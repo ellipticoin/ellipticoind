@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-TARGET_PATH="../target/wasm32-unknown-unknown/release"
+TARGET_PATH="target/wasm32-unknown-unknown/release"
 DIST_DIR="dist"
 
 MODULE_NAME=$(cat Cargo.toml | grep name | sed -n 's/name *= *"\(.*\)"/\1/p')

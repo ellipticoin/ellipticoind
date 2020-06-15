@@ -3,3 +3,4 @@
 **/*.rs.bk
 **/db*
 **/node_modules
+**/target
