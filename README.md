@@ -43,6 +43,7 @@ Private Key: gNCgX1Jfs3gXHDEvd7ano6bflJR0oNscgBI1O4JEN2N06SFQL1isJysk3/ix35gkwG7
 $ cp .env.sample .env
 ```
 # .env
+```
 DATABASE_URL=postgres://root:@/ellipticoind
 PRIVATE_KEY=<Your Base 64 Encoded Private Key>
 ENABLE_MINER=true
