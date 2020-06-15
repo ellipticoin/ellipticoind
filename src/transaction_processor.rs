@@ -86,6 +86,12 @@ pub fn run_transaction(
             block_winner: block.winner.clone(),
             block_number: block.number as u64,
         };
+        if vec!["reveal", "start_mining"].contains(&transaction.function.as_str()) {
+            let (result, _gas_left) = transaction.run(&mut state, &env);
+            return Transaction::from(transaction.complete(result))
+        }
+
+
         let transfer_result = system_contracts::transfer(
             transaction,
             10000,
