@@ -181,36 +181,37 @@ pub async fn catch_up(
 }
 
 pub fn generate_hash_onion(db: &PooledConnection<ConnectionManager<PgConnection>>) {
-    let hash_onion_size = 65534;
-    // let hash_onion_size = 100;
+    let hash_onion_size = 2 * 31 * 24 * 60 * 60;
+    let sql_query_size = 65534;
     let center: Vec<u8> = rand::thread_rng()
         .sample_iter(&rand::distributions::Standard)
         .take(32)
         .collect();
     let mut onion = vec![center];
+
+    println!("Generating Hash Onion");
     let pb = ProgressBar::new(hash_onion_size);
     pb.set_style(
         indicatif::ProgressStyle::default_bar()
             .template("[{elapsed_precise}] [{bar}] {pos}/{len} ({percent}%)")
             .progress_chars("=> "),
     );
-    let mut i = 0;
-    for _ in 1..(hash_onion_size) {
-        onion.push(sha256(onion.last().unwrap().to_vec()));
-        if i % 1000 == 0 {
-            pb.inc(1000);
+    for _ in (0..hash_onion_size).step_by(sql_query_size) {
+        pb.inc(sql_query_size as u64);
+        for _ in 1..(sql_query_size) {
+            onion.push(sha256(onion.last().unwrap().to_vec()));
         }
-        i += 1
+        let values: Vec<HashOnion> = onion
+            .iter()
+            .map(|hash| HashOnion {
+                layer: hash.to_vec(),
+            })
+            .collect();
+        let query = insert_into(hash_onion).values(&values);
+        query.execute(db).unwrap();
+        onion = vec![onion.last().unwrap().to_vec()];
     }
     pb.finish();
-    let values: Vec<HashOnion> = onion
-        .iter()
-        .map(|hash| HashOnion {
-            layer: hash.to_vec(),
-        })
-        .collect();
-    let query = insert_into(hash_onion).values(&values);
-    query.execute(db).unwrap();
 }
 
 pub fn sha256(value: Vec<u8>) -> Vec<u8> {
@@ -228,9 +229,9 @@ pub async fn initialize_rocks_db(
         crate::vm::rocksdb::DB::open_default(path).unwrap()
     } else {
         let db = crate::vm::rocksdb::DB::open_default(path).unwrap();
-        let file = File::open("dist/ethereum-balances-10054080.bin").unwrap();
+        // let file = File::open("dist/ethereum-balances-10054080.bin").unwrap();
 
-        // let file = File::open("dist/development-balances.bin").unwrap();
+        let file = File::open("dist/development-balances.bin").unwrap();
         let metadata = std::fs::metadata("dist/ethereum-balances-10054080.bin").unwrap();
         let pb = ProgressBar::new(metadata.len() / 24);
         println!("Importing Ethereum Balances");
