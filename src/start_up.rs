@@ -14,6 +14,7 @@ use crate::constants::{Namespace, GENISIS_ADRESS, TOKEN_CONTRACT};
 use crate::diesel::ExpressionMethods;
 use crate::diesel::QueryDsl;
 use crate::diesel::RunQueryDsl;
+use crate::helpers::random;
 use crate::schema::hash_onion::dsl::*;
 use diesel::dsl::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
@@ -119,10 +120,6 @@ fn process_transaction(
             serde_cbor::to_vec(&transaction).unwrap(),
         )
         .unwrap();
-}
-fn random() -> u64 {
-    let mut rng = rand::thread_rng();
-    rng.gen_range(0, u32::max_value() as u64)
 }
 
 async fn post_transaction(bootnode: &Bootnode, transaction: crate::vm::Transaction) {
@@ -263,9 +260,9 @@ pub async fn initialize_rocks_db(
                             [chunk[20..24].to_vec(), [0; 4].to_vec()].concat()[..]
                                 .try_into()
                                 .unwrap(),
-                        ))
-                        .to_le_bytes()
-                        .to_vec(),
+                        ) * 10)
+                            .to_le_bytes()
+                            .to_vec(),
                     );
                 }
                 pb.inc(1000);
@@ -293,9 +290,9 @@ pub async fn initialize_rocks_db(
             .unwrap()[..8]
                 .try_into()
                 .unwrap(),
-        ) * 1000)
-            .to_le_bytes()
-            .to_vec();
+        ))
+        .to_le_bytes()
+        .to_vec();
         db.delete(db_key(
             &TOKEN_CONTRACT,
             &[

@@ -1,6 +1,7 @@
 use crate::models::{Block, Transaction};
 use crate::system_contracts;
 use async_std::task;
+use std::collections::BTreeMap;
 
 use crate::vm::Env;
 use diesel::pg::PgConnection;
@@ -14,6 +15,11 @@ use std::time::Duration;
 
 lazy_static! {
     static ref TRANSACTION_PROCESSING_TIME: Duration = Duration::from_secs(4);
+    static ref OK_MAP: BTreeMap<String, serde_cbor::Value> = {
+        let mut ok_map = BTreeMap::new();
+        ok_map.insert("Ok".to_string(), serde_cbor::Value::Null);
+        ok_map
+    };
 }
 
 lazy_static! {
@@ -75,21 +81,26 @@ pub fn run_transaction(
         let result = system_contracts::run(transaction, &mut state, &env);
         result
     } else {
-        let (result, gas_left) = transaction.run(&mut state, &env);
-        let gas_used = transaction.gas_limit - gas_left.expect("no gas left") as u64;
-
-        let env = crate::vm::Env {
+        let env = Env {
             caller: None,
-            block_winner: PUBLIC_KEY.to_vec(),
-            block_number: 0,
+            block_winner: block.winner.clone(),
+            block_number: block.number as u64,
         };
-        system_contracts::transfer(
+        let transfer_result = system_contracts::transfer(
             transaction,
-            gas_used as u32,
+            10000,
             transaction.sender.clone(),
             env.block_winner.clone(),
+            state,
+            &env,
         );
-        result
+
+        if *OK_MAP == serde_cbor::value::from_value(transfer_result.clone()).unwrap() {
+            let (result, _gas_left) = transaction.run(&mut state, &env);
+            result
+        } else {
+            transfer_result
+        }
     };
     Transaction::from(transaction.complete(result))
 }

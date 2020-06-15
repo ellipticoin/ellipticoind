@@ -19,3 +19,8 @@ pub const BALANCE_ALREADY_UNLOCKED: Error = Error {
     code: 4,
     message: "Balance has already been unlocked",
 };
+
+pub const BALANCE_EXCEEDS_THIS_PHASE: Error = Error {
+    code: 5,
+    message: "Only a total of 1000000 ELC can be unlocked in Phase I",
+};

@@ -1,3 +1,4 @@
+use crate::helpers::random;
 use crate::vm::{Env, State, Transaction};
 use serde_cbor::Value;
 
@@ -47,14 +48,29 @@ fn run_constuctor(
     result
 }
 
-pub fn transfer(transaction: &Transaction, amount: u32, from: Vec<u8>, to: Vec<u8>) {
-    let arguments = vec![Value::Bytes(to), Value::Integer(amount as i128)];
-    let _transaction = Transaction {
+pub fn transfer(
+    transaction: &Transaction,
+    amount: u32,
+    from: Vec<u8>,
+    to: Vec<u8>,
+    vm_state: &mut crate::vm::State,
+    env: &Env,
+) -> serde_cbor::Value {
+    let arguments = vec![
+        to.into_iter()
+            .map(|n| n.into())
+            .collect::<Vec<Value>>()
+            .into(),
+        Value::Integer(amount as i128),
+    ];
+    let transfer = Transaction {
         function: "transfer".to_string(),
-        nonce: 0,
+        nonce: random(),
         gas_limit: transaction.gas_limit,
-        contract_address: [[0 as u8; 32].to_vec(), "BaseToken".as_bytes().to_vec()].concat(),
+        contract_address: [[0 as u8; 32].to_vec(), "Ellipticoin".as_bytes().to_vec()].concat(),
         sender: from.clone(),
         arguments: arguments.clone(),
     };
+    let (result, _) = transfer.run(vm_state, &env);
+    result
 }
