@@ -1,9 +1,9 @@
-use super::State;
+use super::ApiState;
 use crate::vm::redis::Commands;
 use http_service::Body;
 use tide::Response;
 
-pub async fn show(req: tide::Request<State>) -> Response {
+pub async fn show(req: tide::Request<ApiState>) -> Response {
     let key: String = req.param("key").unwrap();
     let mut redis = req.state().redis.get().unwrap();
     let value = redis

@@ -88,9 +88,8 @@ pub fn run_transaction(
         };
         if vec!["reveal", "start_mining"].contains(&transaction.function.as_str()) {
             let (result, _gas_left) = transaction.run(&mut state, &env);
-            return Transaction::from(transaction.complete(result))
+            return Transaction::from(transaction.complete(result));
         }
-
 
         let transfer_result = system_contracts::transfer(
             transaction,
