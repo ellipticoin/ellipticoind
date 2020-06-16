@@ -1,8 +1,8 @@
-use super::State;
+use super::ApiState;
 use crate::api::{addresses, blocks, memory, state, storage, transactions};
 use tide::middleware::Cors;
 
-pub fn app(state: State) -> tide::server::Server<State> {
+pub fn app(state: ApiState) -> tide::server::Server<ApiState> {
     let mut app = tide::with_state(state);
     app.middleware(Cors::new());
     app.at("/p2p/blocks").post(blocks::create);

@@ -109,7 +109,7 @@ pub async fn run(
     .await;
     let (miner_sender, miner_receiver) = channel(1);
     let (broadcast_sender, broadcast_receiver) = channel(1);
-    let api_state = api::State::new(
+    let api_state = api::ApiState::new(
         redis_pool.clone(),
         rocksdb.clone(),
         pg_pool,

@@ -1,4 +1,4 @@
-use super::State;
+use super::ApiState;
 use crate::api::views::Block;
 use crate::diesel::ExpressionMethods;
 use crate::diesel::GroupedBy;
@@ -21,7 +21,7 @@ struct QueryParams {
     limit: Option<i64>,
 }
 
-pub async fn create(mut req: tide::Request<State>) -> Response {
+pub async fn create(mut req: tide::Request<ApiState>) -> Response {
     let block_bytes = req.body_bytes().await.unwrap();
     let block_view: crate::api::views::Block = serde_cbor::value::from_value(
         serde_cbor::from_slice::<serde_cbor::Value>(&block_bytes).unwrap(),
@@ -50,7 +50,7 @@ pub async fn create(mut req: tide::Request<State>) -> Response {
     Response::new(201)
 }
 
-pub async fn index(req: tide::Request<State>) -> Response {
+pub async fn index(req: tide::Request<ApiState>) -> Response {
     let query = req.query::<QueryParams>().unwrap();
     let con = req.state().db.get().unwrap();
     let blocks = blocks::dsl::blocks
@@ -72,7 +72,7 @@ pub async fn index(req: tide::Request<State>) -> Response {
         .set_header("Content-type", "application/cors")
 }
 
-pub async fn show(req: tide::Request<State>) -> Response {
+pub async fn show(req: tide::Request<ApiState>) -> Response {
     let block_param: String = req.param("block_hash").unwrap();
     let con = req.state().db.get().unwrap();
     let block = match block_param.parse::<i64>() {
