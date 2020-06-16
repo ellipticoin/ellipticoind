@@ -29,7 +29,7 @@ $ sudo apt-get update && sudo apt-get install build-essential libpq-dev pkg-conf
 4. Build  ellipticoind
 ```
 $ cd ellipticoind
-$ C_INCLUDE_PATH=/usr/lib/gcc/x86_64-linux-gnu/7/include cargo build
+$ C_INCLUDE_PATH=/usr/lib/gcc/x86_64-linux-gnu/7/include cargo build --release
 ```
 5. Generate a key pair:
 ```
