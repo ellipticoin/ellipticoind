@@ -94,7 +94,7 @@ mod token {
             get_storage::<_, u64>(Namespace::EthereumBalances, address.clone()) * 100;
 
         let mut total_unlocked_ethereum: u64 = get_storage::<Vec<u8>, u64>(Namespace::TotalUnlockedEthereum, vec![]);
-        if  total_unlocked_ethereum + balance > 1000000 {
+        if  total_unlocked_ethereum + balance > 1000000 * 10000 {
             return Err(errors::BALANCE_EXCEEDS_THIS_PHASE);
         } else {
             total_unlocked_ethereum += balance;
@@ -310,7 +310,7 @@ mod tests {
         set_storage(
             Namespace::EthereumBalances,
             hex::decode(ethereum_address).unwrap(),
-            10001 as u64,
+            100000001 as u64,
         );
         assert!(unlock_ether(hex::decode(&"e8fe080305be6153dda25cd046f022fe93fce9e9abf7443cb602236317769ea3007922a1ee66a8dc64caae93bd7073af95633bb64389b61679c83c05590d1fbf1c").unwrap(), ALICE.to_vec()).is_err());
         let alices_balance = balance_of(ALICE.to_vec());
