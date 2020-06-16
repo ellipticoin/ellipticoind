@@ -34,13 +34,14 @@ mod token {
     }
 
     pub fn transfer_from(from: Vec<u8>, to: Vec<u8>, amount: u64) -> Result<Value, Error> {
-        if get_memory::<_, u64>(Namespace::Balances, from.clone()) < amount {
-            return Err(errors::INSUFFICIENT_FUNDS);
-        }
         let allowance: u64 = get_memory(
             Namespace::Allowences,
             [from.clone().to_vec(), caller()].concat(),
         );
+
+        if get_memory::<_, u64>(Namespace::Balances, from.clone()) < amount {
+            return Err(errors::INSUFFICIENT_FUNDS);
+        }
 
         if allowance >= amount {
             debit_allowance(from.clone().to_vec(), caller(), amount);
@@ -67,6 +68,7 @@ mod token {
             Namespace::Allowences,
             [from.clone().to_vec(), to.clone().to_vec()].concat(),
         );
+
         set_memory(
             Namespace::Allowences,
             [from.to_vec(), to.to_vec()].concat(),
