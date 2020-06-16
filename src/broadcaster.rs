@@ -20,10 +20,12 @@ pub async fn broadcast(
                 let block: views::Block = (block, transactions).into();
                 for peer in get_peers(&mut vm_state).await {
                     let uri = format!("http://{}/p2p/blocks", peer);
-                    let _res = surf::post(uri)
+                    if let Ok(_res) = surf::post(uri)
                         .body_bytes(serde_cbor::to_vec(&block).unwrap())
-                        .await
-                        .unwrap();
+                        .await {
+                    } else {
+                        println!("failed posting to http://{}/p2p/blocks", peer);
+                    }
                 }
             }
             Message::Transaction(transaction) => {

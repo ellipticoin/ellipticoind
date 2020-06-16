@@ -73,19 +73,31 @@ pub async fn index(req: tide::Request<ApiState>) -> Response {
 }
 
 pub async fn show(req: tide::Request<ApiState>) -> Response {
-    let block_param: String = req.param("block_hash").unwrap();
+    let block_param: String = req.param("block_hash").unwrap_or("".to_string());
     let con = req.state().db.get().unwrap();
     let block = match block_param.parse::<i64>() {
-        Ok(block_number) => blocks::dsl::blocks
-            .filter(number.eq(block_number))
-            .first::<models::Block>(&con)
-            .optional()
-            .unwrap(),
-        Err(_) => blocks::dsl::blocks
-            .find(base64::decode_config(&block_param, base64::URL_SAFE).unwrap())
-            .first::<models::Block>(&con)
-            .optional()
-            .unwrap(),
+        Ok(block_number) => {
+            if let Ok(block) = blocks::dsl::blocks
+                .filter(number.eq(block_number))
+                .first::<models::Block>(&con)
+                .optional()
+            {
+                block
+            } else {
+                return Response::new(404);
+            }
+        }
+        Err(_) => {
+            if let Ok(block) = blocks::dsl::blocks
+                .find(base64::decode_config(&block_param, base64::URL_SAFE).unwrap_or(vec![]))
+                .first::<models::Block>(&con)
+                .optional()
+            {
+                block
+            } else {
+                return Response::new(404);
+            }
+        }
     };
 
     if let Some(block) = block {
