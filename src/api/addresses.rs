@@ -1,4 +1,4 @@
-use super::State;
+use super::ApiState;
 use crate::models::highest_nonce;
 use http_service::Body;
 use serde::Serialize;
@@ -9,7 +9,7 @@ pub struct Address {
     pub highest_nonce: Option<serde_cbor::Value>,
 }
 
-pub async fn show(req: tide::Request<State>) -> Response {
+pub async fn show(req: tide::Request<ApiState>) -> Response {
     let con = req.state().db.get().unwrap();
     let address: String = req.param("address").unwrap();
     let highest_nonce: Option<i64> = highest_nonce(

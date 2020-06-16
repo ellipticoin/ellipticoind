@@ -18,7 +18,7 @@ pub mod views;
 
 pub mod websocket;
 
-pub struct State {
+pub struct ApiState {
     pub websockets: Arc<Mutex<Vec<UnboundedSender<Message>>>>,
     pub redis: crate::vm::r2d2_redis::r2d2::Pool<crate::vm::r2d2_redis::RedisConnectionManager>,
     pub rocksdb: Arc<rocksdb::DB>,
@@ -27,7 +27,7 @@ pub struct State {
     pub miner_sender: Sender<network::Message>,
 }
 
-impl State {
+impl ApiState {
     pub fn new(
         redis: crate::vm::r2d2_redis::r2d2::Pool<crate::vm::r2d2_redis::RedisConnectionManager>,
         rocksdb: Arc<rocksdb::DB>,
