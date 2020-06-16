@@ -11,6 +11,7 @@ mod addresses;
 pub mod app;
 mod blocks;
 mod memory;
+mod state;
 mod storage;
 mod transactions;
 pub mod views;

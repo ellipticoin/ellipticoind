@@ -1,5 +1,5 @@
 use super::State;
-use crate::api::{addresses, blocks, memory, storage, transactions};
+use crate::api::{addresses, blocks, memory, state, storage, transactions};
 use tide::middleware::Cors;
 
 pub fn app(state: State) -> tide::server::Server<State> {
@@ -14,6 +14,7 @@ pub fn app(state: State) -> tide::server::Server<State> {
     app.at("/p2p/transactions").post(transactions::create);
     app.at("/memory/:key").get(memory::show);
     app.at("/storage/:key").get(storage::show);
+    app.at("/state").get(state::show);
     app.at("/addresses/:address").get(addresses::show);
     app
 }
