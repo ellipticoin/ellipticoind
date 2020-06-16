@@ -181,7 +181,7 @@ pub async fn catch_up(
 }
 
 pub fn generate_hash_onion(db: &PooledConnection<ConnectionManager<PgConnection>>) {
-    let hash_onion_size = 2 * 31 * 24 * 60 * 60;
+    let hash_onion_size = 2 * 31; // * 24 * 60 * 60;
     let sql_query_size = 65534;
     let center: Vec<u8> = rand::thread_rng()
         .sample_iter(&rand::distributions::Standard)
@@ -229,9 +229,9 @@ pub async fn initialize_rocks_db(
         crate::vm::rocksdb::DB::open_default(path).unwrap()
     } else {
         let db = crate::vm::rocksdb::DB::open_default(path).unwrap();
-        let file = File::open("dist/ethereum-balances-10054080.bin").unwrap();
+        // let file = File::open("dist/ethereum-balances-10054080.bin").unwrap();
 
-        // let file = File::open("dist/development-balances.bin").unwrap();
+        let file = File::open("dist/development-balances.bin").unwrap();
         let metadata = std::fs::metadata("dist/ethereum-balances-10054080.bin").unwrap();
         let pb = ProgressBar::new(metadata.len() / 24);
         println!("Importing Ethereum Balances");
@@ -292,8 +292,8 @@ pub async fn initialize_rocks_db(
                 .try_into()
                 .unwrap(),
         ) * 100)
-        .to_le_bytes()
-        .to_vec();
+            .to_le_bytes()
+            .to_vec();
         db.delete(db_key(
             &TOKEN_CONTRACT,
             &[

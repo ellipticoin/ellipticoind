@@ -1,5 +1,5 @@
 use super::views::Transaction;
-use super::State;
+use super::ApiState;
 use crate::diesel::OptionalExtension;
 use crate::models;
 use crate::schema::transactions::dsl::transactions;
@@ -12,7 +12,7 @@ use http_service::Body;
 use serde_cbor::from_slice;
 use tide::Response;
 
-pub async fn show(req: tide::Request<State>) -> Response {
+pub async fn show(req: tide::Request<ApiState>) -> Response {
     let con = req.state().db.get().unwrap();
     let transaction_hash: String = req.param("transaction_hash").unwrap();
     let transaction = transactions
@@ -30,7 +30,7 @@ pub async fn show(req: tide::Request<State>) -> Response {
     }
 }
 
-pub async fn create(mut req: tide::Request<State>) -> Response {
+pub async fn create(mut req: tide::Request<ApiState>) -> Response {
     let transaction_bytes = req.body_bytes().await.unwrap();
     let transaction: crate::vm::Transaction = from_slice(&transaction_bytes).unwrap();
     let mut redis = req.state().redis.get().unwrap();
@@ -44,7 +44,7 @@ pub async fn create(mut req: tide::Request<State>) -> Response {
     Response::new(201)
 }
 
-pub async fn broadcast(mut req: tide::Request<State>) -> Response {
+pub async fn broadcast(mut req: tide::Request<ApiState>) -> Response {
     let transaction_bytes = req.body_bytes().await.unwrap();
     let transaction: crate::vm::Transaction = from_slice(&transaction_bytes).unwrap();
     let mut redis = req.state().redis.get().unwrap();
