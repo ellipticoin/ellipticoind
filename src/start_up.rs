@@ -291,7 +291,7 @@ pub async fn initialize_rocks_db(
             .unwrap()[..8]
                 .try_into()
                 .unwrap(),
-        ))
+        ) * 100)
         .to_le_bytes()
         .to_vec();
         db.delete(db_key(
