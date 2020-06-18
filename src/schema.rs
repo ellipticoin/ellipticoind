@@ -19,6 +19,7 @@ table! {
 
 table! {
     transactions (hash) {
+        network_id -> Int8,
         block_hash -> Bytea,
         hash -> Bytea,
         contract_address -> Bytea,

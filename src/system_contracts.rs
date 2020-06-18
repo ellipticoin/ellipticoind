@@ -33,6 +33,7 @@ fn run_constuctor(
     arguments: &Vec<Value>,
 ) -> Value {
     let (result, _gas_left) = Transaction {
+        network_id: 0,
         function: "constructor".to_string(),
         arguments: arguments.to_vec(),
         sender: transaction.sender.clone(),
@@ -64,6 +65,7 @@ pub fn transfer(
         Value::Integer(amount as i128),
     ];
     let transfer = Transaction {
+        network_id: 0,
         function: "transfer".to_string(),
         nonce: random(),
         gas_limit: transaction.gas_limit,

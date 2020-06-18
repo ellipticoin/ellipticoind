@@ -1,3 +1,4 @@
+use crate::config::keypair;
 use crate::constants::{Namespace, TOKEN_CONTRACT};
 use crate::diesel::ExpressionMethods;
 use crate::diesel::RunQueryDsl;
@@ -6,6 +7,7 @@ use crate::schema::blocks;
 use crate::schema::hash_onion;
 use crate::schema::transactions;
 use crate::schema::transactions::columns::{nonce, sender};
+use crate::vm;
 use crate::BEST_BLOCK;
 use diesel::dsl::insert_into;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
@@ -52,15 +54,16 @@ pub async fn is_next_block(block: &Block) -> bool {
     }
 }
 
-pub fn is_block_winner(vm_state: &mut crate::vm::State, public_key: Vec<u8>) -> bool {
+pub fn is_block_winner(vm_state: &mut vm::State) -> bool {
     let winner = vm_state.get_storage(&TOKEN_CONTRACT, &vec![Namespace::CurrentMiner as u8]);
     // println!("winner {}", base64::encode(&winner));
-    winner.eq(&public_key)
+    winner.eq(&keypair().public.as_bytes().to_vec())
 }
 
-impl From<Transaction> for crate::vm::Transaction {
-    fn from(transaction: Transaction) -> crate::vm::Transaction {
-        crate::vm::Transaction {
+impl From<Transaction> for vm::Transaction {
+    fn from(transaction: Transaction) -> vm::Transaction {
+        vm::Transaction {
+            network_id: transaction.network_id as u32,
             sender: transaction.sender,
             arguments: from_slice(&transaction.arguments).unwrap(),
             contract_address: transaction.contract_address,
@@ -71,9 +74,10 @@ impl From<Transaction> for crate::vm::Transaction {
     }
 }
 
-impl From<crate::vm::CompletedTransaction> for Transaction {
-    fn from(transaction: crate::vm::CompletedTransaction) -> Self {
+impl From<vm::CompletedTransaction> for Transaction {
+    fn from(transaction: vm::CompletedTransaction) -> Self {
         Self {
+            network_id: transaction.network_id as i64,
             hash: vec![],
             block_hash: vec![],
             contract_address: transaction.contract_address,
@@ -149,6 +153,7 @@ impl Block {
 #[primary_key(hash)]
 #[belongs_to(Block, foreign_key = "block_hash")]
 pub struct Transaction {
+    pub network_id: i64,
     pub block_hash: Vec<u8>,
     pub hash: Vec<u8>,
     pub contract_address: Vec<u8>,

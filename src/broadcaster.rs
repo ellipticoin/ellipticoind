@@ -22,7 +22,8 @@ pub async fn broadcast(
                     let uri = format!("http://{}/p2p/blocks", peer);
                     if let Ok(_res) = surf::post(uri)
                         .body_bytes(serde_cbor::to_vec(&block).unwrap())
-                        .await {
+                        .await
+                    {
                     } else {
                         println!("failed posting to http://{}/p2p/blocks", peer);
                     }
