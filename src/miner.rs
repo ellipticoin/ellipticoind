@@ -1,3 +1,4 @@
+use crate::config::OPTS;
 use crate::constants::TOKEN_CONTRACT;
 use crate::diesel::QueryDsl;
 use crate::models::*;
@@ -54,6 +55,7 @@ pub async fn mine_next_block(
         .map(|n| n.into())
         .collect();
     let reveal_transaction = crate::vm::Transaction {
+        network_id: OPTS.network_id,
         contract_address: TOKEN_CONTRACT.to_vec(),
         sender: PUBLIC_KEY.to_vec(),
         nonce: sender_nonce,

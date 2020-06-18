@@ -10,6 +10,7 @@ use serde_cbor::Value;
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct Transaction {
+    pub network_id: u32,
     #[serde(with = "serde_bytes")]
     pub contract_address: Vec<u8>,
     #[serde(with = "serde_bytes")]
@@ -22,6 +23,7 @@ pub struct Transaction {
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct CompletedTransaction {
+    pub network_id: u32,
     #[serde(with = "serde_bytes")]
     pub contract_address: Vec<u8>,
     #[serde(with = "serde_bytes")]
@@ -67,10 +69,11 @@ impl Transaction {
 
     pub fn complete(&self, return_value: Value) -> CompletedTransaction {
         CompletedTransaction {
+            network_id: self.network_id,
             contract_address: self.contract_address.clone(),
             sender: self.sender.clone(),
-            nonce: self.nonce.clone(),
-            gas_limit: self.gas_limit.clone(),
+            nonce: self.nonce,
+            gas_limit: self.gas_limit,
             function: self.function.clone(),
             arguments: self.arguments.clone(),
             return_value: return_value,
