@@ -1,4 +1,5 @@
 CREATE TABLE "transactions" (
+  "network_id" BIGINT NOT NULL,
   "block_hash" BYTEA CONSTRAINT "transactions_block_hash_fkey" REFERENCES "blocks" ("hash") NOT NULL,
   "hash" BYTEA NOT NULL,
   "contract_address" BYTEA NOT NULL,
