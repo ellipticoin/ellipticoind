@@ -2,6 +2,7 @@ extern crate clap;
 use clap::Clap;
 use dotenv::dotenv;
 use ed25519_dalek::Keypair;
+use rand::seq::SliceRandom;
 use serde::{Deserialize, Deserializer};
 use std::{
     env,
@@ -58,7 +59,7 @@ lazy_static! {
     };
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Bootnode {
     pub host: String,
     #[serde(deserialize_with = "decode_base64")]
@@ -95,4 +96,17 @@ pub fn socket() -> SocketAddr {
 
 pub fn keypair() -> Keypair {
     Keypair::from_bytes(&base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap()).unwrap()
+}
+
+pub fn public_key() -> Vec<u8> {
+    keypair().public.to_bytes().to_vec()
+}
+
+pub fn random_bootnode() -> Bootnode {
+    let mut rng = rand::thread_rng();
+    (*bootnodes().choose(&mut rng).unwrap()).clone()
+}
+
+pub fn ethereum_balances_path() -> String {
+    env::var("ETHEREUM_BALANCES_PATH").unwrap_or("dist/ethereum-balances-10054080.bin".to_string())
 }

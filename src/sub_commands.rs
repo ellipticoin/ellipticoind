@@ -13,7 +13,7 @@ use diesel::{
 };
 
 use crate::{
-    config::{bootnodes, database_url, keypair, socket, GENESIS_NODE, OPTS},
+    config::{database_url, socket, ENABLE_MINER, GENESIS_NODE, OPTS},
     BEST_BLOCK,
 };
 use ed25519_dalek::Keypair;
@@ -45,20 +45,11 @@ pub async fn main() {
     let mut vm_state = vm::State::new(redis_pool.get().unwrap(), rocksdb.clone());
 
     if !*GENESIS_NODE {
-        start_up::catch_up(
-            pg_pool.clone(),
-            redis_pool.clone(),
-            &mut vm_state,
-            &bootnodes(),
-        )
-        .await;
-        start_up::start_miner(
-            &rocksdb,
-            &pg_pool.get().unwrap(),
-            keypair().public,
-            &bootnodes(),
-        )
-        .await;
+        start_up::catch_up(pg_pool.clone(), redis_pool.clone(), &mut vm_state).await;
+    }
+
+    if *ENABLE_MINER {
+        start_up::start_miner(&pg_pool.get().unwrap(), &mut redis_pool.get().unwrap()).await;
     }
     let (miner_sender, miner_receiver) = channel(1);
     let (broadcast_sender, broadcast_receiver) = channel(1);

@@ -1,22 +1,21 @@
-use crate::vm;
 use crate::{
-    config::OPTS,
+    config::{public_key, OPTS},
     constants::TOKEN_CONTRACT,
     diesel::QueryDsl,
+    helpers::bytes_to_value,
     models::*,
     schema,
-    schema::{blocks::dsl::blocks, hash_onion::dsl::*},
-    transaction_processor::{run_transaction, run_transactions, PUBLIC_KEY},
+    schema::blocks::dsl::blocks,
+    transaction_processor::{run_transaction, run_transactions},
+    vm,
     vm::redis,
     BEST_BLOCK,
 };
 use diesel::{
-    dsl::sql_query,
     pg::PgConnection,
     prelude::*,
     r2d2::{ConnectionManager, PooledConnection},
 };
-use serde_cbor::Value;
 
 pub fn get_best_block(db: &PgConnection) -> Option<Block> {
     blocks
@@ -39,7 +38,6 @@ pub async fn next_block_template() -> Block {
         },
     )
 }
-
 pub async fn mine_next_block(
     con: redis::Pool,
     pg_db: PooledConnection<ConnectionManager<PgConnection>>,
@@ -47,35 +45,18 @@ pub async fn mine_next_block(
 ) -> (Block, Vec<Transaction>) {
     let mut vm_state = vm::State::new(con.get().unwrap(), rocksdb);
     let mut block = next_block_template().await;
-    block.winner = PUBLIC_KEY.to_vec();
+    block.winner = public_key();
     let mut transactions = run_transactions(con.clone(), &mut vm_state, &block).await;
-
-    let sender_nonce = random();
-    let skin: Vec<Value> = hash_onion
-        .select(layer)
-        .order(id.desc())
-        .first::<Vec<u8>>(&pg_db)
-        .unwrap()
-        .into_iter()
-        .map(|n| n.into())
-        .collect();
     let reveal_transaction = vm::Transaction {
         network_id: OPTS.network_id,
         contract_address: TOKEN_CONTRACT.to_vec(),
-        sender: PUBLIC_KEY.to_vec(),
-        nonce: sender_nonce,
+        sender: public_key(),
+        nonce: random(),
         function: "reveal".to_string(),
-        arguments: vec![skin.into()],
+        arguments: vec![bytes_to_value(HashOnion::peel(&pg_db))],
         gas_limit: 10000000,
     };
     let reveal_result = run_transaction(&mut vm_state, &reveal_transaction, &block);
-    sql_query(
-        "delete from hash_onion where id in (
-        select id from hash_onion order by id desc limit 1
-    )",
-    )
-    .execute(&pg_db)
-    .unwrap();
     transactions.push(reveal_result);
     block.set_hash();
     transactions.iter_mut().for_each(|transaction| {

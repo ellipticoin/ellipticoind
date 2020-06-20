@@ -8,6 +8,7 @@ use ellipticoin::{
 use errors;
 use ethereum;
 use hashing::sha256;
+
 use std::collections::BTreeMap;
 enum Namespace {
     Allowences,
@@ -131,9 +132,9 @@ mod token {
         let random_seed = get_random_seed();
         set_random_seed(
             sha256([random_seed.to_vec(), value.to_vec()].concat())[0..16]
-                .try_into()
-                .unwrap(),
-        );
+            .try_into()
+            .unwrap(),
+            );
         set_miners(&miners);
         set_current_miner(get_next_winner(&miners).to_vec());
 
@@ -155,9 +156,13 @@ mod token {
         ellipticoin::set_storage(Namespace::RandomSeed as u8, random_seed.to_vec());
     }
     fn get_random_seed() -> [u8; 16] {
-        ellipticoin::get_storage::<_, Vec<u8>>(Namespace::RandomSeed as u8)[0..16]
-            .try_into()
-            .unwrap()
+        let random_seed = ellipticoin::get_storage::<_, Vec<u8>>(Namespace::RandomSeed as u8);
+
+        if random_seed.len() == 0 {
+            [0 as u8; 16].try_into().unwrap()
+        } else {
+            random_seed[0..16].try_into().unwrap()
+        }
     }
 
     fn get_next_winner(miners: &BTreeMap<Vec<u8>, (String, u64, Vec<u8>)>) -> Vec<u8> {

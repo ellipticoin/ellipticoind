@@ -1,8 +1,13 @@
 extern crate base64;
-use crate::vm::{
-    env::Env,
-    error::{Error, CONTRACT_NOT_FOUND},
-    new_module_instance, State, VM,
+use crate::{
+    config::{public_key, OPTS},
+    constants::TOKEN_CONTRACT,
+    helpers::random,
+    vm::{
+        env::Env,
+        error::{Error, CONTRACT_NOT_FOUND},
+        new_module_instance, State, VM,
+    },
 };
 pub use metered_wasmi::{
     isa, FunctionContext, ImportsBuilder, Module, ModuleInstance, NopExternals, RuntimeValue,
@@ -23,6 +28,20 @@ pub struct Transaction {
     pub arguments: Vec<Value>,
 }
 
+impl Default for Transaction {
+    fn default() -> Self {
+        Self {
+            network_id: OPTS.network_id,
+            contract_address: TOKEN_CONTRACT.to_vec(),
+            sender: public_key(),
+            nonce: 0,
+            function: "".to_string(),
+            arguments: vec![],
+            gas_limit: 10000000,
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct CompletedTransaction {
     pub network_id: u32,
@@ -38,6 +57,14 @@ pub struct CompletedTransaction {
 }
 
 impl Transaction {
+    pub fn new(function: String, arguments: Vec<Value>) -> Self {
+        Self {
+            nonce: random(),
+            function,
+            arguments,
+            ..Default::default()
+        }
+    }
     pub fn run(&self, mut state: &mut State, env: &Env) -> (Value, Option<u32>) {
         let code = state.get_code(&self.contract_address);
         if code.len() == 0 {
