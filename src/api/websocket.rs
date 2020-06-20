@@ -1,10 +1,13 @@
-use async_std::net::{TcpListener, TcpStream};
-use async_std::sync::Arc;
-use async_std::sync::Mutex;
-use async_std::task;
-use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
-use futures::sink::SinkExt;
-use futures::StreamExt;
+use async_std::{
+    net::{TcpListener, TcpStream},
+    sync::{Arc, Mutex},
+    task,
+};
+use futures::{
+    channel::mpsc::{UnboundedReceiver, UnboundedSender},
+    sink::SinkExt,
+    StreamExt,
+};
 use serde::Serialize;
 use std::net::SocketAddr;
 use tungstenite::Message;

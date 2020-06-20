@@ -1,5 +1,4 @@
-use serde_cbor::value::to_value;
-use serde_cbor::Value;
+use serde_cbor::{value::to_value, Value};
 use std::collections::HashMap;
 
 lazy_static! {

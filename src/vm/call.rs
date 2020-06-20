@@ -10,7 +10,12 @@ impl<'a> VM<'a> {
             match self.write_pointer(arg_vec) {
                 Ok(Some(arg_pointer)) => runtime_values.push(arg_pointer),
                 Ok(None) => return (0.into(), self.gas),
-                Err(trap) => return (trap.to_string().into(), self.gas),
+                Err(trap) => {
+                    return (
+                        serde_cbor::value::to_value(&Err::<(), String>(trap.to_string())).unwrap(),
+                        self.gas,
+                    )
+                }
             }
         }
         match self.instance.invoke_export(func, &runtime_values, self) {
@@ -18,7 +23,10 @@ impl<'a> VM<'a> {
                 serde_cbor::from_slice(&self.read_pointer(value)).unwrap(),
                 self.gas,
             ),
-            Err(trap) => (trap.to_string().into(), self.gas),
+            Err(trap) => (
+                serde_cbor::value::to_value(&Err::<(), String>(trap.to_string())).unwrap(),
+                self.gas,
+            ),
             _ => panic!("vm error"),
         }
     }

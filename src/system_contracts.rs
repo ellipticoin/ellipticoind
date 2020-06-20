@@ -1,5 +1,7 @@
-use crate::helpers::random;
-use crate::vm::{Env, State, Transaction};
+use crate::{
+    helpers::random,
+    vm::{Env, State, Transaction},
+};
 use serde_cbor::Value;
 
 pub fn is_system_contract(transaction: &Transaction) -> bool {

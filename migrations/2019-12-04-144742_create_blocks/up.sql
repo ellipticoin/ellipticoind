@@ -6,7 +6,6 @@ CREATE TABLE "blocks" (
   "winner" BYTEA NOT NULL,
   "memory_changeset_hash" BYTEA NOT NULL,
   "storage_changeset_hash" BYTEA NOT NULL,
-  "proof_of_work_value" BIGINT NOT NULL,
   PRIMARY KEY ("hash")
 );
 

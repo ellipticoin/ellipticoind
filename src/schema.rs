@@ -6,7 +6,6 @@ table! {
         winner -> Bytea,
         memory_changeset_hash -> Bytea,
         storage_changeset_hash -> Bytea,
-        proof_of_work_value -> Int8,
     }
 }
 

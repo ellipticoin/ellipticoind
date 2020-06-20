@@ -1,8 +1,8 @@
 use super::ApiState;
-use crate::constants::Namespace;
-use crate::constants::TOKEN_CONTRACT;
-use crate::vm::redis::Commands;
-use crate::vm::state::db_key;
+use crate::{
+    constants::{Namespace, TOKEN_CONTRACT},
+    vm::{redis::Commands, state::db_key},
+};
 use http_service::Body;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

@@ -1,5 +1,7 @@
-use diesel::r2d2::{ConnectionManager, Pool};
-use diesel::PgConnection;
+use diesel::{
+    r2d2::{ConnectionManager, Pool},
+    PgConnection,
+};
 
 use crate::network;
 use async_std::sync::Sender;

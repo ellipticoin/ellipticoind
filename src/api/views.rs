@@ -1,3 +1,4 @@
+use crate::models;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -12,7 +13,6 @@ pub struct Block {
     pub memory_changeset_hash: Vec<u8>,
     #[serde(with = "serde_bytes")]
     pub storage_changeset_hash: Vec<u8>,
-    pub proof_of_work_value: i64,
     pub transactions: Vec<Transaction>,
 }
 
@@ -32,8 +32,8 @@ pub struct Transaction {
     pub sender: Vec<u8>,
 }
 
-impl From<(crate::models::Block, Vec<crate::models::Transaction>)> for Block {
-    fn from(block: (crate::models::Block, Vec<crate::models::Transaction>)) -> Self {
+impl From<(models::Block, Vec<models::Transaction>)> for Block {
+    fn from(block: (models::Block, Vec<models::Transaction>)) -> Self {
         Self {
             hash: block.0.hash.clone(),
             parent_hash: block.0.parent_hash.clone(),
@@ -41,7 +41,6 @@ impl From<(crate::models::Block, Vec<crate::models::Transaction>)> for Block {
             winner: block.0.winner.clone(),
             memory_changeset_hash: block.0.memory_changeset_hash.clone(),
             storage_changeset_hash: block.0.storage_changeset_hash.clone(),
-            proof_of_work_value: block.0.proof_of_work_value.clone(),
             transactions: block
                 .1
                 .into_iter()
@@ -51,8 +50,8 @@ impl From<(crate::models::Block, Vec<crate::models::Transaction>)> for Block {
     }
 }
 
-impl From<crate::models::Transaction> for Transaction {
-    fn from(transaction: crate::models::Transaction) -> Self {
+impl From<models::Transaction> for Transaction {
+    fn from(transaction: models::Transaction) -> Self {
         Self {
             network_id: transaction.network_id as u64,
             contract_address: transaction.contract_address.clone(),
@@ -67,28 +66,27 @@ impl From<crate::models::Transaction> for Transaction {
     }
 }
 
-impl From<Block> for (crate::models::Block, Vec<crate::models::Transaction>) {
+impl From<Block> for (models::Block, Vec<models::Transaction>) {
     fn from(block: Block) -> Self {
         (
-            crate::models::Block {
+            models::Block {
                 hash: block.hash.clone(),
                 parent_hash: block.parent_hash.clone(),
                 number: block.number,
                 winner: block.winner.clone(),
                 memory_changeset_hash: block.memory_changeset_hash.clone(),
                 storage_changeset_hash: block.storage_changeset_hash.clone(),
-                proof_of_work_value: block.proof_of_work_value.clone(),
             },
             block
                 .transactions
                 .into_iter()
-                .map(crate::models::Transaction::from)
+                .map(models::Transaction::from)
                 .collect(),
         )
     }
 }
 
-impl From<Transaction> for crate::models::Transaction {
+impl From<Transaction> for models::Transaction {
     fn from(transaction: Transaction) -> Self {
         Self {
             network_id: transaction.network_id as i64,
