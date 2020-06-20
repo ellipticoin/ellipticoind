@@ -25,9 +25,12 @@ pub use env::Env;
 pub use helpers::zero_pad_vec;
 pub use metered_wasmi::RuntimeValue;
 use metered_wasmi::{ImportsBuilder, Module, ModuleInstance, ModuleRef, NopExternals};
-pub use r2d2_redis::redis;
-pub use r2d2_redis::redis::{pipe, Client, Commands, ControlFlow, PubSubCommands};
-pub use r2d2_redis::{r2d2, RedisConnectionManager};
+pub mod redis;
+pub use r2d2_redis::{
+    r2d2,
+    redis::{pipe, Client, Commands, ControlFlow, PubSubCommands},
+    RedisConnectionManager,
+};
 pub use rocksdb::DB;
 pub use state::{Changeset, State};
 pub use transaction::{CompletedTransaction, Transaction};

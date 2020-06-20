@@ -1,15 +1,15 @@
-use crate::api;
-use crate::miner::mine_next_block;
+use crate::{api, miner::mine_next_block};
 
-use crate::models::{is_block_winner, is_next_block};
-use crate::network::Message;
-use crate::transaction_processor;
-use crate::vm::{self, redis::Commands};
-use crate::BEST_BLOCK;
+use crate::{
+    models::{is_block_winner, is_next_block},
+    network::Message,
+    transaction_processor,
+    vm::{self, redis::Commands},
+    BEST_BLOCK,
+};
 use async_std::sync;
 
-use futures::future::FutureExt;
-use futures::stream::StreamExt;
+use futures::{future::FutureExt, stream::StreamExt};
 
 pub async fn run(
     mut websocket: api::websocket::Websocket,

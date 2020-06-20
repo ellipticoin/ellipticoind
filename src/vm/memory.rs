@@ -1,8 +1,6 @@
-use crate::vm::helpers::i32_to_vec;
-use crate::vm::VM;
+use crate::vm::{helpers::i32_to_vec, VM};
 use metered_wasmi::{memory_units::Pages, ExternVal, MemoryInstance, RuntimeValue};
-use std::convert::TryInto;
-use std::mem;
+use std::{convert::TryInto, mem};
 
 impl<'a> VM<'a> {
     pub fn read_pointer(&mut self, ptr: i32) -> Vec<u8> {

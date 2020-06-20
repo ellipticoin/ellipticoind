@@ -1,6 +1,7 @@
-use ellipticoind::config::SubCommand;
-use ellipticoind::config::OPTS;
-use ellipticoind::sub_commands::{self, generate_keypair};
+use ellipticoind::{
+    config::{SubCommand, OPTS},
+    sub_commands::{self, generate_keypair},
+};
 
 #[async_std::main]
 async fn main() {

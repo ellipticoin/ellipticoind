@@ -3,9 +3,10 @@ use clap::Clap;
 use dotenv::dotenv;
 use ed25519_dalek::Keypair;
 use serde::{Deserialize, Deserializer};
-use std::env;
-use std::net::IpAddr;
-use std::net::SocketAddr;
+use std::{
+    env,
+    net::{IpAddr, SocketAddr},
+};
 
 #[derive(Clap, Debug)]
 pub struct Opts {
@@ -21,6 +22,8 @@ pub struct Opts {
     pub port: u16,
     #[clap(long = "rocksdb-path", default_value = "./db")]
     pub rocksdb_path: String,
+    #[clap(long = "save-state")]
+    pub save_state: bool,
     #[clap(long = "redis-url", default_value = "redis://127.0.0.1")]
     pub redis_url: String,
     #[clap(subcommand)]
@@ -40,6 +43,19 @@ lazy_static! {
         dotenv().ok();
         Opts::parse()
     };
+    pub static ref HOST: String = env::var("HOST").unwrap();
+    pub static ref GENESIS_NODE: bool = env::var("GENESIS_NODE").is_ok();
+    pub static ref ENABLE_MINER: bool = env::var("ENABLE_MINER").is_ok();
+    pub static ref BURN_PER_BLOCK: u64 = {
+        if *ENABLE_MINER {
+            env::var("BURN_PER_BLOCK")
+                .expect("BURN_PER_BLOCK not set")
+                .parse()
+                .unwrap()
+        } else {
+            0
+        }
+    };
 }
 
 #[derive(Deserialize, Debug)]
@@ -58,8 +74,11 @@ where
         .and_then(|string| base64::decode(&string).map_err(|err| Error::custom(err.to_string())))
 }
 
-pub fn bootnodes(path: Option<String>) -> Vec<Bootnode> {
-    let path = path.unwrap_or("dist/bootnodes.yaml".to_string());
+pub fn bootnodes() -> Vec<Bootnode> {
+    let path = OPTS
+        .bootnodes
+        .clone()
+        .unwrap_or("dist/bootnodes.yaml".to_string());
     let string = std::fs::read_to_string(path).unwrap();
     serde_yaml::from_str(&string).unwrap()
 }
