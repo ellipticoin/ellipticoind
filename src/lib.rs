@@ -24,6 +24,7 @@ mod helpers;
 mod miner;
 mod models;
 mod network;
+mod pg;
 mod run_loop;
 mod schema;
 mod start_up;
