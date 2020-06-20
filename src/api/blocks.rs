@@ -1,14 +1,11 @@
 use super::ApiState;
-use crate::api::views::Block;
-use crate::diesel::ExpressionMethods;
-use crate::diesel::GroupedBy;
-use crate::diesel::OptionalExtension;
-use crate::diesel::QueryDsl;
-use crate::diesel::RunQueryDsl;
-use crate::models;
-use crate::network::Message;
-use crate::schema::blocks;
-use crate::schema::blocks::columns::number;
+use crate::{
+    api::views::Block,
+    diesel::{ExpressionMethods, GroupedBy, OptionalExtension, QueryDsl, RunQueryDsl},
+    models,
+    network::Message,
+    schema::{blocks, blocks::columns::number},
+};
 use diesel::BelongingToDsl;
 use http_service::Body;
 use serde::Deserialize;

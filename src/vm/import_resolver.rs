@@ -1,6 +1,7 @@
 use crate::vm::externals::*;
-use metered_wasmi::Error as InterpreterError;
-use metered_wasmi::{FuncInstance, FuncRef, ModuleImportResolver, Signature, ValueType};
+use metered_wasmi::{
+    Error as InterpreterError, FuncInstance, FuncRef, ModuleImportResolver, Signature, ValueType,
+};
 use std::str;
 
 pub struct ImportResolver;

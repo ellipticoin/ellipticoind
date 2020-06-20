@@ -1,7 +1,5 @@
-use crate::vm::backend::Backend;
-use crate::vm::helpers::zero_pad_vec;
-use std::collections::HashMap;
-use std::sync::Arc;
+use crate::vm::{backend::Backend, helpers::zero_pad_vec};
+use std::{collections::HashMap, sync::Arc};
 
 pub type Changeset = HashMap<Vec<u8>, Vec<u8>>;
 pub struct State {

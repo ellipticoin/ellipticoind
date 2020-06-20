@@ -1,12 +1,13 @@
-use crate::api::views;
-use crate::constants::{Namespace, TOKEN_CONTRACT};
+use crate::{
+    api::views,
+    constants::{Namespace, TOKEN_CONTRACT},
+};
 
 use crate::network::Message;
 use async_std::sync::Receiver;
 use futures::stream::StreamExt;
 use serde_cbor::Value;
-use std::collections::BTreeMap;
-use std::env;
+use std::{collections::BTreeMap, env};
 
 pub async fn broadcast(
     mut block_receiver_out: Receiver<Message>,
@@ -46,7 +47,7 @@ pub async fn get_peers(vm_state: &mut crate::vm::State) -> Vec<String> {
     let miners: BTreeMap<Vec<Value>, (String, u64, Vec<Value>)> = serde_cbor::from_slice(
         &vm_state.get_storage(&TOKEN_CONTRACT, &vec![Namespace::Miners as u8]),
     )
-    .unwrap();
+    .unwrap_or(BTreeMap::new());
     miners
         .iter()
         .map(|(_, (host, _, _))| host.clone())

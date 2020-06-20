@@ -24,7 +24,6 @@ pub struct Block {
     pub winner: Vec<u8>,
     pub memory_changeset_hash: Vec<u8>,
     pub storage_changeset_hash: Vec<u8>,
-    pub proof_of_work_value: i64,
 }
 
 #[derive(Serialize)]
@@ -34,7 +33,6 @@ pub struct BlockWithoutHash {
     pub winner: Vec<u8>,
     pub memory_changeset_hash: Vec<u8>,
     pub storage_changeset_hash: Vec<u8>,
-    pub proof_of_work_value: i64,
 }
 
 #[derive(Serialize)]
@@ -56,7 +54,7 @@ pub async fn is_next_block(block: &Block) -> bool {
 
 pub fn is_block_winner(vm_state: &mut vm::State) -> bool {
     let winner = vm_state.get_storage(&TOKEN_CONTRACT, &vec![Namespace::CurrentMiner as u8]);
-    // println!("winner {}", base64::encode(&winner));
+    println!("winner {}", base64::encode(&winner));
     winner.eq(&keypair().public.as_bytes().to_vec())
 }
 
@@ -111,7 +109,6 @@ impl From<Block> for BlockWithoutHash {
             winner: block.winner.clone(),
             memory_changeset_hash: block.memory_changeset_hash.clone(),
             storage_changeset_hash: block.storage_changeset_hash.clone(),
-            proof_of_work_value: block.proof_of_work_value.clone(),
         }
     }
 }
@@ -167,6 +164,7 @@ pub struct Transaction {
 
 #[derive(Serialize, Debug)]
 pub struct TransactionWithoutHash {
+    network_id: u32,
     nonce: u64,
     #[serde(with = "serde_bytes")]
     sender: Vec<u8>,
@@ -180,6 +178,7 @@ pub struct TransactionWithoutHash {
 impl From<Transaction> for TransactionWithoutHash {
     fn from(transaction: Transaction) -> Self {
         Self {
+            network_id: transaction.network_id as u32,
             contract_address: transaction.contract_address,
             sender: transaction.sender,
             gas_limit: transaction.gas_limit as u64,

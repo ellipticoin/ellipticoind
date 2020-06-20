@@ -1,22 +1,24 @@
-use crate::miner::get_best_block;
-
-use crate::api;
-use crate::run_loop;
-use crate::start_up;
-use crate::vm;
-use crate::vm::{redis, RedisConnectionManager};
+use crate::{
+    api,
+    broadcaster::broadcast,
+    miner::get_best_block,
+    run_loop, start_up, vm,
+    vm::{rocksdb, RedisConnectionManager},
+};
 use async_std::sync::channel;
+use diesel::{
+    pg::PgConnection,
+    prelude::*,
+    r2d2::{ConnectionManager, Pool},
+};
 
-use crate::broadcaster::broadcast;
-use diesel::pg::PgConnection;
-use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, Pool};
-
-use crate::config::{bootnodes, database_url, keypair, socket, OPTS};
-use crate::BEST_BLOCK;
+use crate::{
+    config::{bootnodes, database_url, keypair, socket, GENESIS_NODE, OPTS},
+    BEST_BLOCK,
+};
 use ed25519_dalek::Keypair;
 use rand::rngs::OsRng;
-use std::{env, sync::Arc};
+use std::sync::Arc;
 
 pub fn generate_keypair() {
     let mut os_rng = OsRng {};
@@ -28,49 +30,36 @@ pub fn generate_keypair() {
 }
 
 pub async fn main() {
-    diesel_migrations::embed_migrations!();
     let db = PgConnection::establish(&database_url())
         .expect(&format!("Error connecting to {}", &database_url()));
-    embedded_migrations::run(&db).unwrap();
     let manager = ConnectionManager::<PgConnection>::new(&database_url());
     let pg_pool = Pool::new(manager).unwrap();
-    diesel::sql_query("TRUNCATE blocks CASCADE")
-        .execute(&db)
-        .unwrap();
     let redis_manager = RedisConnectionManager::new(OPTS.redis_url.clone()).unwrap();
     let redis_pool = vm::r2d2_redis::r2d2::Pool::builder()
         .build(redis_manager)
         .unwrap();
-    let _: () = redis::cmd("FLUSHALL")
-        .query(&mut *redis_pool.get().unwrap())
-        .unwrap();
 
-    let rocksdb = Arc::new(
-        start_up::initialize_rocks_db(
-            &OPTS.rocksdb_path,
-            &pg_pool.get().unwrap(),
-            redis_pool.clone(),
-        )
-        .await,
-    );
+    let rocksdb = Arc::new(rocksdb::DB::open_default(&OPTS.rocksdb_path).unwrap());
+
+    start_up::reset_state(rocksdb.clone(), &pg_pool.get().unwrap(), redis_pool.clone()).await;
     let mut vm_state = vm::State::new(redis_pool.get().unwrap(), rocksdb.clone());
-    if env::var("GENISIS_NODE").is_err() {
+
+    if !*GENESIS_NODE {
         start_up::catch_up(
             pg_pool.clone(),
             redis_pool.clone(),
             &mut vm_state,
-            &bootnodes(None),
+            &bootnodes(),
+        )
+        .await;
+        start_up::start_miner(
+            &rocksdb,
+            &pg_pool.get().unwrap(),
+            keypair().public,
+            &bootnodes(),
         )
         .await;
     }
-    start_up::start_miner(
-        &rocksdb,
-        &pg_pool.get().unwrap(),
-        redis_pool.clone(),
-        keypair().public,
-        &bootnodes(None),
-    )
-    .await;
     let (miner_sender, miner_receiver) = channel(1);
     let (broadcast_sender, broadcast_receiver) = channel(1);
     let api_state = api::ApiState::new(

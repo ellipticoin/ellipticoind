@@ -1,13 +1,8 @@
-use super::views::Transaction;
-use super::ApiState;
-use crate::diesel::OptionalExtension;
-use crate::models;
-use crate::schema::transactions::dsl::transactions;
-use diesel::QueryDsl;
-use diesel::RunQueryDsl;
+use super::{views::Transaction, ApiState};
+use crate::{diesel::OptionalExtension, models, schema::transactions::dsl::transactions, vm};
+use diesel::{QueryDsl, RunQueryDsl};
 
-use crate::network::Message;
-use crate::vm::redis::Commands;
+use crate::{network::Message, vm::redis::Commands};
 use http_service::Body;
 use serde_cbor::from_slice;
 use tide::Response;
@@ -31,8 +26,9 @@ pub async fn show(req: tide::Request<ApiState>) -> Response {
 }
 
 pub async fn create(mut req: tide::Request<ApiState>) -> Response {
+    println!("transactions::create");
     let transaction_bytes = req.body_bytes().await.unwrap();
-    let transaction: crate::vm::Transaction = from_slice(&transaction_bytes).unwrap();
+    let transaction: vm::Transaction = from_slice(&transaction_bytes).unwrap();
     let mut redis = req.state().redis.get().unwrap();
     redis
         .rpush::<&str, Vec<u8>, ()>(
@@ -45,8 +41,9 @@ pub async fn create(mut req: tide::Request<ApiState>) -> Response {
 }
 
 pub async fn broadcast(mut req: tide::Request<ApiState>) -> Response {
+    println!("transactions::broadcast");
     let transaction_bytes = req.body_bytes().await.unwrap();
-    let transaction: crate::vm::Transaction = from_slice(&transaction_bytes).unwrap();
+    let transaction: vm::Transaction = from_slice(&transaction_bytes).unwrap();
     let mut redis = req.state().redis.get().unwrap();
     redis
         .rpush::<&str, Vec<u8>, ()>(

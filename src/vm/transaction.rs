@@ -1,7 +1,9 @@
 extern crate base64;
-use crate::vm::env::Env;
-use crate::vm::error::{Error, CONTRACT_NOT_FOUND};
-use crate::vm::{new_module_instance, State, VM};
+use crate::vm::{
+    env::Env,
+    error::{Error, CONTRACT_NOT_FOUND},
+    new_module_instance, State, VM,
+};
 pub use metered_wasmi::{
     isa, FunctionContext, ImportsBuilder, Module, ModuleInstance, NopExternals, RuntimeValue,
 };

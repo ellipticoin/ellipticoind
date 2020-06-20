@@ -1,5 +1,4 @@
-use std::mem;
-use std::mem::transmute;
+use std::{mem, mem::transmute};
 
 pub fn i32_to_vec(n: i32) -> Vec<u8> {
     unsafe { transmute::<i32, [u8; mem::size_of::<i32>()]>(n) }.to_vec()

@@ -30,11 +30,8 @@ mod start_up;
 mod system_contracts;
 mod transaction_processor;
 mod vm;
-
 use crate::models::Block;
-
 use api::app::app as api;
-
 use async_std::sync::Mutex;
 
 lazy_static! {

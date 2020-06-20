@@ -1,16 +1,21 @@
-use crate::config::OPTS;
-use crate::constants::TOKEN_CONTRACT;
-use crate::diesel::QueryDsl;
-use crate::models::*;
-use crate::schema;
-use crate::schema::blocks::dsl::blocks;
-use crate::schema::hash_onion::dsl::*;
-use crate::transaction_processor::{run_transaction, run_transactions, PUBLIC_KEY};
-use crate::BEST_BLOCK;
-use diesel::dsl::sql_query;
-use diesel::pg::PgConnection;
-use diesel::prelude::*;
-use diesel::r2d2::{ConnectionManager, PooledConnection};
+use crate::vm;
+use crate::{
+    config::OPTS,
+    constants::TOKEN_CONTRACT,
+    diesel::QueryDsl,
+    models::*,
+    schema,
+    schema::{blocks::dsl::blocks, hash_onion::dsl::*},
+    transaction_processor::{run_transaction, run_transactions, PUBLIC_KEY},
+    vm::redis,
+    BEST_BLOCK,
+};
+use diesel::{
+    dsl::sql_query,
+    pg::PgConnection,
+    prelude::*,
+    r2d2::{ConnectionManager, PooledConnection},
+};
 use serde_cbor::Value;
 
 pub fn get_best_block(db: &PgConnection) -> Option<Block> {
@@ -36,11 +41,11 @@ pub async fn next_block_template() -> Block {
 }
 
 pub async fn mine_next_block(
-    con: crate::vm::r2d2_redis::r2d2::Pool<crate::vm::r2d2_redis::RedisConnectionManager>,
+    con: redis::Pool,
     pg_db: PooledConnection<ConnectionManager<PgConnection>>,
     rocksdb: std::sync::Arc<rocksdb::DB>,
 ) -> (Block, Vec<Transaction>) {
-    let mut vm_state = crate::vm::State::new(con.get().unwrap(), rocksdb);
+    let mut vm_state = vm::State::new(con.get().unwrap(), rocksdb);
     let mut block = next_block_template().await;
     block.winner = PUBLIC_KEY.to_vec();
     let mut transactions = run_transactions(con.clone(), &mut vm_state, &block).await;
@@ -54,7 +59,7 @@ pub async fn mine_next_block(
         .into_iter()
         .map(|n| n.into())
         .collect();
-    let reveal_transaction = crate::vm::Transaction {
+    let reveal_transaction = vm::Transaction {
         network_id: OPTS.network_id,
         contract_address: TOKEN_CONTRACT.to_vec(),
         sender: PUBLIC_KEY.to_vec(),
@@ -85,5 +90,5 @@ pub async fn mine_next_block(
 fn random() -> u64 {
     use rand::Rng;
     let mut rng = rand::thread_rng();
-    rng.gen_range(3000, 5000)
+    rng.gen_range(0, u64::MAX)
 }

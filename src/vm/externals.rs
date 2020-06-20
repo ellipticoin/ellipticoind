@@ -1,7 +1,4 @@
-use crate::vm::gas_costs;
-use crate::vm::new_module_instance;
-use crate::vm::transaction::Transaction;
-use crate::vm::VM;
+use crate::vm::{gas_costs, new_module_instance, transaction::Transaction, VM};
 use metered_wasmi::{isa, RuntimeArgs, RuntimeValue, TrapKind};
 use serde_cbor::{from_slice, to_vec};
 use std::str;
