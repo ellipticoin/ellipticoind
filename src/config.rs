@@ -17,7 +17,7 @@ pub struct Opts {
     pub bootnodes: Option<String>,
     #[clap(short = "d", long = "database-url")]
     pub database_url: Option<String>,
-    #[clap(short = "n", long = "network-id", default_value = "1793045504")]
+    #[clap(short = "n", long = "network-id", default_value = "3750925312")]
     pub network_id: u32,
     #[clap(short = "p", long = "port", default_value = "80")]
     pub port: u16,
