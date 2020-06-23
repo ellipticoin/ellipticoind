@@ -54,7 +54,6 @@ pub async fn is_next_block(block: &Block) -> bool {
 
 pub fn is_block_winner(vm_state: &mut vm::State) -> bool {
     let winner = vm_state.get_storage(&TOKEN_CONTRACT, &vec![Namespace::CurrentMiner as u8]);
-    println!("winner {}", base64::encode(&winner));
     winner.eq(&keypair().public.as_bytes().to_vec())
 }
 
