@@ -1,9 +1,12 @@
 use crate::{
-    api::views,
+    api::{
+        views,
+        state::State,
+    },
     config::{
         ethereum_balances_path, random_bootnode, Bootnode, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
     },
-    constants::{Namespace, GENESIS_ADDRESS, TOKEN_CONTRACT, TOKEN_WASM_PATH},
+    constants::{Namespace, GENESIS_ADDRESS, TOKEN_CONTRACT, TOKEN_WASM_PATH, GENESIS_STATE_PATH},
     helpers::bytes_to_value,
     models::HashOnion,
     pg,
@@ -17,7 +20,6 @@ use crate::{
     },
     BEST_BLOCK,
 };
-
 pub use diesel_migrations::revert_latest_migration;
 use indicatif::ProgressBar;
 
@@ -39,11 +41,11 @@ pub async fn start_miner(pg_db: &pg::Connection, redis: &mut redis::Connection) 
             bytes_to_value(HashOnion::peel(&pg_db)),
         ],
     );
-    if *GENESIS_NODE {
-        process_transaction(redis, start_mining_transaction);
-    } else {
-        post_transaction(&random_bootnode(), start_mining_transaction).await;
+    if !*GENESIS_NODE {
+        post_transaction(&random_bootnode(), start_mining_transaction.clone()).await;
     }
+
+    process_transaction(redis, start_mining_transaction);
 }
 
 fn process_transaction(redis: &mut redis::Connection, transaction: Transaction) {
@@ -118,16 +120,40 @@ pub async fn reset_state(
     reset_rocksdb(rocksdb.clone()).await;
     import_ethereum_balances(rocksdb.clone()).await;
     set_token_contract(rocksdb.clone());
+    load_genesis_state(&mut redis_pool.get().unwrap(), rocksdb.clone());
+    reset_current_miner(rocksdb.clone());
     HashOnion::generate(pg_db);
 }
 
-pub fn set_token_contract(rocksdb: Arc<rocksdb::DB>) {
+pub fn reset_current_miner(
+    rocksdb: Arc<rocksdb::DB>
+) {
+    rocksdb
+        .delete(
+            db_key(&TOKEN_CONTRACT, &vec![Namespace::Miners as u8]),
+        )
+        .unwrap();
     rocksdb
         .put(
             db_key(&TOKEN_CONTRACT, &vec![Namespace::CurrentMiner as u8]),
             GENESIS_ADDRESS.to_vec(),
         )
         .unwrap();
+}
+pub fn load_genesis_state(
+    redis: &mut redis::Connection,
+    rocksdb: Arc<rocksdb::DB>
+) {
+    let genesis_file = File::open(GENESIS_STATE_PATH).unwrap();
+    let state: State = serde_cbor::from_reader(genesis_file).unwrap();
+    for (key, value) in state.memory {
+        let _:() = redis.set(key, value).unwrap();
+    }
+    for (key, value) in state.storage {
+        rocksdb.put(key, value).unwrap();
+    }
+}
+pub fn set_token_contract(rocksdb: Arc<rocksdb::DB>) {
     let mut token_file = File::open(TOKEN_WASM_PATH).unwrap();
     let mut token_wasm = Vec::new();
     token_file.read_to_end(&mut token_wasm).unwrap();
@@ -137,7 +163,7 @@ pub fn set_token_contract(rocksdb: Arc<rocksdb::DB>) {
 }
 
 async fn reset_redis(redis: &mut redis::Connection) {
-    let _: () = redis::cmd("FLUSHALL").query(redis.deref_mut()).unwrap();
+    let _: () = redis::cmd("FLUSHDB").query(redis.deref_mut()).unwrap();
 }
 
 async fn reset_pg(pg_db: &pg::Connection) {

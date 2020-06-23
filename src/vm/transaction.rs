@@ -22,7 +22,7 @@ pub struct Transaction {
     pub contract_address: Vec<u8>,
     #[serde(with = "serde_bytes")]
     pub sender: Vec<u8>,
-    pub nonce: u64,
+    pub nonce: u32,
     pub gas_limit: u64,
     pub function: String,
     pub arguments: Vec<Value>,
@@ -49,7 +49,7 @@ pub struct CompletedTransaction {
     pub contract_address: Vec<u8>,
     #[serde(with = "serde_bytes")]
     pub sender: Vec<u8>,
-    pub nonce: u64,
+    pub nonce: u32,
     pub gas_limit: u64,
     pub function: String,
     pub arguments: Vec<Value>,

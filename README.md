@@ -67,5 +67,5 @@ $ git lfs pull
 9. Clear your state and run  ellipticoind (replace <your-external-ip> with your IP)
 
 ```
-$ rm -rf db && HOST="<your-external-ip>" ./target/release/ellipticoind
+$ HOST="<your-external-ip>" ./target/release/ellipticoind
 ```

@@ -26,7 +26,6 @@ pub async fn show(req: tide::Request<ApiState>) -> Response {
 }
 
 pub async fn create(mut req: tide::Request<ApiState>) -> Response {
-    println!("transactions::create");
     let transaction_bytes = req.body_bytes().await.unwrap();
     let transaction: vm::Transaction = from_slice(&transaction_bytes).unwrap();
     let mut redis = req.state().redis.get().unwrap();
@@ -41,7 +40,6 @@ pub async fn create(mut req: tide::Request<ApiState>) -> Response {
 }
 
 pub async fn broadcast(mut req: tide::Request<ApiState>) -> Response {
-    println!("transactions::broadcast");
     let transaction_bytes = req.body_bytes().await.unwrap();
     let transaction: vm::Transaction = from_slice(&transaction_bytes).unwrap();
     let mut redis = req.state().redis.get().unwrap();

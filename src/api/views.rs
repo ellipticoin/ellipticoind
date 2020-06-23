@@ -18,7 +18,7 @@ pub struct Block {
 
 #[derive(Serialize, Clone, Deserialize, Debug)]
 pub struct Transaction {
-    pub network_id: u64,
+    pub network_id: u32,
     pub arguments: Vec<serde_cbor::Value>,
     #[serde(with = "serde_bytes")]
     pub block_hash: Vec<u8>,
@@ -26,7 +26,7 @@ pub struct Transaction {
     pub contract_address: Vec<u8>,
     pub function: String,
     pub gas_limit: u64,
-    pub nonce: u64,
+    pub nonce: u32,
     return_value: serde_cbor::Value,
     #[serde(with = "serde_bytes")]
     pub sender: Vec<u8>,
@@ -53,11 +53,11 @@ impl From<(models::Block, Vec<models::Transaction>)> for Block {
 impl From<models::Transaction> for Transaction {
     fn from(transaction: models::Transaction) -> Self {
         Self {
-            network_id: transaction.network_id as u64,
+            network_id: transaction.network_id as u32,
             contract_address: transaction.contract_address.clone(),
             block_hash: transaction.block_hash.clone(),
             sender: transaction.sender.clone(),
-            nonce: transaction.nonce as u64,
+            nonce: transaction.nonce as u32,
             gas_limit: transaction.gas_limit as u64,
             function: transaction.function.clone(),
             arguments: serde_cbor::from_slice(&transaction.arguments).unwrap(),
