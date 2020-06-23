@@ -1,5 +1,6 @@
 use crate::{
     config::{public_key, OPTS},
+    helpers::random,
     constants::TOKEN_CONTRACT,
     diesel::QueryDsl,
     helpers::bytes_to_value,
@@ -66,10 +67,4 @@ pub async fn mine_next_block(
     vm_state.commit();
     block.clone().insert(&pg_db, transactions.clone());
     (block, transactions)
-}
-
-fn random() -> u64 {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    rng.gen_range(0, u64::MAX)
 }

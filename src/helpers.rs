@@ -19,7 +19,7 @@ pub fn bytes_to_value(bytes: Vec<u8>) -> Value {
         .into()
 }
 
-pub fn random() -> u64 {
+pub fn random() -> u32 {
     let mut rng = rand::thread_rng();
-    rng.gen_range(0, u32::max_value() as u64)
+    rng.gen_range(0, u32::max_value() as u32)
 }

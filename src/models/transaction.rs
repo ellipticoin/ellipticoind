@@ -24,7 +24,7 @@ impl From<Transaction> for vm::Transaction {
             contract_address: transaction.contract_address,
             function: transaction.function,
             gas_limit: transaction.gas_limit as u64,
-            nonce: transaction.nonce as u64,
+            nonce: transaction.nonce as u32,
         }
     }
 }
@@ -74,13 +74,13 @@ pub struct Transaction {
 
 #[derive(Serialize, Debug)]
 pub struct TransactionWithoutHash {
-    network_id: u32,
-    nonce: u64,
+    nonce: u32,
     #[serde(with = "serde_bytes")]
     sender: Vec<u8>,
     function: String,
     arguments: Vec<serde_cbor::Value>,
     gas_limit: u64,
+    network_id: u64,
     #[serde(with = "serde_bytes")]
     contract_address: Vec<u8>,
 }
@@ -88,13 +88,13 @@ pub struct TransactionWithoutHash {
 impl From<Transaction> for TransactionWithoutHash {
     fn from(transaction: Transaction) -> Self {
         Self {
-            network_id: transaction.network_id as u32,
-            contract_address: transaction.contract_address,
-            sender: transaction.sender,
-            gas_limit: transaction.gas_limit as u64,
-            nonce: transaction.nonce as u64,
-            function: transaction.function,
             arguments: from_slice(&transaction.arguments).unwrap(),
+            contract_address: transaction.contract_address,
+            nonce: transaction.nonce as u32,
+            function: transaction.function,
+            gas_limit: transaction.gas_limit as u64,
+            network_id: transaction.network_id as u64,
+            sender: transaction.sender,
         }
     }
 }

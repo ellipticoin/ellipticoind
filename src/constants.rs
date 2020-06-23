@@ -1,3 +1,4 @@
+pub const GENESIS_STATE_PATH: &'static str = "./dist/genesis.cbor";
 pub const TOKEN_WASM_PATH: &'static str = "./contracts/token/dist/token.wasm";
 pub const SYSTEM_ADDRESS: [u8; 32] = [0; 32];
 // vQMn3JvS3ATITteQ+gOYfuVSn2buuAH+4e8NY/CvtwA= in hex
