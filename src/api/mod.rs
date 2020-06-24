@@ -12,6 +12,7 @@ pub use views::Block;
 mod addresses;
 pub mod app;
 mod blocks;
+mod helpers;
 mod memory;
 pub mod state;
 mod storage;

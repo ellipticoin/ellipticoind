@@ -1,4 +1,5 @@
 extern crate clap;
+use crate::vm::{self, redis};
 use clap::Clap;
 use dotenv::dotenv;
 use ed25519_dalek::Keypair;
@@ -8,6 +9,7 @@ use std::{
     env,
     net::{IpAddr, SocketAddr},
 };
+use vm::RedisConnectionManager;
 
 #[derive(Clap, Debug)]
 pub struct Opts {
@@ -57,6 +59,12 @@ lazy_static! {
             0
         }
     };
+    pub static ref REDIS_POOL: redis::Pool = {
+        let redis_manager = RedisConnectionManager::new(OPTS.redis_url.clone()).unwrap();
+        vm::r2d2_redis::r2d2::Pool::builder()
+            .build(redis_manager)
+            .unwrap()
+    };
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -105,6 +113,10 @@ pub fn public_key() -> Vec<u8> {
 pub fn random_bootnode() -> Bootnode {
     let mut rng = rand::thread_rng();
     (*bootnodes().choose(&mut rng).unwrap()).clone()
+}
+
+pub fn get_redis_connection() -> redis::Connection {
+    REDIS_POOL.get().unwrap()
 }
 
 pub fn ethereum_balances_path() -> String {
