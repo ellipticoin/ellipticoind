@@ -1,10 +1,10 @@
 use super::{views::Transaction, ApiState};
-use crate::{diesel::OptionalExtension, models, schema::transactions::dsl::transactions, vm};
+use crate::{diesel::OptionalExtension, models, schema::transactions::dsl::transactions};
 use diesel::{QueryDsl, RunQueryDsl};
 
-use crate::{network::Message, vm::redis::Commands};
+use crate::{api::helpers::body, models::TransactionPool, network::Message};
 use http_service::Body;
-use serde_cbor::from_slice;
+
 use tide::Response;
 
 pub async fn show(req: tide::Request<ApiState>) -> Response {
@@ -26,32 +26,22 @@ pub async fn show(req: tide::Request<ApiState>) -> Response {
 }
 
 pub async fn create(mut req: tide::Request<ApiState>) -> Response {
-    let transaction_bytes = req.body_bytes().await.unwrap();
-    let transaction: vm::Transaction = from_slice(&transaction_bytes).unwrap();
-    let mut redis = req.state().redis.get().unwrap();
-    redis
-        .rpush::<&str, Vec<u8>, ()>(
-            "transactions::pending",
-            serde_cbor::to_vec(&transaction).unwrap(),
-        )
-        .unwrap();
+    let transaction = match body(&mut req).await {
+        Ok(transaction) => transaction,
+        Err(_) => return Response::new(400),
+    };
 
+    TransactionPool::add(&transaction);
     Response::new(201)
 }
 
 pub async fn broadcast(mut req: tide::Request<ApiState>) -> Response {
-    let transaction_bytes = req.body_bytes().await.unwrap();
-    let transaction: vm::Transaction = from_slice(&transaction_bytes).unwrap();
-    let mut redis = req.state().redis.get().unwrap();
-    redis
-        .rpush::<&str, Vec<u8>, ()>(
-            "transactions::pending",
-            serde_cbor::to_vec(&transaction).unwrap(),
-        )
-        .unwrap();
+    let transaction = match body(&mut req).await {
+        Ok(transaction) => transaction,
+        Err(_) => return Response::new(400),
+    };
+    TransactionPool::add(&transaction);
     let sender_in = req.state().broadcast_sender.clone();
-    sender_in
-        .send(Message::Transaction(transaction.clone()))
-        .await;
+    sender_in.send(Message::Transaction(transaction)).await;
     Response::new(201)
 }
