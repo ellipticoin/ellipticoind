@@ -36,10 +36,18 @@ pub async fn create(mut req: tide::Request<ApiState>) -> Response {
 }
 
 pub async fn broadcast(mut req: tide::Request<ApiState>) -> Response {
-    let transaction = match body(&mut req).await {
+    let transaction: crate::vm::Transaction = match body(&mut req).await {
         Ok(transaction) => transaction,
-        Err(_) => return Response::new(400),
+        Err(e) => {
+            println!("{:?}", e);
+            return Response::new(400);
+        }
     };
+
+    if !transaction.valid_signature() {
+        return Response::new(403);
+    }
+
     TransactionPool::add(&transaction);
     let sender_in = req.state().broadcast_sender.clone();
     sender_in.send(Message::Transaction(transaction)).await;

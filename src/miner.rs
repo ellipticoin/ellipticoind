@@ -1,8 +1,8 @@
 use crate::{
-    config::{public_key, OPTS},
+    config::public_key,
     constants::TOKEN_CONTRACT,
     diesel::QueryDsl,
-    helpers::{bytes_to_value, random},
+    helpers::bytes_to_value,
     models::*,
     schema,
     schema::blocks::dsl::blocks,
@@ -47,15 +47,11 @@ pub async fn mine_next_block(
     let mut block = next_block_template().await;
     block.winner = public_key();
     let mut transactions = run_transactions(con.clone(), &mut vm_state, &block).await;
-    let reveal_transaction = vm::Transaction {
-        network_id: OPTS.network_id,
-        contract_address: TOKEN_CONTRACT.to_vec(),
-        sender: public_key(),
-        nonce: random(),
-        function: "reveal".to_string(),
-        arguments: vec![bytes_to_value(HashOnion::peel(&pg_db))],
-        gas_limit: 10000000,
-    };
+    let reveal_transaction = vm::Transaction::new(
+        TOKEN_CONTRACT.to_vec(),
+        "reveal",
+        vec![bytes_to_value(HashOnion::peel(&pg_db))],
+    );
     let reveal_result = run_transaction(&mut vm_state, &reveal_transaction, &block);
     transactions.push(reveal_result);
     block.set_hash();

@@ -15,12 +15,17 @@ pub const INSUFFICIENT_FUNDS: Error = Error {
     message: "Insufficient funds",
 };
 
-pub const BALANCE_ALREADY_UNLOCKED: Error = Error {
+pub const INSUFFICIENT_ALLOWANCE: Error = Error {
     code: 4,
+    message: "Insufficient allowance",
+};
+
+pub const BALANCE_ALREADY_UNLOCKED: Error = Error {
+    code: 5,
     message: "Balance has already been unlocked",
 };
 
 pub const BALANCE_EXCEEDS_THIS_PHASE: Error = Error {
-    code: 5,
+    code: 6,
     message: "Only a total of 1000000 ELC can be unlocked in Phase I",
 };

@@ -2,7 +2,7 @@ extern crate clap;
 use crate::vm::{self, redis};
 use clap::Clap;
 use dotenv::dotenv;
-use ed25519_dalek::Keypair;
+use ed25519_dalek::{Keypair, SecretKey};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Deserializer};
 use std::{
@@ -108,6 +108,10 @@ pub fn keypair() -> Keypair {
 
 pub fn public_key() -> Vec<u8> {
     keypair().public.to_bytes().to_vec()
+}
+
+pub fn secret_key() -> SecretKey {
+    keypair().secret
 }
 
 pub fn random_bootnode() -> Bootnode {

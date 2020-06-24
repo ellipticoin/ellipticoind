@@ -11,7 +11,7 @@ use hashing::sha256;
 
 use std::collections::BTreeMap;
 enum Namespace {
-    Allowences,
+    Allowances,
     Balances,
     CurrentMiner,
     EthereumBalances,
@@ -28,34 +28,43 @@ use std::convert::TryInto;
 mod token {
     pub fn approve(spender: Vec<u8>, amount: u64) {
         set_memory(
-            Namespace::Allowences,
+            Namespace::Allowances,
             [caller(), spender.to_vec()].concat(),
             amount,
         );
     }
 
     pub fn transfer_from(from: Vec<u8>, to: Vec<u8>, amount: u64) -> Result<Value, Error> {
-        let allowance: u64 = get_memory(
-            Namespace::Allowences,
-            [from.clone().to_vec(), caller()].concat(),
-        );
+        if caller().ne(&get_current_miner()) {
+            return Err(errors::SENDER_IS_NOT_THE_WINNER);
+        }
 
-        if get_memory::<_, u64>(Namespace::Balances, from.clone()) < amount {
+        if get_balance(from.clone()) < amount {
             return Err(errors::INSUFFICIENT_FUNDS);
         }
 
-        if allowance >= amount {
-            debit_allowance(from.clone().to_vec(), caller(), amount);
-            debit(from.to_vec(), amount);
-            credit(to.to_vec(), amount);
-            Ok(Value::Null)
-        } else {
-            Err(errors::INSUFFICIENT_FUNDS)
+        debit(from.to_vec(), amount);
+        credit(to.to_vec(), amount);
+        Ok(Value::Null)
+    }
+
+    pub fn transfer_from_allowance(from: Vec<u8>, to: Vec<u8>, amount: u64) -> Result<Value, Error> {
+        if get_allowance(from.clone(), caller()) < amount {
+            return Err(errors::INSUFFICIENT_ALLOWANCE)
         }
+
+        if get_balance(from.clone()) < amount {
+            return Err(errors::INSUFFICIENT_FUNDS);
+        }
+
+        debit_allowance(from.clone().to_vec(), caller(), amount);
+        debit(from.to_vec(), amount);
+        credit(to.to_vec(), amount);
+        Ok(Value::Null)
     }
 
     pub fn transfer(to: Vec<u8>, amount: u64) -> Result<Value, Error> {
-        if get_memory::<_, u64>(Namespace::Balances, caller()) >= amount {
+        if get_balance(caller()) >= amount {
             debit(caller(), amount);
             credit(to.to_vec(), amount);
             Ok(Value::Null)
@@ -65,16 +74,8 @@ mod token {
     }
 
     fn debit_allowance(from: Vec<u8>, to: Vec<u8>, amount: u64) {
-        let allowance: u64 = get_memory(
-            Namespace::Allowences,
-            [from.clone().to_vec(), to.clone().to_vec()].concat(),
-        );
-
-        set_memory(
-            Namespace::Allowences,
-            [from.to_vec(), to.to_vec()].concat(),
-            allowance - amount,
-        );
+        let allowance = get_allowance(from.clone(), to.clone());
+        set_allowance(from, to, allowance - amount);
     }
 
     pub fn unlock_ether(
@@ -94,12 +95,17 @@ mod token {
         let balance: u64 =
             get_storage::<_, u64>(Namespace::EthereumBalances, address.clone()) * 100;
 
-        let mut total_unlocked_ethereum: u64 = get_storage::<Vec<u8>, u64>(Namespace::TotalUnlockedEthereum, vec![]);
-        if  total_unlocked_ethereum + balance > 1000000 * 10000 {
+        let mut total_unlocked_ethereum: u64 =
+            get_storage::<Vec<u8>, u64>(Namespace::TotalUnlockedEthereum, vec![]);
+        if total_unlocked_ethereum + balance > 1000000 * 10000 {
             return Err(errors::BALANCE_EXCEEDS_THIS_PHASE);
         } else {
             total_unlocked_ethereum += balance;
-            set_storage::<Vec<u8>, u64>(Namespace::TotalUnlockedEthereum, vec![], total_unlocked_ethereum);
+            set_storage::<Vec<u8>, u64>(
+                Namespace::TotalUnlockedEthereum,
+                vec![],
+                total_unlocked_ethereum,
+            );
         }
         credit(ellipticoin_address, balance);
         set_storage(Namespace::UnlockedEthereumBalances, address.clone(), true);
@@ -132,9 +138,9 @@ mod token {
         let random_seed = get_random_seed();
         set_random_seed(
             sha256([random_seed.to_vec(), value.to_vec()].concat())[0..16]
-            .try_into()
-            .unwrap(),
-            );
+                .try_into()
+                .unwrap(),
+        );
         set_miners(&miners);
         set_current_miner(get_next_winner(&miners).to_vec());
 
@@ -198,6 +204,25 @@ mod token {
         }
     }
 
+    fn get_balance(address: Vec<u8>) -> u64 {
+        get_memory::<_, u64>(Namespace::Balances, address)
+    }
+
+    fn get_allowance(from: Vec<u8>, to: Vec<u8>) -> u64 {
+        get_memory(
+            Namespace::Allowances,
+            [from.clone().to_vec(), to.clone().to_vec()].concat(),
+        )
+    }
+
+    fn set_allowance(from: Vec<u8>, to: Vec<u8>, value: u64) {
+        set_memory(
+            Namespace::Allowances,
+            [from.to_vec(), to.to_vec()].concat(),
+            value,
+        );
+    }
+
     fn credit(address: Vec<u8>, amount: u64) {
         let balance: u64 = get_memory(Namespace::Balances, address.clone());
         set_memory(Namespace::Balances, address, balance + amount);
@@ -246,6 +271,20 @@ mod tests {
     }
 
     #[test]
+    fn test_transfer_from() {
+        set_storage::<Vec<u8>, _>(
+            Namespace::CurrentMiner,
+            vec![],
+            ALICE.to_vec()
+        );
+        set_caller(ALICE.to_vec());
+        set_balance(BOB.to_vec(), 100);
+        transfer_from(BOB.to_vec(), CAROL.to_vec(), 20).unwrap();
+        assert_eq!(balance_of(CAROL.to_vec()), 20);
+        assert_eq!(balance_of(BOB.to_vec()), 80);
+    }
+
+    #[test]
     fn test_transfer_insufficient_funds() {
         set_caller(ALICE.to_vec());
         set_balance(ALICE.to_vec(), 100);
@@ -253,12 +292,24 @@ mod tests {
     }
 
     #[test]
-    fn test_transfer_from() {
+    fn test_transfer_from_insufficient_funds() {
+        set_storage::<Vec<u8>, _>(
+            Namespace::CurrentMiner,
+            vec![],
+            ALICE.to_vec()
+        );
+        set_caller(ALICE.to_vec());
+        set_balance(BOB.to_vec(), 100);
+        assert!(transfer_from(BOB.to_vec(), CAROL.to_vec(), 120).is_err());
+    }
+
+    #[test]
+    fn test_transfer_from_allowance() {
         set_caller(ALICE.to_vec());
         set_balance(ALICE.to_vec(), 100);
         approve(BOB.to_vec(), 50);
         set_caller(BOB.to_vec());
-        transfer_from(ALICE.to_vec(), CAROL.to_vec(), 20).unwrap();
+        transfer_from_allowance(ALICE.to_vec(), CAROL.to_vec(), 20).unwrap();
         let alices_balance = balance_of(ALICE.to_vec());
         assert_eq!(alices_balance, 80);
         let bobs_allowance = allowance(ALICE.to_vec(), BOB.to_vec());
@@ -276,7 +327,7 @@ mod tests {
     }
 
     pub fn allowance(owner: Vec<u8>, spender: Vec<u8>) -> u64 {
-        get_memory(Namespace::Allowences, [owner, spender].concat())
+        get_memory(Namespace::Allowances, [owner, spender].concat())
     }
 
     #[test]

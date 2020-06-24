@@ -23,8 +23,9 @@ impl From<Transaction> for vm::Transaction {
             arguments: from_slice(&transaction.arguments).unwrap(),
             contract_address: transaction.contract_address,
             function: transaction.function,
-            gas_limit: transaction.gas_limit as u64,
+            gas_limit: transaction.gas_limit as u32,
             nonce: transaction.nonce as u32,
+            signature: Some(transaction.signature),
         }
     }
 }
@@ -42,6 +43,7 @@ impl From<vm::CompletedTransaction> for Transaction {
             function: transaction.function,
             arguments: to_vec(&transaction.arguments).unwrap(),
             return_value: to_vec(&transaction.return_value).unwrap(),
+            signature: transaction.signature.unwrap(),
         }
     }
 }
@@ -70,6 +72,7 @@ pub struct Transaction {
     pub function: String,
     pub arguments: Vec<u8>,
     pub return_value: Vec<u8>,
+    pub signature: Vec<u8>,
 }
 
 #[derive(Serialize, Debug)]
@@ -83,6 +86,7 @@ pub struct TransactionWithoutHash {
     network_id: u64,
     #[serde(with = "serde_bytes")]
     contract_address: Vec<u8>,
+    signature: Option<Vec<u8>>,
 }
 
 impl From<Transaction> for TransactionWithoutHash {
@@ -95,6 +99,7 @@ impl From<Transaction> for TransactionWithoutHash {
             gas_limit: transaction.gas_limit as u64,
             network_id: transaction.network_id as u64,
             sender: transaction.sender,
+            signature: Some(transaction.signature),
         }
     }
 }

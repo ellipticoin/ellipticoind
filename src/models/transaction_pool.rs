@@ -1,5 +1,7 @@
-use crate::config::get_redis_connection;
-use crate::vm::{redis::Commands, Transaction};
+use crate::{
+    config::get_redis_connection,
+    vm::{redis::Commands, Transaction},
+};
 pub struct TransactionPool;
 
 impl TransactionPool {
