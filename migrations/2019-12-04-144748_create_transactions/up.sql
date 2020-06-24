@@ -9,6 +9,7 @@ CREATE TABLE "transactions" (
   "function" VARCHAR NOT NULL,
   "arguments" BYTEA NOT NULL,
   "return_value" BYTEA NOT NULL,
+  "signature" BYTEA NOT NULL,
   PRIMARY KEY ("hash")
 );
 

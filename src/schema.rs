@@ -28,6 +28,7 @@ table! {
         function -> Varchar,
         arguments -> Bytea,
         return_value -> Bytea,
+        signature -> Bytea,
     }
 }
 

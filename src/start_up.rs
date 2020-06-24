@@ -1,11 +1,9 @@
 use crate::{
     api::{state::State, views},
-    config::{
-        ethereum_balances_path, random_bootnode, Bootnode, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
-    },
+    config::{ethereum_balances_path, random_bootnode, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS},
     constants::{Namespace, GENESIS_ADDRESS, GENESIS_STATE_PATH, TOKEN_CONTRACT, TOKEN_WASM_PATH},
-    helpers::bytes_to_value,
-    models::HashOnion,
+    helpers::{bytes_to_value, post_transaction},
+    models::{HashOnion, TransactionPool},
     pg,
     transaction_processor::apply_block,
     vm::{
@@ -17,9 +15,8 @@ use crate::{
     },
     BEST_BLOCK,
 };
-pub use diesel_migrations::revert_latest_migration;
+use diesel_migrations::revert_latest_migration;
 use indicatif::ProgressBar;
-
 use serde_cbor::{value::from_value, Value};
 use std::{
     convert::TryInto,
@@ -29,9 +26,10 @@ use std::{
     sync::Arc,
 };
 
-pub async fn start_miner(pg_db: &pg::Connection, redis: &mut redis::Connection) {
+pub async fn start_miner(pg_db: &pg::Connection, _redis: &mut redis::Connection) {
     let start_mining_transaction = Transaction::new(
-        "start_mining".to_string(),
+        TOKEN_CONTRACT.to_vec(),
+        "start_mining",
         vec![
             ((*HOST).clone().to_string().clone()).into(),
             (*BURN_PER_BLOCK).into(),
@@ -42,24 +40,7 @@ pub async fn start_miner(pg_db: &pg::Connection, redis: &mut redis::Connection) 
         post_transaction(&random_bootnode(), start_mining_transaction.clone()).await;
     }
 
-    process_transaction(redis, start_mining_transaction);
-}
-
-fn process_transaction(redis: &mut redis::Connection, transaction: Transaction) {
-    redis
-        .rpush::<&str, Vec<u8>, ()>(
-            "transactions::pending",
-            serde_cbor::to_vec(&transaction).unwrap(),
-        )
-        .unwrap();
-}
-
-async fn post_transaction(bootnode: &Bootnode, transaction: Transaction) {
-    let uri = format!("http://{}/transactions", bootnode.host);
-    let _res = surf::post(uri)
-        .body_bytes(serde_cbor::to_vec(&transaction).unwrap())
-        .await
-        .unwrap();
+    TransactionPool::add(&start_mining_transaction);
 }
 
 pub async fn catch_up(db_pool: pg::Pool, redis_pool: redis::Pool, vm_state: &mut vm::State) {
@@ -116,9 +97,9 @@ pub async fn reset_state(
     reset_pg(pg_db).await;
     reset_rocksdb(rocksdb.clone()).await;
     import_ethereum_balances(rocksdb.clone()).await;
-    set_token_contract(rocksdb.clone());
     load_genesis_state(&mut redis_pool.get().unwrap(), rocksdb.clone());
     reset_current_miner(rocksdb.clone());
+    set_token_contract(rocksdb.clone());
     HashOnion::generate(pg_db);
 }
 
