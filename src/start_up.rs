@@ -1,12 +1,9 @@
 use crate::{
-    api::{
-        views,
-        state::State,
-    },
+    api::{state::State, views},
     config::{
         ethereum_balances_path, random_bootnode, Bootnode, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
     },
-    constants::{Namespace, GENESIS_ADDRESS, TOKEN_CONTRACT, TOKEN_WASM_PATH, GENESIS_STATE_PATH},
+    constants::{Namespace, GENESIS_ADDRESS, GENESIS_STATE_PATH, TOKEN_CONTRACT, TOKEN_WASM_PATH},
     helpers::bytes_to_value,
     models::HashOnion,
     pg,
@@ -125,13 +122,9 @@ pub async fn reset_state(
     HashOnion::generate(pg_db);
 }
 
-pub fn reset_current_miner(
-    rocksdb: Arc<rocksdb::DB>
-) {
+pub fn reset_current_miner(rocksdb: Arc<rocksdb::DB>) {
     rocksdb
-        .delete(
-            db_key(&TOKEN_CONTRACT, &vec![Namespace::Miners as u8]),
-        )
+        .delete(db_key(&TOKEN_CONTRACT, &vec![Namespace::Miners as u8]))
         .unwrap();
     rocksdb
         .put(
@@ -140,14 +133,11 @@ pub fn reset_current_miner(
         )
         .unwrap();
 }
-pub fn load_genesis_state(
-    redis: &mut redis::Connection,
-    rocksdb: Arc<rocksdb::DB>
-) {
+pub fn load_genesis_state(redis: &mut redis::Connection, rocksdb: Arc<rocksdb::DB>) {
     let genesis_file = File::open(GENESIS_STATE_PATH).unwrap();
     let state: State = serde_cbor::from_reader(genesis_file).unwrap();
     for (key, value) in state.memory {
-        let _:() = redis.set(key, value).unwrap();
+        let _: () = redis.set(key, value).unwrap();
     }
     for (key, value) in state.storage {
         rocksdb.put(key, value).unwrap();

@@ -1,9 +1,8 @@
 use crate::{
     config::{public_key, OPTS},
-    helpers::random,
     constants::TOKEN_CONTRACT,
     diesel::QueryDsl,
-    helpers::bytes_to_value,
+    helpers::{bytes_to_value, random},
     models::*,
     schema,
     schema::blocks::dsl::blocks,
