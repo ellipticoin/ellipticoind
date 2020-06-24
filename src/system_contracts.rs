@@ -1,6 +1,7 @@
 use crate::{
-    helpers::random,
-    vm::{Env, State, Transaction},
+    constants::TOKEN_CONTRACT,
+    helpers::bytes_to_value,
+    vm::{self, Env, State, Transaction},
 };
 use serde_cbor::Value;
 
@@ -34,47 +35,32 @@ fn run_constuctor(
     contract_name: &str,
     arguments: &Vec<Value>,
 ) -> Value {
-    let (result, _gas_left) = Transaction {
-        network_id: 0,
-        function: "constructor".to_string(),
-        arguments: arguments.to_vec(),
-        sender: transaction.sender.clone(),
-        nonce: transaction.nonce,
-        gas_limit: transaction.gas_limit,
-        contract_address: [
+    let (result, _gas_left) = Transaction::new(
+        [
             transaction.sender.clone(),
             contract_name.as_bytes().to_vec(),
         ]
         .concat(),
-    }
+        "constructor",
+        arguments.to_vec(),
+    )
     .run(state, env);
     result
 }
 
 pub fn transfer(
-    transaction: &Transaction,
     amount: u32,
     from: Vec<u8>,
     to: Vec<u8>,
-    vm_state: &mut crate::vm::State,
+    vm_state: &mut vm::State,
     env: &Env,
 ) -> serde_cbor::Value {
     let arguments = vec![
-        to.into_iter()
-            .map(|n| n.into())
-            .collect::<Vec<Value>>()
-            .into(),
-        Value::Integer(amount as i128),
+        bytes_to_value(from.clone()),
+        bytes_to_value(to.clone()),
+        amount.into(),
     ];
-    let transfer = Transaction {
-        network_id: 0,
-        function: "transfer".to_string(),
-        nonce: random(),
-        gas_limit: transaction.gas_limit,
-        contract_address: [[0 as u8; 32].to_vec(), "Ellipticoin".as_bytes().to_vec()].concat(),
-        sender: from.clone(),
-        arguments: arguments.clone(),
-    };
+    let transfer = Transaction::new(TOKEN_CONTRACT.to_vec(), "transfer_from", arguments.clone());
     let (result, _) = transfer.run(vm_state, &env);
     result
 }

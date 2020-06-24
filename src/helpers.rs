@@ -1,3 +1,4 @@
+use crate::{config::Bootnode, vm::Transaction};
 use rand::Rng;
 use serde_cbor::Value;
 use sha2::{Digest, Sha256};
@@ -22,4 +23,12 @@ pub fn bytes_to_value(bytes: Vec<u8>) -> Value {
 pub fn random() -> u32 {
     let mut rng = rand::thread_rng();
     rng.gen_range(0, u32::max_value() as u32)
+}
+
+pub async fn post_transaction(bootnode: &Bootnode, transaction: Transaction) {
+    let uri = format!("http://{}/transactions", bootnode.host);
+    let _res = surf::post(uri)
+        .body_bytes(serde_cbor::to_vec(&transaction).unwrap())
+        .await
+        .unwrap();
 }

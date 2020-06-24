@@ -93,7 +93,6 @@ pub fn run_transaction(
         }
 
         let transfer_result = system_contracts::transfer(
-            transaction,
             10000,
             transaction.sender.clone(),
             env.block_winner.clone(),

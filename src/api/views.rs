@@ -30,6 +30,8 @@ pub struct Transaction {
     return_value: serde_cbor::Value,
     #[serde(with = "serde_bytes")]
     pub sender: Vec<u8>,
+    #[serde(with = "serde_bytes")]
+    pub signature: Option<Vec<u8>>,
 }
 
 impl From<(models::Block, Vec<models::Transaction>)> for Block {
@@ -62,6 +64,7 @@ impl From<models::Transaction> for Transaction {
             function: transaction.function.clone(),
             arguments: serde_cbor::from_slice(&transaction.arguments).unwrap(),
             return_value: serde_cbor::from_slice(&transaction.return_value).unwrap(),
+            signature: Some(transaction.signature.clone()),
         }
     }
 }
@@ -99,6 +102,7 @@ impl From<Transaction> for models::Transaction {
             function: transaction.function.clone(),
             arguments: serde_cbor::to_vec(&transaction.arguments).unwrap(),
             return_value: serde_cbor::to_vec(&transaction.return_value).unwrap(),
+            signature: transaction.signature.clone().unwrap(),
         }
     }
 }
