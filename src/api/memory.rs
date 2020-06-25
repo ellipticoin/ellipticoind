@@ -1,16 +1,14 @@
-use super::ApiState;
-use crate::vm::redis::Commands;
-use http_service::Body;
-use tide::Response;
+use super::{helpers::base64_param, ApiState};
+use crate::{api::helpers::to_cbor_response, VM_STATE};
+use tide::{Response, Result};
 
-pub async fn show(req: tide::Request<ApiState>) -> Response {
-    let key: String = req.param("key").unwrap_or("".to_string());
-    let mut redis = req.state().redis.get().unwrap();
-    if let Ok(value) =
-        redis.get::<Vec<u8>, Vec<u8>>(base64::decode_config(&key, base64::URL_SAFE).unwrap())
-    {
-        Response::new(200).body(Body::from(serde_cbor::to_vec(&value).unwrap()))
-    } else {
-        Response::new(404)
-    }
+pub async fn show(req: tide::Request<ApiState>) -> Result<Response> {
+    let contract_name: String = req.param("contract_name")?;
+    let contract_owner_bytes = base64_param(&req, "contract_owner")?;
+    let contract_address = [contract_owner_bytes, contract_name.as_bytes().to_vec()].concat();
+    let key_bytes = base64_param(&req, "key")?;
+    let mut vm_state = VM_STATE.lock().await;
+
+    let value = vm_state.get_memory(&contract_address, &key_bytes);
+    Ok(to_cbor_response(&value))
 }

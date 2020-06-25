@@ -8,17 +8,25 @@ use ellipticoin::{
 use errors;
 use ethereum;
 use hashing::sha256;
+use wasm_rpc::serde::{Deserialize, Serialize};
 
-use std::collections::BTreeMap;
+
 enum Namespace {
     Allowances,
     Balances,
-    CurrentMiner,
+    BlockNumber,
     EthereumBalances,
     Miners,
-    RandomSeed,
     UnlockedEthereumBalances,
     TotalUnlockedEthereum,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
+struct Miner {
+    host: String,
+    address: Vec<u8>,
+    burn_per_block: u64,
+    hash_onion_skin: Vec<u8>,
 }
 
 use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
@@ -35,7 +43,7 @@ mod token {
     }
 
     pub fn transfer_from(from: Vec<u8>, to: Vec<u8>, amount: u64) -> Result<Value, Error> {
-        if caller().ne(&get_current_miner()) {
+        if caller().ne(&get_miners().first().unwrap().address) {
             return Err(errors::SENDER_IS_NOT_THE_WINNER);
         }
 
@@ -48,9 +56,13 @@ mod token {
         Ok(Value::Null)
     }
 
-    pub fn transfer_from_allowance(from: Vec<u8>, to: Vec<u8>, amount: u64) -> Result<Value, Error> {
+    pub fn transfer_from_allowance(
+        from: Vec<u8>,
+        to: Vec<u8>,
+        amount: u64,
+    ) -> Result<Value, Error> {
         if get_allowance(from.clone(), caller()) < amount {
-            return Err(errors::INSUFFICIENT_ALLOWANCE)
+            return Err(errors::INSUFFICIENT_ALLOWANCE);
         }
 
         if get_balance(from.clone()) < amount {
@@ -67,7 +79,7 @@ mod token {
         if get_balance(caller()) >= amount {
             debit(caller(), amount);
             credit(to.to_vec(), amount);
-            Ok(Value::Null)
+            Ok(get_balance(caller()).into())
         } else {
             Err(errors::INSUFFICIENT_FUNDS)
         }
@@ -115,92 +127,76 @@ mod token {
 
     pub fn start_mining(
         host: String,
-        bet_per_block: u64,
-        hash_onion: Vec<u8>,
+        burn_per_block: u64,
+        hash_onion_skin: Vec<u8>,
     ) -> Result<Value, Error> {
         let mut miners = get_miners();
-        miners.insert(caller(), (host, bet_per_block, hash_onion.clone().to_vec()));
+        miners.push(Miner {
+            address: caller(),
+            host,
+            burn_per_block,
+            hash_onion_skin,
+        });
         set_miners(&miners);
         Ok(Value::Null)
     }
 
     pub fn reveal(value: Vec<u8>) -> Result<Value, Error> {
         let mut miners = get_miners();
-        if caller() != get_current_miner() {
+        if caller() != miners.first().unwrap().address {
             return Err(errors::SENDER_IS_NOT_THE_WINNER);
         }
-        let (host, bet_per_block, hash) = miners.get(&caller()).unwrap();
-        if !hash.to_vec().eq(&sha256(value.clone().to_vec())) {
+        if !miners
+            .first()
+            .unwrap()
+            .hash_onion_skin
+            .eq(&sha256(value.clone()))
+        {
             return Err(errors::INVALID_VALUE);
         }
-        *miners.get_mut(&caller()).unwrap() = (host.clone(), *bet_per_block, value.clone());
-        settle_block_rewards(get_current_miner(), &miners);
-        let random_seed = get_random_seed();
-        set_random_seed(
-            sha256([random_seed.to_vec(), value.to_vec()].concat())[0..16]
-                .try_into()
-                .unwrap(),
-        );
-        set_miners(&miners);
-        set_current_miner(get_next_winner(&miners).to_vec());
+        settle_block_rewards();
+        miners.first_mut().unwrap().hash_onion_skin = value.clone();
+        set_miners(&shuffle_miners(miners, value));
+        increment_block_number();
 
         Ok(Value::Null)
     }
 
-    fn set_current_miner(current_miner: Vec<u8>) {
-        ellipticoin::set_storage::<_, Vec<u8>>(
-            Namespace::CurrentMiner as u8,
-            current_miner.to_vec(),
-        );
+    fn increment_block_number() {
+        let block_number = ellipticoin::get_storage::<_, u32>(Namespace::BlockNumber as u8);
+        ellipticoin::set_storage::<_, u32>(Namespace::BlockNumber as u8, block_number + 1);
     }
 
-    fn get_current_miner() -> Vec<u8> {
-        ellipticoin::get_storage::<_, Vec<u8>>(Namespace::CurrentMiner as u8).to_vec()
-    }
-
-    fn set_random_seed(random_seed: [u8; 16]) {
-        ellipticoin::set_storage(Namespace::RandomSeed as u8, random_seed.to_vec());
-    }
-    fn get_random_seed() -> [u8; 16] {
-        let random_seed = ellipticoin::get_storage::<_, Vec<u8>>(Namespace::RandomSeed as u8);
-
-        if random_seed.len() == 0 {
-            [0 as u8; 16].try_into().unwrap()
-        } else {
-            random_seed[0..16].try_into().unwrap()
+    fn shuffle_miners(mut miners: Vec<Miner>, value: Vec<u8>) -> Vec<Miner> {
+        let mut rng = SmallRng::from_seed(value[0..16].try_into().unwrap());
+        let mut shuffled_miners = vec![];
+        while !miners.is_empty() {
+            let random_miner = miners
+                .choose_weighted(&mut rng, |miner| miner.burn_per_block)
+                .unwrap()
+                .clone();
+            shuffled_miners.push(random_miner.clone());
+            miners.retain(|miner| miner.clone() != random_miner);
         }
+        shuffled_miners
+    }
+    fn get_miners() -> Vec<Miner> {
+        from_value(ellipticoin::get_storage(Namespace::Miners as u8)).unwrap_or(vec![])
     }
 
-    fn get_next_winner(miners: &BTreeMap<Vec<u8>, (String, u64, Vec<u8>)>) -> Vec<u8> {
-        let random_seed: [u8; 16] = get_random_seed();
-        let mut rng = SmallRng::from_seed(random_seed);
-        let mut bets: Vec<(Vec<u8>, u64)> = miners
-            .iter()
-            .map(|(miner, (_host, bet_per_block, _hash))| (miner.to_vec(), *bet_per_block))
-            .collect();
-        bets.sort();
-        bets.choose_weighted(&mut rng, |(_miner, bet_per_block)| *bet_per_block)
-            .map(|(miner, _bet_per_block)| miner.to_vec())
-            .unwrap()
-    }
-
-    fn get_miners() -> BTreeMap<Vec<u8>, (String, u64, Vec<u8>)> {
-        from_value(ellipticoin::get_storage(Namespace::Miners as u8)).unwrap_or(BTreeMap::new())
-    }
-
-    fn set_miners(miners: &BTreeMap<Vec<u8>, (String, u64, Vec<u8>)>) {
-        ellipticoin::set_storage(
+    fn set_miners(miners: &Vec<Miner>) {
+        ellipticoin::set_storage::<_, Value>(
             Namespace::Miners as u8,
-            to_value(miners).unwrap_or(Value::Null),
+            to_value(miners).unwrap(),
         );
     }
 
-    fn settle_block_rewards(winner: Vec<u8>, miners: &BTreeMap<Vec<u8>, (String, u64, Vec<u8>)>) {
-        for (miner, (_host, bet_per_block, _hash)) in miners {
-            if miner.to_vec() != winner.to_vec() {
-                credit(winner.to_vec(), *bet_per_block);
-                debit(miner.to_vec(), *bet_per_block);
-            }
+    fn settle_block_rewards() {
+        let miners = get_miners();
+        let winner = miners.first().as_ref().unwrap().clone();
+        for miner in &miners {
+            credit(winner.address.to_vec(), miner.burn_per_block);
+            debit(miner.address.to_vec(), miner.burn_per_block);
         }
     }
 
@@ -263,7 +259,8 @@ mod tests {
     fn test_transfer() {
         set_caller(ALICE.to_vec());
         set_balance(ALICE.to_vec(), 100);
-        transfer(BOB.to_vec(), 20).unwrap();
+        let result = transfer(BOB.to_vec(), 20).unwrap();
+        assert_eq!(result, Value::Integer(80));
         let alices_balance = balance_of(ALICE.to_vec());
         assert_eq!(alices_balance, 80);
         let bobs_balance = balance_of(BOB.to_vec());
@@ -272,12 +269,8 @@ mod tests {
 
     #[test]
     fn test_transfer_from() {
-        set_storage::<Vec<u8>, _>(
-            Namespace::CurrentMiner,
-            vec![],
-            ALICE.to_vec()
-        );
         set_caller(ALICE.to_vec());
+        start_mining(HOST.to_string(), 1, vec![]).unwrap();
         set_balance(BOB.to_vec(), 100);
         transfer_from(BOB.to_vec(), CAROL.to_vec(), 20).unwrap();
         assert_eq!(balance_of(CAROL.to_vec()), 20);
@@ -287,18 +280,15 @@ mod tests {
     #[test]
     fn test_transfer_insufficient_funds() {
         set_caller(ALICE.to_vec());
+        start_mining(HOST.to_string(), 1, vec![]).unwrap();
         set_balance(ALICE.to_vec(), 100);
         assert!(transfer(BOB.to_vec(), 120).is_err());
     }
 
     #[test]
     fn test_transfer_from_insufficient_funds() {
-        set_storage::<Vec<u8>, _>(
-            Namespace::CurrentMiner,
-            vec![],
-            ALICE.to_vec()
-        );
         set_caller(ALICE.to_vec());
+        start_mining(HOST.to_string(), 1, vec![]).unwrap();
         set_balance(BOB.to_vec(), 100);
         assert!(transfer_from(BOB.to_vec(), CAROL.to_vec(), 120).is_err());
     }
@@ -375,10 +365,8 @@ mod tests {
 
     #[test]
     fn test_commit_and_reveal() {
-        set_random_seed([2 as u8; 16]);
         set_balance(ALICE.to_vec(), 5);
         set_balance(BOB.to_vec(), 5);
-        set_current_miner(ALICE.to_vec());
         let alices_center = [0; 32].to_vec();
         let bobs_center = [1; 32].to_vec();
         let mut alices_onion = generate_hash_onion(3, alices_center.clone());
@@ -400,11 +388,14 @@ mod tests {
 
         assert_eq!(balance_of(ALICE.to_vec()), 6);
         assert_eq!(balance_of(BOB.to_vec()), 4);
+        assert_eq!(
+            get_storage::<Vec<u8>, u32>(Namespace::BlockNumber, vec![]),
+            3
+        );
     }
 
     #[test]
     fn test_commit_and_reveal_invalid() {
-        set_random_seed([0 as u8; 16]);
         let value = random_bytes(32);
         let hash = sha256(value.clone());
         let invalid_value = random_bytes(32);

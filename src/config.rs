@@ -1,6 +1,14 @@
 extern crate clap;
-use crate::vm::{self, redis};
+use crate::{
+    pg,
+    vm::{self, redis},
+};
+
 use clap::Clap;
+use diesel::{
+    pg::PgConnection,
+    r2d2::{ConnectionManager, Pool},
+};
 use dotenv::dotenv;
 use ed25519_dalek::{Keypair, SecretKey};
 use rand::seq::SliceRandom;
@@ -8,6 +16,7 @@ use serde::{Deserialize, Deserializer};
 use std::{
     env,
     net::{IpAddr, SocketAddr},
+    sync::Arc,
 };
 use vm::RedisConnectionManager;
 
@@ -65,6 +74,12 @@ lazy_static! {
             .build(redis_manager)
             .unwrap()
     };
+    pub static ref PG_POOL: pg::Pool = {
+        let manager = ConnectionManager::<PgConnection>::new(&database_url());
+        Pool::new(manager).unwrap()
+    };
+    pub static ref ROCKSDB: Arc<rocksdb::DB> =
+        Arc::new(rocksdb::DB::open_default(&OPTS.rocksdb_path).unwrap());
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -121,6 +136,19 @@ pub fn random_bootnode() -> Bootnode {
 
 pub fn get_redis_connection() -> redis::Connection {
     REDIS_POOL.get().unwrap()
+}
+
+pub fn get_pg_connection() -> pg::Connection {
+    PG_POOL.get().unwrap()
+}
+
+pub fn get_rocksdb() -> Arc<rocksdb::DB> {
+    (*ROCKSDB).clone()
+}
+pub async fn websocket_socket() -> SocketAddr {
+    let mut websocket_socket = socket().clone();
+    websocket_socket.set_port(OPTS.websocket_port);
+    websocket_socket
 }
 
 pub fn ethereum_balances_path() -> String {

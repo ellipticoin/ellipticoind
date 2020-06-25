@@ -9,6 +9,7 @@ extern crate time;
 
 mod backend;
 mod call;
+mod contracts;
 mod error;
 mod externals;
 mod gas;
@@ -18,10 +19,8 @@ mod import_resolver;
 mod memory;
 mod transaction;
 
-pub mod env;
 pub mod state;
 pub use backend::Backend;
-pub use env::Env;
 pub use helpers::zero_pad_vec;
 pub use metered_wasmi::RuntimeValue;
 use metered_wasmi::{ImportsBuilder, Module, ModuleInstance, ModuleRef, NopExternals};
@@ -39,8 +38,8 @@ pub struct VM<'a> {
     pub instance: &'a ModuleRef,
     pub transaction: &'a Transaction,
     pub state: &'a mut State,
-    pub gas: Option<u32>,
-    pub env: &'a Env,
+    pub gas: u32,
+    pub caller: &'a Vec<u8>,
 }
 
 pub fn new_module_instance(code: Vec<u8>) -> Result<ModuleRef, metered_wasmi::Error> {

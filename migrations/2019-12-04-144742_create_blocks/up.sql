@@ -1,11 +1,11 @@
 CREATE TABLE "blocks" (
   "hash" BYTEA NOT NULL,
-  --Add back this constraint once we have a "catchup" mode
   "parent_hash" BYTEA, --CONSTRAINT "blocks_parent_hash_fkey" REFERENCES "blocks" ("hash"),
-  "number" BIGINT NOT NULL,
   "winner" BYTEA NOT NULL,
+  "number" BIGINT NOT NULL,
   "memory_changeset_hash" BYTEA NOT NULL,
   "storage_changeset_hash" BYTEA NOT NULL,
+  "sealed" BOOL NOT NULL DEFAULT false,
   PRIMARY KEY ("hash")
 );
 

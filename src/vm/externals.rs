@@ -5,16 +5,14 @@ use std::str;
 
 pub const CONTRACT_ADDRESS_FUNC_INDEX: usize = 0;
 pub const SENDER_FUNC_INDEX: usize = 1;
-pub const BLOCK_NUMBER_FUNC_INDEX: usize = 2;
-pub const BLOCK_WINNER_FUNC_INDEX: usize = 3;
-pub const CALLER_FUNC_INDEX: usize = 4;
-pub const GET_MEMORY_FUNC_INDEX: usize = 5;
-pub const SET_MEMORY_FUNC_INDEX: usize = 6;
-pub const GET_STORAGE_FUNC_INDEX: usize = 7;
-pub const SET_STORAGE_FUNC_INDEX: usize = 8;
-pub const THROW_FUNC_INDEX: usize = 9;
-pub const CALL_FUNC_INDEX: usize = 10;
-pub const LOG_WRITE: usize = 11;
+pub const CALLER_FUNC_INDEX: usize = 2;
+pub const GET_MEMORY_FUNC_INDEX: usize = 3;
+pub const SET_MEMORY_FUNC_INDEX: usize = 4;
+pub const GET_STORAGE_FUNC_INDEX: usize = 5;
+pub const SET_STORAGE_FUNC_INDEX: usize = 6;
+pub const THROW_FUNC_INDEX: usize = 7;
+pub const CALL_FUNC_INDEX: usize = 8;
+pub const LOG_WRITE: usize = 9;
 
 impl<'a> VM<'a> {
     pub fn contract_address(&self) -> Vec<u8> {
@@ -25,21 +23,8 @@ impl<'a> VM<'a> {
         self.transaction.sender.to_vec()
     }
 
-    pub fn block_number(&self) -> Vec<u8> {
-        let block_number: serde_cbor::Value = self.env.block_number.into();
-        to_vec(&block_number).unwrap()
-    }
-
-    pub fn block_winner(&self) -> Vec<u8> {
-        self.env.block_winner.clone()
-    }
-
     pub fn caller(&self) -> Vec<u8> {
-        self.env
-            .caller
-            .clone()
-            .map(|v| v.to_vec())
-            .unwrap_or(self.transaction.sender.to_vec())
+        self.caller.clone()
     }
 
     pub fn get_memory(&mut self, key_pointer: i32) -> Result<Vec<u8>, metered_wasmi::TrapKind> {
@@ -70,7 +55,6 @@ impl<'a> VM<'a> {
         let value = self
             .state
             .get_storage(&self.transaction.contract_address, &key);
-
         self.use_gas(value.len() as u32 * gas_costs::GET_BYTE_STORAGE)?;
         Ok(value)
     }
@@ -107,22 +91,16 @@ impl<'a> VM<'a> {
             .unwrap());
         }
         let module_instance = new_module_instance(code).unwrap();
-        let mut transaction: Transaction = (*self.transaction).clone();
-        transaction.contract_address = contract_address;
-        transaction.function = function_name.to_string();
-        let mut env = &mut self.env.clone();
-        env.caller = Some(serde_bytes::ByteBuf::from(
-            self.transaction.contract_address.clone(),
-        ));
+        let transaction: Transaction = (*self.transaction).clone();
         let mut vm = VM {
             instance: &module_instance,
-            env: &env,
+            caller: &self.transaction.contract_address.clone(),
             state: &mut self.state,
             transaction: &transaction,
             gas: self.gas,
         };
         let (result, gas_left) = vm.call(function_name, arguments);
-        let gas_used = self.gas.unwrap() - gas_left.expect("no gas left");
+        let gas_used = self.gas - gas_left;
         self.use_gas(gas_used)?;
         Ok(to_vec(&result).unwrap())
     }
@@ -156,8 +134,6 @@ impl metered_wasmi::Externals for VM<'_> {
         match index {
             CONTRACT_ADDRESS_FUNC_INDEX => self.write_pointer(self.contract_address()),
             SENDER_FUNC_INDEX => self.write_pointer(self.sender()),
-            BLOCK_NUMBER_FUNC_INDEX => self.write_pointer(self.block_number()),
-            BLOCK_WINNER_FUNC_INDEX => self.write_pointer(self.block_winner()),
             CALLER_FUNC_INDEX => self.write_pointer(self.caller()),
             GET_MEMORY_FUNC_INDEX => {
                 let value_pointer = self.get_memory(args.nth(0))?;

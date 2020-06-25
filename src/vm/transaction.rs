@@ -1,10 +1,9 @@
-extern crate base64;
 use crate::{
     config::{keypair, public_key, OPTS},
     constants::TOKEN_CONTRACT,
     helpers::random,
+    system_contracts::{self, is_system_contract},
     vm::{
-        env::Env,
         error::{Error, CONTRACT_NOT_FOUND},
         new_module_instance, State, VM,
     },
@@ -55,16 +54,18 @@ pub struct CompletedTransaction {
     #[serde(with = "serde_bytes")]
     pub sender: Vec<u8>,
     pub nonce: u32,
-    pub gas_limit: u64,
+    pub gas_limit: u32,
+    pub gas_used: u32,
     pub function: String,
     pub arguments: Vec<Value>,
     pub return_value: Value,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<Vec<u8>>,
 }
 
 impl Transaction {
     pub fn new(contract_address: Vec<u8>, function: &str, arguments: Vec<Value>) -> Self {
-        let transaction = Self {
+        let mut transaction = Self {
             contract_address,
             nonce: random(),
             function: function.to_string(),
@@ -72,54 +73,57 @@ impl Transaction {
             ..Default::default()
         };
 
-        transaction.sign()
-    }
-
-    pub fn sign(&self) -> Self {
-        let mut transaction = self.clone();
-        let signature = keypair().sign(&to_vec(&transaction).unwrap());
-        transaction.signature = Some(signature.to_bytes().to_vec());
+        transaction.sign();
         transaction
     }
 
-    pub fn run(&self, mut state: &mut State, env: &Env) -> (Value, Option<u32>) {
+    pub fn sign(&mut self) {
+        let transaction = self.clone();
+        let signature = keypair().sign(&to_vec(&transaction).unwrap());
+        self.signature = Some(signature.to_bytes().to_vec());
+    }
+
+    pub fn run(&self, state: &mut State) -> CompletedTransaction {
         let code = state.get_code(&self.contract_address);
         if code.len() == 0 {
-            return (
-                (CONTRACT_NOT_FOUND.clone()).into(),
-                Some(self.gas_limit as u32),
-            );
+            return self.complete((CONTRACT_NOT_FOUND.clone()).into(), self.gas_limit);
         }
-        match new_module_instance(code) {
-            Ok(instance) => {
-                let mut vm = VM {
-                    instance: &instance,
-                    env: env,
-                    state: &mut state,
-                    transaction: self,
-                    gas: Some(self.gas_limit as u32),
-                };
-                vm.call(&self.function, self.arguments.clone())
-            }
+        if is_system_contract(&self) {
+            return system_contracts::run(self, state);
+        }
+
+        let instance = match new_module_instance(code) {
+            Ok(instance) => instance,
             Err(err) => {
-                return (
+                return self.complete(
                     Error {
                         message: err.to_string(),
                     }
                     .into(),
-                    Some(self.gas_limit as u32),
+                    self.gas_limit,
                 )
             }
-        }
+        };
+
+        let mut vm = VM {
+            instance: &instance,
+            caller: &self.sender,
+            state: state,
+            transaction: self,
+            gas: self.gas_limit,
+        };
+        let (return_value, gas_left) = vm.call(&self.function, self.arguments.clone());
+        self.complete(return_value, gas_left)
     }
 
-    pub fn complete(&self, return_value: Value) -> CompletedTransaction {
+    pub fn complete(&self, return_value: Value, gas_left: u32) -> CompletedTransaction {
         CompletedTransaction {
             network_id: self.network_id,
             contract_address: self.contract_address.clone(),
             sender: self.sender.clone(),
             nonce: self.nonce,
-            gas_limit: self.gas_limit as u64,
+            gas_limit: self.gas_limit,
+            gas_used: self.gas_limit - gas_left,
             function: self.function.clone(),
             arguments: self.arguments.clone(),
             return_value: return_value,
@@ -131,7 +135,6 @@ impl Transaction {
         if self.signature.is_none() {
             return false;
         };
-
         let public_key = match PublicKey::from_bytes(&self.sender) {
             Ok(signature) => signature,
             _ => return false,

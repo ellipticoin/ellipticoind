@@ -6,6 +6,7 @@ table! {
         winner -> Bytea,
         memory_changeset_hash -> Bytea,
         storage_changeset_hash -> Bytea,
+        sealed -> Bool,
     }
 }
 
@@ -24,6 +25,7 @@ table! {
         contract_address -> Bytea,
         sender -> Bytea,
         gas_limit -> Int8,
+        gas_used -> Int8,
         nonce -> Int8,
         function -> Varchar,
         arguments -> Bytea,
