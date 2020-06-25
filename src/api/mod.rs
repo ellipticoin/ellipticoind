@@ -1,8 +1,3 @@
-use diesel::{
-    r2d2::{ConnectionManager, Pool},
-    PgConnection,
-};
-
 use crate::network;
 use async_std::sync::Sender;
 use futures::channel::mpsc::UnboundedSender;
@@ -18,33 +13,16 @@ pub mod state;
 mod storage;
 mod transactions;
 pub mod views;
-
 pub mod websocket;
-
 pub struct ApiState {
     pub websockets: Arc<Mutex<Vec<UnboundedSender<Message>>>>,
-    pub redis: crate::vm::r2d2_redis::r2d2::Pool<crate::vm::r2d2_redis::RedisConnectionManager>,
-    pub rocksdb: Arc<rocksdb::DB>,
-    pub db: Pool<ConnectionManager<PgConnection>>,
-    pub broadcast_sender: Sender<network::Message>,
     pub miner_sender: Sender<network::Message>,
 }
-
 impl ApiState {
-    pub fn new(
-        redis: crate::vm::r2d2_redis::r2d2::Pool<crate::vm::r2d2_redis::RedisConnectionManager>,
-        rocksdb: Arc<rocksdb::DB>,
-        db: Pool<ConnectionManager<PgConnection>>,
-        broadcast_sender: Sender<network::Message>,
-        miner_sender: Sender<network::Message>,
-    ) -> Self {
+    pub fn new(miner_sender: Sender<network::Message>) -> Self {
         Self {
             websockets: Arc::new(Mutex::new(Vec::new())),
-            redis,
-            rocksdb,
-            db,
             miner_sender,
-            broadcast_sender,
         }
     }
 }

@@ -18,13 +18,14 @@ ellipticoin-test-framework = { path = "../../../rust-ellipticoin-test-framework"
 hex = "0.4.0"
 
 [dependencies]
-sha2 = "0.8.1"
-hex = "*"
 base64 = "*"
-lazy_static = "1.3.0"
-rand = {version = "0.7.3", features = ["small_rng"]}
 ellipticoin = { path = "../../../rust-ellipticoin"}
+hex = "*"
+lazy_static = "1.3.0"
 libsecp256k1 = "0.3.4"
+rand = {version = "0.7.3", features = ["small_rng"]}
+serde = { version = "1.0.114", features = ["derive"] }
+sha2 = "0.8.1"
 tiny-keccak = {version = "2.0.1", features = ["keccak"] }
 wasm-rpc = { path = "../../../rust-wasm-rpc/wasm-rpc"}
 wasm-rpc-macros =  { path = "../../../rust-wasm-rpc/wasm-rpc-macros"}

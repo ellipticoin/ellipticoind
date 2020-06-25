@@ -1,7 +1,7 @@
 use crate::{
     constants::TOKEN_CONTRACT,
     helpers::bytes_to_value,
-    vm::{self, Env, State, Transaction},
+    vm::{self, CompletedTransaction, State, Transaction},
 };
 use serde_cbor::Value;
 
@@ -9,33 +9,31 @@ pub fn is_system_contract(transaction: &Transaction) -> bool {
     transaction.contract_address == [[0; 32].to_vec(), "System".as_bytes().to_vec()].concat()
 }
 
-pub fn run(transaction: &Transaction, state: &mut State, env: &Env) -> Value {
+pub fn run(transaction: &Transaction, state: &mut State) -> CompletedTransaction {
     match transaction.function.as_str() {
-        "create_contract" => create_contract(transaction, state, env),
-        _ => Value::Null,
+        "create_contract" => create_contract(transaction, state),
+        _ => transaction.complete(Value::Null, transaction.gas_limit),
     }
 }
 
-pub fn create_contract(transaction: &Transaction, state: &mut State, env: &Env) -> Value {
+pub fn create_contract(transaction: &Transaction, state: &mut State) -> CompletedTransaction {
     if let [Value::Text(contract_name), serde_cbor::Value::Bytes(code), serde_cbor::Value::Array(arguments)] =
         &transaction.arguments[..]
     {
         let contract_address = [&transaction.sender, contract_name.as_bytes()].concat();
         state.set_code(&contract_address, code);
-        let result = run_constuctor(transaction, state, env, contract_name, arguments);
-        result
+        run_constuctor(transaction, state, contract_name, arguments)
     } else {
-        Value::Null
+        transaction.complete(Value::Null, transaction.gas_limit)
     }
 }
 fn run_constuctor(
     transaction: &Transaction,
     state: &mut State,
-    env: &Env,
     contract_name: &str,
     arguments: &Vec<Value>,
-) -> Value {
-    let (result, _gas_left) = Transaction::new(
+) -> CompletedTransaction {
+    Transaction::new(
         [
             transaction.sender.clone(),
             contract_name.as_bytes().to_vec(),
@@ -44,23 +42,20 @@ fn run_constuctor(
         "constructor",
         arguments.to_vec(),
     )
-    .run(state, env);
-    result
+    .run(state)
 }
 
-pub fn transfer(
+pub async fn _transfer(
     amount: u32,
     from: Vec<u8>,
     to: Vec<u8>,
-    vm_state: &mut vm::State,
-    env: &Env,
-) -> serde_cbor::Value {
+    state: &mut vm::State,
+) -> CompletedTransaction {
     let arguments = vec![
         bytes_to_value(from.clone()),
         bytes_to_value(to.clone()),
         amount.into(),
     ];
     let transfer = Transaction::new(TOKEN_CONTRACT.to_vec(), "transfer_from", arguments.clone());
-    let (result, _) = transfer.run(vm_state, &env);
-    result
+    transfer.run(state)
 }

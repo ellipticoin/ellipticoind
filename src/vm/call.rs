@@ -3,7 +3,7 @@ use metered_wasmi::RuntimeValue;
 use serde_cbor::{to_vec, Value};
 
 impl<'a> VM<'a> {
-    pub fn call(&mut self, func: &str, arguments: Vec<Value>) -> (Value, Option<u32>) {
+    pub fn call(&mut self, func: &str, arguments: Vec<Value>) -> (Value, u32) {
         let mut runtime_values: Vec<RuntimeValue> = vec![];
         for arg in arguments {
             let arg_vec = to_vec(&arg).expect("no args");

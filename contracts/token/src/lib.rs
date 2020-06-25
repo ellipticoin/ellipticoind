@@ -1,5 +1,3 @@
-// #![feature(proc_macro_hygiene)]
-
 #[cfg(not(test))]
 extern crate ellipticoin;
 #[cfg(test)]
@@ -7,6 +5,7 @@ extern crate mock_ellipticoin as ellipticoin;
 
 extern crate hex;
 extern crate rand;
+extern crate serde;
 extern crate sha2;
 extern crate tiny_keccak;
 extern crate wasm_rpc;

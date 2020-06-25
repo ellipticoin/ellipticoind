@@ -1,4 +1,4 @@
-use crate::{config::Bootnode, vm::Transaction};
+use crate::{api::views, config::Bootnode, vm::Transaction};
 use rand::Rng;
 use serde_cbor::Value;
 use sha2::{Digest, Sha256};
@@ -27,8 +27,20 @@ pub fn random() -> u32 {
 
 pub async fn post_transaction(bootnode: &Bootnode, transaction: Transaction) {
     let uri = format!("http://{}/transactions", bootnode.host);
-    let _res = surf::post(uri)
+    surf::post(uri)
         .body_bytes(serde_cbor::to_vec(&transaction).unwrap())
         .await
         .unwrap();
+}
+
+pub async fn get_block(bootnode: &Bootnode, block_number: u32) -> Option<views::Block> {
+    let url = format!("http://{}/blocks/{}", bootnode.host, block_number);
+    let mut res = surf::get(url).await.unwrap();
+    if res.status() == 200 {
+        serde_cbor::from_slice::<views::Block>(&res.body_bytes().await.unwrap())
+            .unwrap()
+            .into()
+    } else {
+        None
+    }
 }

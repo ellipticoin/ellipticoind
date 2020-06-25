@@ -1,19 +1,27 @@
-use crate::vm::{backend::Backend, helpers::zero_pad_vec};
+use crate::{
+    config::public_key,
+    vm::{backend::Backend, helpers::zero_pad_vec, redis},
+    VM_STATE,
+};
 use std::{collections::HashMap, sync::Arc};
 
 pub type Changeset = HashMap<Vec<u8>, Vec<u8>>;
 pub struct State {
-    pub redis: r2d2_redis::r2d2::PooledConnection<r2d2_redis::RedisConnectionManager>,
+    pub redis: redis::Connection,
     pub rocksdb: Arc<rocksdb::DB>,
     pub memory_changeset: Changeset,
     pub storage_changeset: Changeset,
 }
 
 impl State {
-    pub fn new(
-        redis: r2d2_redis::r2d2::PooledConnection<r2d2_redis::RedisConnectionManager>,
-        rocksdb: Arc<rocksdb::DB>,
-    ) -> Self {
+    pub async fn is_block_winner() -> bool {
+        let mut vm_state = VM_STATE.lock().await;
+        vm_state.current_miner().map_or(false, |current_miner| {
+            current_miner.address.eq(&public_key())
+        })
+    }
+
+    pub fn new(redis: redis::Connection, rocksdb: Arc<rocksdb::DB>) -> Self {
         let vm_state = Self {
             redis,
             rocksdb,

@@ -14,6 +14,7 @@ pub struct Block {
     #[serde(with = "serde_bytes")]
     pub storage_changeset_hash: Vec<u8>,
     pub transactions: Vec<Transaction>,
+    pub sealed: bool,
 }
 
 #[derive(Serialize, Clone, Deserialize, Debug)]
@@ -26,6 +27,7 @@ pub struct Transaction {
     pub contract_address: Vec<u8>,
     pub function: String,
     pub gas_limit: u64,
+    pub gas_used: u64,
     pub nonce: u32,
     return_value: serde_cbor::Value,
     #[serde(with = "serde_bytes")]
@@ -43,6 +45,7 @@ impl From<(models::Block, Vec<models::Transaction>)> for Block {
             winner: block.0.winner.clone(),
             memory_changeset_hash: block.0.memory_changeset_hash.clone(),
             storage_changeset_hash: block.0.storage_changeset_hash.clone(),
+            sealed: block.0.sealed,
             transactions: block
                 .1
                 .into_iter()
@@ -61,6 +64,7 @@ impl From<models::Transaction> for Transaction {
             sender: transaction.sender.clone(),
             nonce: transaction.nonce as u32,
             gas_limit: transaction.gas_limit as u64,
+            gas_used: transaction.gas_used as u64,
             function: transaction.function.clone(),
             arguments: serde_cbor::from_slice(&transaction.arguments).unwrap(),
             return_value: serde_cbor::from_slice(&transaction.return_value).unwrap(),
@@ -79,6 +83,7 @@ impl From<Block> for (models::Block, Vec<models::Transaction>) {
                 winner: block.winner.clone(),
                 memory_changeset_hash: block.memory_changeset_hash.clone(),
                 storage_changeset_hash: block.storage_changeset_hash.clone(),
+                sealed: block.sealed,
             },
             block
                 .transactions
@@ -99,6 +104,7 @@ impl From<Transaction> for models::Transaction {
             sender: transaction.sender.clone(),
             nonce: transaction.nonce as i64,
             gas_limit: transaction.gas_limit as i64,
+            gas_used: transaction.gas_used as i64,
             function: transaction.function.clone(),
             arguments: serde_cbor::to_vec(&transaction.arguments).unwrap(),
             return_value: serde_cbor::to_vec(&transaction.return_value).unwrap(),
