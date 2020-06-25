@@ -5,6 +5,7 @@ CREATE TABLE "transactions" (
   "contract_address" BYTEA NOT NULL,
   "sender" BYTEA NOT NULL,
   "gas_limit" BIGINT NOT NULL,
+  "gas_used" BIGINT NOT NULL,
   "nonce" BIGINT NOT NULL,
   "function" VARCHAR NOT NULL,
   "arguments" BYTEA NOT NULL,

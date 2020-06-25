@@ -10,18 +10,15 @@ extern crate diesel;
 #[macro_use]
 extern crate diesel_migrations;
 #[macro_use]
-extern crate hex_literal;
-#[macro_use]
 extern crate lazy_static;
 
 pub mod config;
 pub mod sub_commands;
 
 mod api;
-mod broadcaster;
+mod block_broadcaster;
 mod constants;
 mod helpers;
-mod miner;
 mod models;
 mod network;
 mod pg;
@@ -29,13 +26,21 @@ mod run_loop;
 mod schema;
 mod start_up;
 mod system_contracts;
-mod transaction_processor;
 mod vm;
-use crate::models::Block;
+
+use crate::{
+    config::{get_redis_connection, get_rocksdb},
+    models::Block,
+};
 use api::app::app as api;
-use async_std::sync::Mutex;
+use async_std::sync::{Arc, Mutex};
 
 lazy_static! {
-    pub static ref BEST_BLOCK: async_std::sync::Arc<Mutex<Option<Block>>> =
-        async_std::sync::Arc::new(Mutex::new(None));
+    pub static ref WEB_SOCKET: Arc<Mutex<api::websocket::Websocket>> =
+        Arc::new(Mutex::new(api::websocket::Websocket::new()));
+    pub static ref VM_STATE: Arc<Mutex<vm::State>> = {
+        let vm_state = vm::State::new(get_redis_connection(), get_rocksdb());
+        Arc::new(Mutex::new(vm_state))
+    };
+    pub static ref CURRENT_BLOCK: Arc<Mutex<Option<Block>>> = Arc::new(Mutex::new(None));
 }

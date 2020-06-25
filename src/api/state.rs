@@ -1,29 +1,30 @@
 use super::ApiState;
 use crate::{
+    api::helpers::to_cbor_response,
+    config::{get_redis_connection, get_rocksdb},
     constants::{Namespace, TOKEN_CONTRACT},
     vm::{redis::Commands, state::db_key},
 };
-use http_service::Body;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tide::Response;
+use tide::{Response, Result};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct State {
     pub memory: HashMap<Vec<u8>, Vec<u8>>,
     pub storage: HashMap<Vec<u8>, Vec<u8>>,
 }
-pub async fn show(req: tide::Request<ApiState>) -> Response {
-    let rocksdb = &req.state().rocksdb;
+pub async fn show(_req: tide::Request<ApiState>) -> Result<Response> {
+    let rocksdb = get_rocksdb();
     let iter = rocksdb.prefix_iterator(db_key(
         &TOKEN_CONTRACT,
-        &vec![Namespace::_UnlockedEthereumBalances as u8],
+        &vec![Namespace::UnlockedEthereumBalances as u8],
     ));
     let storage = iter
         .map(|(key, value)| (key.to_vec(), value.to_vec()))
         .collect::<HashMap<Vec<u8>, Vec<u8>>>();
 
-    let mut redis = req.state().redis.get().unwrap();
+    let mut redis = get_redis_connection();
     let redis_keys: Vec<Vec<u8>> = redis.keys("*").unwrap_or(vec![]);
     let memory = redis_keys
         .iter()
@@ -33,11 +34,8 @@ pub async fn show(req: tide::Request<ApiState>) -> Response {
         })
         .collect::<HashMap<Vec<u8>, Vec<u8>>>();
 
-    Response::new(200).body(Body::from(
-        serde_cbor::to_vec(&State {
-            memory: memory,
-            storage: storage,
-        })
-        .unwrap_or(vec![]),
-    ))
+    Ok(to_cbor_response(&State {
+        memory: memory,
+        storage: storage,
+    }))
 }

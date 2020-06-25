@@ -1,66 +1,36 @@
-use crate::{api, miner::mine_next_block};
-
 use crate::{
-    models::{is_block_winner, is_next_block},
-    network::Message,
-    transaction_processor,
-    vm::{self, redis::Commands},
-    BEST_BLOCK,
+    api, block_broadcaster::broadcast, constants::BLOCK_TIME, models::Block, network::Message,
+    vm::State, VM_STATE, WEB_SOCKET,
 };
-use async_std::sync;
-
+use async_std::{sync, task::sleep};
 use futures::{future::FutureExt, stream::StreamExt};
 
-pub async fn run(
-    mut websocket: api::websocket::Websocket,
-    redis: vm::r2d2_redis::r2d2::Pool<vm::r2d2_redis::RedisConnectionManager>,
-    rocksdb: std::sync::Arc<rocksdb::DB>,
-    db_pool: diesel::r2d2::Pool<diesel::r2d2::ConnectionManager<diesel::PgConnection>>,
-    mut receiver_in: sync::Receiver<Message>,
-    sender_out: sync::Sender<Message>,
-) {
+pub async fn run(mut receiver: sync::Receiver<Message>) {
     loop {
-        let mut vm_state = vm::State::new(redis.clone().get().unwrap(), rocksdb.clone());
-        if is_block_winner(&mut vm_state) {
-            let (new_block, transactions) =
-                mine_next_block(redis.clone(), db_pool.get().unwrap(), rocksdb.clone()).await;
-            websocket
-                .send::<api::Block>((new_block.clone(), transactions.clone()).into())
+        if State::is_block_winner().await {
+            let block = Block::insert().await;
+            {
+                let mut vm_state = VM_STATE.lock().await;
+                println!("Won block #{}", vm_state.block_number());
+            }
+            sleep(*BLOCK_TIME).await;
+            let transactions = block.seal().await;
+            broadcast(block.clone(), transactions.clone()).await;
+            (*WEB_SOCKET)
+                .lock()
+                .await
+                .send::<api::Block>((block, transactions).into())
                 .await;
-            sender_out
-                .send(Message::Block((new_block.clone(), transactions.clone())))
-                .await;
-            *BEST_BLOCK.lock().await = Some(new_block.clone());
-            println!("Mined block #{}", &new_block.number);
             continue;
         }
-        match receiver_in.next().map(Option::unwrap).await {
-            Message::Block((new_block, transactions)) => {
-                if is_next_block(&new_block).await {
-                    transaction_processor::apply_block(
-                        redis.get().unwrap(),
-                        &mut vm_state,
-                        new_block.clone(),
-                        transactions.clone(),
-                        db_pool.get().unwrap(),
-                    )
+        if let Message::Block((block, transactions)) = receiver.next().map(Option::unwrap).await {
+            if block.is_valid().await {
+                block.clone().apply(transactions.clone()).await;
+                (*WEB_SOCKET)
+                    .lock()
+                    .await
+                    .send::<api::Block>((block, transactions).into())
                     .await;
-                    websocket
-                        .send::<api::Block>((new_block.clone(), transactions).into())
-                        .await;
-                    println!("Applied block #{}", &new_block.number);
-                    *BEST_BLOCK.lock().await = Some(new_block.clone());
-                }
-            }
-            Message::Transaction(transaction) => {
-                redis
-                    .get()
-                    .unwrap()
-                    .rpush::<&str, Vec<u8>, ()>(
-                        "transactions::pending",
-                        serde_cbor::to_vec(&transaction).unwrap(),
-                    )
-                    .unwrap();
             }
         }
     }

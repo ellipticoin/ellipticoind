@@ -1,32 +1,33 @@
 use crate::{
-    api::{state::State, views},
-    config::{ethereum_balances_path, random_bootnode, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS},
-    constants::{Namespace, GENESIS_ADDRESS, GENESIS_STATE_PATH, TOKEN_CONTRACT, TOKEN_WASM_PATH},
-    helpers::{bytes_to_value, post_transaction},
-    models::{HashOnion, TransactionPool},
-    pg,
-    transaction_processor::apply_block,
+    api::state::State,
+    config::{
+        ethereum_balances_path, get_pg_connection, get_redis_connection, get_rocksdb,
+        random_bootnode, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
+    },
+    constants::{Namespace, GENESIS_STATE_PATH, TOKEN_CONTRACT, TOKEN_WASM_PATH},
+    helpers::{bytes_to_value, get_block, post_transaction},
+    models,
+    models::{Block, HashOnion},
     vm::{
-        self,
         redis::{self, Commands},
         rocksdb,
         state::db_key,
         Transaction,
     },
-    BEST_BLOCK,
+    VM_STATE,
 };
 use diesel_migrations::revert_latest_migration;
 use indicatif::ProgressBar;
-use serde_cbor::{value::from_value, Value};
+
 use std::{
     convert::TryInto,
     fs::File,
     io::{BufRead, Read},
     ops::DerefMut,
-    sync::Arc,
 };
 
-pub async fn start_miner(pg_db: &pg::Connection, _redis: &mut redis::Connection) {
+pub async fn start_miner() {
+    let pg_db = get_pg_connection();
     let start_mining_transaction = Transaction::new(
         TOKEN_CONTRACT.to_vec(),
         "start_mining",
@@ -36,85 +37,66 @@ pub async fn start_miner(pg_db: &pg::Connection, _redis: &mut redis::Connection)
             bytes_to_value(HashOnion::peel(&pg_db)),
         ],
     );
-    if !*GENESIS_NODE {
+    if *GENESIS_NODE {
+        let block = Block::insert().await;
+        {
+            let mut vm_state = VM_STATE.lock().await;
+            models::Transaction::run(&mut vm_state, &block, start_mining_transaction);
+        }
+        block.seal().await;
+    } else {
         post_transaction(&random_bootnode(), start_mining_transaction.clone()).await;
     }
-
-    TransactionPool::add(&start_mining_transaction);
 }
 
-pub async fn catch_up(db_pool: pg::Pool, redis_pool: redis::Pool, vm_state: &mut vm::State) {
+pub async fn catch_up() {
     for block_number in 0.. {
-        let mut res = surf::get(format!(
-            "http://{}/blocks/{}",
-            random_bootnode().host,
-            block_number
-        ))
-        .await
-        .unwrap();
-        if res.status() == 200 {
-            let body_bytes = res.body_bytes().await.unwrap();
-            let block_value = serde_cbor::from_slice::<Value>(&body_bytes).unwrap();
-            let block_view: views::Block = from_value(block_value).unwrap();
-            let (block, mut transactions) = block_view.into();
-            transactions.iter_mut().for_each(|transaction| {
-                transaction.set_hash();
-                transaction.block_hash = block.hash.clone();
-            });
-            let mut ordered_transactions = transactions.clone();
-            ordered_transactions.sort_by(|a, b| {
-                if a.function == "start_mining" {
-                    std::cmp::Ordering::Less
-                } else if b.function == "start_mining" {
-                    std::cmp::Ordering::Greater
-                } else {
-                    std::cmp::Ordering::Equal
-                }
-            });
-            apply_block(
-                redis_pool.get().unwrap(),
-                vm_state,
-                block.clone(),
-                ordered_transactions,
-                db_pool.get().unwrap(),
-            )
-            .await;
-            *BEST_BLOCK.lock().await = Some(block.clone());
-            println!("Applied block #{}", &block.number);
+        if let Some(block) = get_block(&random_bootnode(), block_number).await {
+            if !block.sealed {
+                break;
+            }
+
+            let (block, transactions) = block.into();
+            block.apply(transactions).await;
+            {
+                let mut vm_state = VM_STATE.lock().await;
+                println!(
+                    "winner: {}",
+                    base64::encode(&vm_state.current_miner().unwrap().address)
+                );
+            }
         } else {
-            println!("Syncing complete");
             break;
         }
     }
+    println!("Syncing complete");
 }
 
-pub async fn reset_state(
-    rocksdb: Arc<rocksdb::DB>,
-    pg_db: &pg::Connection,
-    redis_pool: redis::Pool,
-) {
-    reset_redis(&mut redis_pool.get().unwrap()).await;
-    reset_pg(pg_db).await;
-    reset_rocksdb(rocksdb.clone()).await;
-    import_ethereum_balances(rocksdb.clone()).await;
-    load_genesis_state(&mut redis_pool.get().unwrap(), rocksdb.clone());
-    reset_current_miner(rocksdb.clone());
-    set_token_contract(rocksdb.clone());
-    HashOnion::generate(pg_db);
+pub async fn reset_state() {
+    let rocksdb = get_rocksdb();
+    rocksdb
+        .delete(db_key(&TOKEN_CONTRACT, &vec![Namespace::BlockNumber as u8]))
+        .unwrap();
+    let pg_db = get_pg_connection();
+    reset_redis().await;
+    reset_pg().await;
+    reset_rocksdb().await;
+    import_ethereum_balances().await;
+    load_genesis_state().await;
+    reset_current_miner().await;
+    set_token_contract().await;
+    HashOnion::generate(&pg_db);
 }
 
-pub fn reset_current_miner(rocksdb: Arc<rocksdb::DB>) {
+pub async fn reset_current_miner() {
+    let rocksdb = get_rocksdb();
     rocksdb
         .delete(db_key(&TOKEN_CONTRACT, &vec![Namespace::Miners as u8]))
         .unwrap();
-    rocksdb
-        .put(
-            db_key(&TOKEN_CONTRACT, &vec![Namespace::CurrentMiner as u8]),
-            GENESIS_ADDRESS.to_vec(),
-        )
-        .unwrap();
 }
-pub fn load_genesis_state(redis: &mut redis::Connection, rocksdb: Arc<rocksdb::DB>) {
+pub async fn load_genesis_state() {
+    let mut redis = get_redis_connection();
+    let rocksdb = get_rocksdb();
     let genesis_file = File::open(GENESIS_STATE_PATH).unwrap();
     let state: State = serde_cbor::from_reader(genesis_file).unwrap();
     for (key, value) in state.memory {
@@ -124,7 +106,8 @@ pub fn load_genesis_state(redis: &mut redis::Connection, rocksdb: Arc<rocksdb::D
         rocksdb.put(key, value).unwrap();
     }
 }
-pub fn set_token_contract(rocksdb: Arc<rocksdb::DB>) {
+pub async fn set_token_contract() {
+    let rocksdb = get_rocksdb();
     let mut token_file = File::open(TOKEN_WASM_PATH).unwrap();
     let mut token_wasm = Vec::new();
     token_file.read_to_end(&mut token_wasm).unwrap();
@@ -133,19 +116,22 @@ pub fn set_token_contract(rocksdb: Arc<rocksdb::DB>) {
         .unwrap();
 }
 
-async fn reset_redis(redis: &mut redis::Connection) {
+async fn reset_redis() {
+    let mut redis = get_redis_connection();
     let _: () = redis::cmd("FLUSHDB").query(redis.deref_mut()).unwrap();
 }
 
-async fn reset_pg(pg_db: &pg::Connection) {
+async fn reset_pg() {
+    let pg_db = get_pg_connection();
     diesel_migrations::embed_migrations!();
     for _ in 0..4 {
-        let _ = revert_latest_migration(pg_db);
+        let _ = revert_latest_migration(&pg_db);
     }
-    embedded_migrations::run(pg_db).unwrap();
+    embedded_migrations::run(&pg_db).unwrap();
 }
 
-async fn reset_rocksdb(rocksdb: Arc<rocksdb::DB>) {
+async fn reset_rocksdb() {
+    let rocksdb = get_rocksdb();
     if OPTS.save_state {
         return;
     }
@@ -161,9 +147,11 @@ async fn reset_rocksdb(rocksdb: Arc<rocksdb::DB>) {
         .for_each(|(key, _value)| {
             rocksdb.delete(key).unwrap();
         });
+    println!("Reset RocksDB");
 }
 
-async fn import_ethereum_balances(rocksdb: Arc<rocksdb::DB>) {
+async fn import_ethereum_balances() {
+    let rocksdb = get_rocksdb();
     if rocksdb
         .prefix_iterator(db_key(
             &TOKEN_CONTRACT,
