@@ -2,8 +2,8 @@ table! {
     blocks (hash) {
         hash -> Bytea,
         parent_hash -> Nullable<Bytea>,
-        number -> Int8,
         winner -> Bytea,
+        number -> Int8,
         memory_changeset_hash -> Bytea,
         storage_changeset_hash -> Bytea,
         sealed -> Bool,
@@ -22,6 +22,7 @@ table! {
         network_id -> Int8,
         block_hash -> Bytea,
         hash -> Bytea,
+        position -> Int8,
         contract_address -> Bytea,
         sender -> Bytea,
         gas_limit -> Int8,

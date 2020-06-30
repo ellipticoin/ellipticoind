@@ -1,6 +1,4 @@
-extern crate bytes;
-extern crate hex;
-extern crate mime;
+#![recursion_limit = "200"]
 extern crate rocksdb;
 extern crate serde;
 extern crate serde_cbor;
@@ -20,7 +18,6 @@ mod block_broadcaster;
 mod constants;
 mod helpers;
 mod models;
-mod network;
 mod pg;
 mod run_loop;
 mod schema;
@@ -32,10 +29,10 @@ use crate::{
     config::{get_redis_connection, get_rocksdb},
     models::Block,
 };
-use api::app::app as api;
 use async_std::sync::{Arc, Mutex};
 
 lazy_static! {
+    pub static ref IS_CURRENT_MINER: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
     pub static ref WEB_SOCKET: Arc<Mutex<api::websocket::Websocket>> =
         Arc::new(Mutex::new(api::websocket::Websocket::new()));
     pub static ref VM_STATE: Arc<Mutex<vm::State>> = {

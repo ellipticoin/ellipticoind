@@ -1,17 +1,17 @@
-use crate::api::ApiState;
+use crate::api::State;
 use serde_cbor::{de::from_slice, to_vec};
 use tide::{
     http::{Error, StatusCode},
     Body, Request, Response, Result,
 };
 
-pub fn base64_param(req: &Request<ApiState>, key: &str) -> Result<Vec<u8>> {
+pub fn base64_param(req: &Request<State>, key: &str) -> Result<Vec<u8>> {
     base64::decode_config(&req.param::<String>(key)?, base64::URL_SAFE)
         .map_err(|err| Error::new(StatusCode::BadRequest, err))
 }
 
 pub async fn body<T: serde::de::DeserializeOwned>(
-    req: &mut tide::Request<ApiState>,
+    req: &mut tide::Request<State>,
 ) -> serde_cbor::Result<T> {
     from_slice(&req.body_bytes().await.unwrap())
 }

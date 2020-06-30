@@ -1,9 +1,12 @@
 use crate::{
     api,
-    config::{socket, websocket_socket, ENABLE_MINER, GENESIS_NODE},
-    run_loop, start_up, WEB_SOCKET,
+    config::{
+         socket, websocket_socket, ENABLE_MINER, GENESIS_NODE,
+    },
+    run_loop, start_up,
+    VM_STATE, WEB_SOCKET,
 };
-use async_std::{sync::channel, task::spawn};
+use async_std::task::spawn;
 use ed25519_dalek::Keypair;
 use rand::rngs::OsRng;
 
@@ -17,16 +20,16 @@ pub fn generate_keypair() {
 }
 
 pub async fn main() {
+    let mut vm_state = VM_STATE.lock().await;
     start_up::reset_state().await;
     if !*GENESIS_NODE {
-        start_up::catch_up().await;
+        start_up::catch_up(&mut vm_state).await;
     }
     if *ENABLE_MINER {
-        start_up::start_miner().await;
+        start_up::start_miner(&mut vm_state).await;
     }
-    let (miner_sender, miner_receiver) = channel(1);
-    let api_state = api::ApiState::new(miner_sender);
-    spawn(api(api_state).listen(socket()));
+    let (api_receiver, api_state) = api::API::new();
+    spawn(api_state.listen(socket()));
     spawn(
         (*WEB_SOCKET)
             .lock()
@@ -34,5 +37,5 @@ pub async fn main() {
             .clone()
             .bind(websocket_socket().await),
     );
-    run_loop::run(miner_receiver).await
+    run_loop::run(&mut vm_state, api_receiver).await
 }

@@ -53,6 +53,7 @@ pub struct Transaction {
     pub network_id: i64,
     pub block_hash: Vec<u8>,
     pub hash: Vec<u8>,
+    pub position: i64,
     pub contract_address: Vec<u8>,
     pub sender: Vec<u8>,
     pub gas_limit: i64,
@@ -85,10 +86,12 @@ impl Transaction {
         vm_state: &mut vm::State,
         current_block: &Block,
         vm_transaction: vm::Transaction,
+        position: i64,
     ) -> Self {
         let mut completed_transaction: models::Transaction = vm_transaction.run(vm_state).into();
         completed_transaction.block_hash = current_block.hash.clone();
         completed_transaction.set_hash();
+        completed_transaction.position = position;
         insert_into(transactions_table)
             .values(&completed_transaction)
             .execute(&get_pg_connection())
@@ -124,6 +127,7 @@ impl From<&vm::CompletedTransaction> for Transaction {
             hash: vec![],
             block_hash: vec![],
             contract_address: transaction.contract_address.clone(),
+            position: 0,
             sender: transaction.sender.clone(),
             gas_limit: transaction.gas_limit as i64,
             gas_used: transaction.gas_used as i64,
@@ -158,6 +162,7 @@ impl From<vm::CompletedTransaction> for Transaction {
             hash: vec![],
             block_hash: vec![],
             contract_address: transaction.contract_address,
+            position: 0,
             sender: transaction.sender,
             gas_limit: transaction.gas_limit as i64,
             gas_used: transaction.gas_used as i64,
