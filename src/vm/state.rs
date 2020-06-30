@@ -1,7 +1,5 @@
 use crate::{
-    config::public_key,
     vm::{backend::Backend, helpers::zero_pad_vec, redis},
-    VM_STATE,
 };
 use std::{collections::HashMap, sync::Arc};
 
@@ -14,13 +12,6 @@ pub struct State {
 }
 
 impl State {
-    pub async fn is_block_winner() -> bool {
-        let mut vm_state = VM_STATE.lock().await;
-        vm_state.current_miner().map_or(false, |current_miner| {
-            current_miner.address.eq(&public_key())
-        })
-    }
-
     pub fn new(redis: redis::Connection, rocksdb: Arc<rocksdb::DB>) -> Self {
         let vm_state = Self {
             redis,

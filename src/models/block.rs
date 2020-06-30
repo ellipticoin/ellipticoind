@@ -5,7 +5,9 @@ use crate::{
     helpers::{bytes_to_value, sha256},
     models::{self, HashOnion, Transaction},
     schema::{blocks, blocks::dsl},
-    vm, CURRENT_BLOCK, VM_STATE,
+    vm,
+    vm::State,
+    IS_CURRENT_MINER,
 };
 use diesel::dsl::insert_into;
 use serde::{Deserialize, Serialize};
@@ -16,8 +18,8 @@ use serde_cbor::to_vec;
 pub struct Block {
     pub hash: Vec<u8>,
     pub parent_hash: Option<Vec<u8>>,
-    pub number: i64,
     pub winner: Vec<u8>,
+    pub number: i64,
     pub memory_changeset_hash: Vec<u8>,
     pub storage_changeset_hash: Vec<u8>,
     pub sealed: bool,
@@ -73,7 +75,7 @@ impl Block {
         block
     }
 
-    pub async fn apply(mut self, transactions: Vec<models::Transaction>) {
+    pub fn apply(mut self, vm_state: &mut State, transactions: Vec<models::Transaction>) {
         let pg_db = get_pg_connection();
         self.set_hash();
         self.sealed = true;
@@ -81,42 +83,44 @@ impl Block {
             .values(&self)
             .execute(&pg_db)
             .unwrap();
-        *CURRENT_BLOCK.lock().await = Some(self.clone());
-        let mut vm_state = VM_STATE.lock().await;
         transactions.iter().for_each(|transaction| {
-            Transaction::run(&mut vm_state, &self, vm::Transaction::from(transaction));
+            Transaction::run(
+                vm_state,
+                &self,
+                vm::Transaction::from(transaction),
+                transaction.position,
+            );
         });
         vm_state.commit();
         println!("Applied block #{}", self.number);
     }
 
-    pub async fn insert() -> Block {
+    pub async fn insert(vm_state: &mut State) -> Block {
         let pg_db = get_pg_connection();
-        let mut vm_state = VM_STATE.lock().await;
         let block = Self::new(vm_state.block_number() as i64);
         insert_into(dsl::blocks)
             .values(&block)
             .execute(&pg_db)
             .unwrap();
-        *CURRENT_BLOCK.lock().await = Some(block.clone());
         block
     }
 
     pub async fn is_valid(&self) -> bool {
-        let current_block = CURRENT_BLOCK.lock().await.as_ref().unwrap().clone();
-        self.number == current_block.number + 1
+        true
     }
 
-    pub async fn seal(&self) -> Vec<Transaction> {
+    pub async fn seal(&self, vm_state: &mut State, transaction_position: i64) -> Vec<Transaction> {
         let pg_db = get_pg_connection();
         let reveal_transaction = vm::Transaction::new(
             TOKEN_CONTRACT.to_vec(),
             "reveal",
             vec![bytes_to_value(HashOnion::peel(&pg_db))],
         );
-        let mut vm_state = VM_STATE.lock().await;
-        let current_block = CURRENT_BLOCK.lock().await.as_ref().unwrap().clone();
-        Transaction::run(&mut vm_state, &current_block, reveal_transaction);
+        // let current_block = CURRENT_BLOCK.lock().await.as_ref().unwrap().clone();
+        Transaction::run(vm_state, &self, reveal_transaction, transaction_position);
+        *IS_CURRENT_MINER.lock().await = vm_state.current_miner().map_or(false, |current_miner| {
+            current_miner.address.eq(&public_key())
+        });
         diesel::update(dsl::blocks.filter(dsl::hash.eq(self.hash.clone())))
             .set(dsl::sealed.eq(true))
             .execute(&pg_db)

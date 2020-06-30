@@ -1,11 +1,10 @@
-use super::{helpers::to_cbor_response, ApiState};
+use super::{helpers::to_cbor_response, State};
 use crate::{
-    api::{views, views::Block},
+    api::{views::Block, Message},
     config::get_pg_connection,
     diesel::{ExpressionMethods, GroupedBy, OptionalExtension, QueryDsl, RunQueryDsl},
     models,
-    network::Message,
-    schema::{blocks, blocks::columns::number},
+    schema::{blocks, blocks::columns::number, transactions},
 };
 use diesel::BelongingToDsl;
 use serde::Deserialize;
@@ -16,17 +15,15 @@ struct QueryParams {
     limit: Option<i64>,
 }
 
-pub async fn create(mut req: tide::Request<ApiState>) -> tide::Result<tide::Response> {
+pub async fn create(mut req: tide::Request<State>) -> tide::Result<tide::Response> {
     let block_bytes = req.body_bytes().await.unwrap();
-    let block_view: Block = serde_cbor::from_slice::<views::Block>(&block_bytes)
-        .unwrap()
-        .into();
-    let miner_sender = &req.state().miner_sender;
-    miner_sender.send(Message::Block(block_view.into())).await;
+    let block = serde_cbor::from_slice(&block_bytes).unwrap();
+    let sender = &req.state().sender;
+    sender.send(Message::Block(block)).await;
     Ok(Response::new(StatusCode::Ok))
 }
 
-pub async fn index(req: tide::Request<ApiState>) -> tide::Result<Response> {
+pub async fn index(req: tide::Request<State>) -> tide::Result<Response> {
     let query = req.query::<QueryParams>().unwrap();
     let con = get_pg_connection();
     let blocks = blocks::dsl::blocks
@@ -35,6 +32,7 @@ pub async fn index(req: tide::Request<ApiState>) -> tide::Result<Response> {
         .load::<models::Block>(&con)
         .unwrap();
     let transactions = models::Transaction::belonging_to(&blocks)
+        .order(transactions::dsl::position.asc())
         .load::<models::Transaction>(&con)
         .unwrap()
         .grouped_by(&blocks);
@@ -46,7 +44,7 @@ pub async fn index(req: tide::Request<ApiState>) -> tide::Result<Response> {
     Ok(to_cbor_response(&blocks_response))
 }
 
-pub async fn show(req: tide::Request<ApiState>) -> tide::Result<Response> {
+pub async fn show(req: tide::Request<State>) -> tide::Result<Response> {
     let block_param: String = req.param("block_hash").unwrap_or("".to_string());
     let con = get_pg_connection();
     let block = match block_param.parse::<i64>() {

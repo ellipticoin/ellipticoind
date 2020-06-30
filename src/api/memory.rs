@@ -1,8 +1,8 @@
-use super::{helpers::base64_param, ApiState};
+use super::{helpers::base64_param, State};
 use crate::{api::helpers::to_cbor_response, VM_STATE};
 use tide::{Response, Result};
 
-pub async fn show(req: tide::Request<ApiState>) -> Result<Response> {
+pub async fn show(req: tide::Request<State>) -> Result<Response> {
     let contract_name: String = req.param("contract_name")?;
     let contract_owner_bytes = base64_param(&req, "contract_owner")?;
     let contract_address = [contract_owner_bytes, contract_name.as_bytes().to_vec()].concat();
