@@ -1,10 +1,8 @@
-extern crate hex;
 extern crate metered_wasmi;
 pub extern crate r2d2_redis;
 pub extern crate rocksdb;
 extern crate serde;
 extern crate serde_cbor;
-extern crate sha3;
 extern crate time;
 
 mod backend;

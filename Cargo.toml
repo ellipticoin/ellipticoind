@@ -7,12 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-compression = { version = "0.3.2", features = ["futures-bufread", "bzip2"] }
 async-std = {version = "1.6.0", features = ["unstable", "attributes"]}
 async-tungstenite = {git = "https://github.com/sdroege/async-tungstenite.git" }
 base64 = "0.10.1"
-bytes = "0.5.2"
-bzip2 = "0.3.3"
 clap = { git = "https://github.com/clap-rs/clap.git" }
 diesel = { version = "1.0.0", features = ["postgres", "r2d2"] }
 diesel_migrations = "1.4.0"
@@ -22,7 +19,6 @@ futures = "0.3.5"
 futures-core-preview = "0.3.0-alpha.19"
 futures-timer = "2.0.2"
 futures-util = "0.3.4"
-hex = "0.4.0"
 http-service = "*"
 indicatif = "0.14.0"
 lazy_static = "1.4.0"
@@ -36,16 +32,11 @@ serde_bytes = "0.11.1"
 serde_cbor = { git = "https://github.com/pyfisch/cbor" }
 serde_yaml = "0.8.12"
 sha2 = "0.8.0"
-sha3 = "0.7.3"
 surf = "2.0.0-alpha.3"
-tar = "0.4.26"
 tide = "0.11.0"
 time = "*"
 tungstenite = { version = "0.10.0", default-features = false}
-url = "*"
 warp = {git = "https://github.com/masonforest/warp.git", branch = "add-cbor-mime-type"}
-[dev-dependencies]
-reqwest = {git = "https://github.com/seanmonstar/reqwest.git" }
-tokio-test = "0.0.0"
+
 [profile.dev]
 panic = 'unwind'

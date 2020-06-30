@@ -1,4 +1,4 @@
-use super::ApiState;
+use super::State;
 use crate::{api::helpers::to_cbor_response, config::get_pg_connection, models::highest_nonce};
 use serde::Serialize;
 use tide::{Response, Result};
@@ -8,7 +8,7 @@ pub struct Address {
     pub highest_nonce: Option<serde_cbor::Value>,
 }
 
-pub async fn show(req: tide::Request<ApiState>) -> Result<Response> {
+pub async fn show(req: tide::Request<State>) -> Result<Response> {
     let con = get_pg_connection();
     let address: String = req.param("address").unwrap();
     let highest_nonce: Option<i64> = highest_nonce(

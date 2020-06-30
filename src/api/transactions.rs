@@ -1,20 +1,22 @@
-use super::{views::Transaction, ApiState};
+use super::{views::Transaction, State};
 use crate::{
-    api::helpers::{body, to_cbor_response},
+    api::{
+        helpers::{body, to_cbor_response},
+        Message,
+    },
     config::get_pg_connection,
     diesel::OptionalExtension,
     models,
-    schema::transactions::dsl::*,
-    vm,
-    vm::State,
-    CURRENT_BLOCK, VM_STATE,
+    schema::transactions::dsl,
+    vm, IS_CURRENT_MINER, VM_STATE,
 };
 use diesel::prelude::*;
+use futures::channel::oneshot;
 use tide::{http::StatusCode, Redirect, Response, Result};
 
-pub async fn show(req: tide::Request<ApiState>) -> Result<Response> {
+pub async fn show(req: tide::Request<State>) -> Result<Response> {
     let transaction_hash: String = req.param("transaction_hash").unwrap();
-    let transaction = transactions
+    let transaction = dsl::transactions
         .find(base64::decode_config(&transaction_hash, base64::URL_SAFE).unwrap())
         .first::<models::Transaction>(&get_pg_connection())
         .optional()
@@ -27,7 +29,7 @@ pub async fn show(req: tide::Request<ApiState>) -> Result<Response> {
     }
 }
 
-pub async fn create(mut req: tide::Request<ApiState>) -> Result<Response> {
+pub async fn create(mut req: tide::Request<State>) -> Result<Response> {
     let transaction: vm::Transaction = match body(&mut req).await {
         Ok(transaction) => transaction,
         Err(_) => return Ok(Response::new(400)),
@@ -37,11 +39,13 @@ pub async fn create(mut req: tide::Request<ApiState>) -> Result<Response> {
         return Ok(Response::new(403));
     }
 
-    if State::is_block_winner().await {
-        let mut vm_state = VM_STATE.lock().await;
-        let current_block = CURRENT_BLOCK.lock().await.as_ref().unwrap().clone();
-        let completed_transaction =
-            models::Transaction::run(&mut vm_state, &current_block, transaction);
+    if *IS_CURRENT_MINER.lock().await {
+        let sender = &req.state().sender;
+        let (responder, response) = oneshot::channel();
+        sender
+            .send(Message::Transaction(transaction, responder))
+            .await;
+        let completed_transaction = response.await.unwrap();
         let transaction_url = format!(
             "/transactions/{}",
             base64::encode_config(&completed_transaction.hash, base64::URL_SAFE)

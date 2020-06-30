@@ -23,6 +23,7 @@ pub struct Transaction {
     pub arguments: Vec<serde_cbor::Value>,
     #[serde(with = "serde_bytes")]
     pub block_hash: Vec<u8>,
+    pub position: u32,
     #[serde(with = "serde_bytes")]
     pub contract_address: Vec<u8>,
     pub function: String,
@@ -61,6 +62,7 @@ impl From<models::Transaction> for Transaction {
             network_id: transaction.network_id as u32,
             contract_address: transaction.contract_address.clone(),
             block_hash: transaction.block_hash.clone(),
+            position: transaction.position as u32,
             sender: transaction.sender.clone(),
             nonce: transaction.nonce as u32,
             gas_limit: transaction.gas_limit as u64,
@@ -101,6 +103,7 @@ impl From<Transaction> for models::Transaction {
             hash: vec![],
             contract_address: transaction.contract_address.clone(),
             block_hash: transaction.block_hash.clone(),
+            position: transaction.position as i64,
             sender: transaction.sender.clone(),
             nonce: transaction.nonce as i64,
             gas_limit: transaction.gas_limit as i64,
