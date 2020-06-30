@@ -1,4 +1,4 @@
-use super::ApiState;
+use super::State;
 use crate::{
     api::helpers::to_cbor_response,
     config::{get_redis_connection, get_rocksdb},
@@ -10,11 +10,11 @@ use std::collections::HashMap;
 use tide::{Response, Result};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct State {
+pub struct VMState {
     pub memory: HashMap<Vec<u8>, Vec<u8>>,
     pub storage: HashMap<Vec<u8>, Vec<u8>>,
 }
-pub async fn show(_req: tide::Request<ApiState>) -> Result<Response> {
+pub async fn show(_req: tide::Request<State>) -> Result<Response> {
     let rocksdb = get_rocksdb();
     let iter = rocksdb.prefix_iterator(db_key(
         &TOKEN_CONTRACT,
@@ -34,7 +34,7 @@ pub async fn show(_req: tide::Request<ApiState>) -> Result<Response> {
         })
         .collect::<HashMap<Vec<u8>, Vec<u8>>>();
 
-    Ok(to_cbor_response(&State {
+    Ok(to_cbor_response(&VMState {
         memory: memory,
         storage: storage,
     }))

@@ -1,5 +1,5 @@
 use crate::{
-    api::state::State,
+    api::state::VMState,
     config::{
         ethereum_balances_path, get_pg_connection, get_redis_connection, get_rocksdb,
         random_bootnode, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
@@ -12,9 +12,8 @@ use crate::{
         redis::{self, Commands},
         rocksdb,
         state::db_key,
-        Transaction,
+        State, Transaction,
     },
-    VM_STATE,
 };
 use diesel_migrations::revert_latest_migration;
 use indicatif::ProgressBar;
@@ -26,7 +25,7 @@ use std::{
     ops::DerefMut,
 };
 
-pub async fn start_miner() {
+pub async fn start_miner(vm_state: &mut State) {
     let pg_db = get_pg_connection();
     let start_mining_transaction = Transaction::new(
         TOKEN_CONTRACT.to_vec(),
@@ -38,18 +37,15 @@ pub async fn start_miner() {
         ],
     );
     if *GENESIS_NODE {
-        let block = Block::insert().await;
-        {
-            let mut vm_state = VM_STATE.lock().await;
-            models::Transaction::run(&mut vm_state, &block, start_mining_transaction);
-        }
-        block.seal().await;
+        let block = Block::insert(vm_state).await;
+        models::Transaction::run(vm_state, &block, start_mining_transaction, 0);
+        block.seal(vm_state, 1).await;
     } else {
         post_transaction(&random_bootnode(), start_mining_transaction.clone()).await;
     }
 }
 
-pub async fn catch_up() {
+pub async fn catch_up(vm_state: &mut State) {
     for block_number in 0.. {
         if let Some(block) = get_block(&random_bootnode(), block_number).await {
             if !block.sealed {
@@ -57,14 +53,7 @@ pub async fn catch_up() {
             }
 
             let (block, transactions) = block.into();
-            block.apply(transactions).await;
-            {
-                let mut vm_state = VM_STATE.lock().await;
-                println!(
-                    "winner: {}",
-                    base64::encode(&vm_state.current_miner().unwrap().address)
-                );
-            }
+            block.apply(vm_state, transactions);
         } else {
             break;
         }
@@ -98,7 +87,7 @@ pub async fn load_genesis_state() {
     let mut redis = get_redis_connection();
     let rocksdb = get_rocksdb();
     let genesis_file = File::open(GENESIS_STATE_PATH).unwrap();
-    let state: State = serde_cbor::from_reader(genesis_file).unwrap();
+    let state: VMState = serde_cbor::from_reader(genesis_file).unwrap();
     for (key, value) in state.memory {
         let _: () = redis.set(key, value).unwrap();
     }
