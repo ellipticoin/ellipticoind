@@ -4,7 +4,11 @@ use crate::{
     api::{addresses, blocks, memory, state, storage, transactions},
 };
 use std::{future::Future, pin::Pin};
-use tide::{security::CorsMiddleware, Next, Request, Result};
+use tide::{
+    http::headers::HeaderValue,
+    security::{CorsMiddleware, Origin},
+    Next, Request, Result,
+};
 
 fn cbor_middleware<'a>(
     request: Request<api::ApiState>,
@@ -20,7 +24,10 @@ fn cbor_middleware<'a>(
 
 pub fn app(state: ApiState) -> tide::Server<ApiState> {
     let mut app = tide::with_state(state);
-    let cors_middleware = CorsMiddleware::new();
+    let cors_middleware = CorsMiddleware::new()
+        .allow_methods("GET, POST, OPTIONS".parse::<HeaderValue>().unwrap())
+        .allow_origin(Origin::from("*"))
+        .allow_credentials(false);
     app.middleware(cors_middleware);
     app.middleware(cbor_middleware);
     app.at("/blocks").post(blocks::create);
