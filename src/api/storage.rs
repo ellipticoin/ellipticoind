@@ -7,14 +7,16 @@ pub async fn show(req: tide::Request<State>) -> Result<Response> {
     let contract_owner_bytes = base64_param(&req, "contract_owner")?;
     let contract_address = [contract_owner_bytes, contract_name.as_bytes().to_vec()].concat();
     let key_bytes = base64_param(&req, "key")?;
-    let mut vm_state = VM_STATE.lock().await;
 
     let current_miner = {
         let mut vm_state = VM_STATE.lock().await;
         vm_state.current_miner().unwrap()
     };
     if current_miner.address.eq(&public_key()) {
-        let value = vm_state.get_storage(&contract_address, &key_bytes);
+        let value = {
+            let mut vm_state = VM_STATE.lock().await;
+            vm_state.get_storage(&contract_address, &key_bytes)
+        };
         Ok(to_cbor_response(&value))
     } else {
         proxy_get(&req, current_miner.host).await
