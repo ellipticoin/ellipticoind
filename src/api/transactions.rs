@@ -1,31 +1,39 @@
 use super::{views::Transaction, State};
 use crate::{
     api::{
-        helpers::{body, to_cbor_response},
+        helpers::{body, proxy_get, proxy_post, to_cbor_response},
         Message,
     },
-    config::get_pg_connection,
+    config::{get_pg_connection, public_key},
     diesel::OptionalExtension,
     models,
     schema::transactions::dsl,
-    vm, IS_CURRENT_MINER, VM_STATE,
+    vm, VM_STATE,
 };
 use diesel::prelude::*;
 use futures::channel::oneshot;
-use tide::{http::StatusCode, Redirect, Response, Result};
+use tide::{Redirect, Response, Result};
 
 pub async fn show(req: tide::Request<State>) -> Result<Response> {
     let transaction_hash: String = req.param("transaction_hash").unwrap();
-    let transaction = dsl::transactions
-        .find(base64::decode_config(&transaction_hash, base64::URL_SAFE).unwrap())
-        .first::<models::Transaction>(&get_pg_connection())
-        .optional()
-        .unwrap();
+    let current_miner = {
+        let mut vm_state = VM_STATE.lock().await;
+        vm_state.current_miner().unwrap()
+    };
+    if current_miner.address.eq(&public_key()) {
+        let transaction = dsl::transactions
+            .find(base64::decode_config(&transaction_hash, base64::URL_SAFE).unwrap())
+            .first::<models::Transaction>(&get_pg_connection())
+            .optional()
+            .unwrap();
 
-    if let Some(transaction) = transaction {
-        Ok(to_cbor_response(&Transaction::from(transaction)))
+        if let Some(transaction) = transaction {
+            Ok(to_cbor_response(&Transaction::from(transaction)))
+        } else {
+            Ok(Response::new(404))
+        }
     } else {
-        Ok(Response::new(404))
+        proxy_get(&req, current_miner.host).await
     }
 }
 
@@ -39,7 +47,11 @@ pub async fn create(mut req: tide::Request<State>) -> Result<Response> {
         return Ok(Response::new(403));
     }
 
-    if *IS_CURRENT_MINER.lock().await {
+    let current_miner = {
+        let mut vm_state = VM_STATE.lock().await;
+        vm_state.current_miner().unwrap()
+    };
+    if current_miner.address.eq(&public_key()) {
         let sender = &req.state().sender;
         let (responder, response) = oneshot::channel();
         sender
@@ -52,20 +64,11 @@ pub async fn create(mut req: tide::Request<State>) -> Result<Response> {
         );
         Ok(Redirect::see_other(transaction_url).into())
     } else {
-        let current_miner = {
-            let mut vm_state = VM_STATE.lock().await;
-            vm_state.current_miner().unwrap()
-        };
-        let uri = format!("http://{}/transactions", current_miner.host);
-        if surf::post(uri)
-            .body_bytes(serde_cbor::to_vec(&transaction).unwrap())
-            .await
-            .is_err()
-        {
-            println!("failed posting to http://{}/transactions", "");
-            Ok(Response::new(StatusCode::ServiceUnavailable))
-        } else {
-            Ok(Response::new(StatusCode::Ok))
-        }
+        proxy_post(
+            &req,
+            current_miner.host,
+            serde_cbor::to_vec(&transaction).unwrap(),
+        )
+        .await
     }
 }
