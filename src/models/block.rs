@@ -4,7 +4,7 @@ use crate::{
     diesel::{BelongingToDsl, ExpressionMethods, QueryDsl, RunQueryDsl},
     helpers::{bytes_to_value, sha256},
     models::{self, HashOnion, Transaction},
-    schema::{blocks, transactions, blocks::dsl},
+    schema::{blocks, blocks::dsl, transactions},
     vm,
     vm::State,
     IS_CURRENT_MINER,
