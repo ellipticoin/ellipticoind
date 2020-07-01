@@ -74,6 +74,7 @@ pub async fn show(req: tide::Request<State>) -> tide::Result<Response> {
 
     if let Some(block) = block {
         let transactions = models::Transaction::belonging_to(&block)
+            .order(transactions::dsl::position.asc())
             .load::<models::Transaction>(&con)
             .unwrap();
         let blocks_response = Block::from((block, transactions));
