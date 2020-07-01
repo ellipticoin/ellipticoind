@@ -28,7 +28,7 @@ pub async fn run(mut api_receiver: sync::Receiver<Message>) {
                 select! {
                     () = sleep_fused => {
                         let mut vm_state = VM_STATE.lock().await;
-                        let transactions = block.seal(&mut vm_state, transaction_position).await;
+                        let transactions = block.seal(&mut vm_state, transaction_position + 1).await;
                         broadcast(&mut vm_state, (block.clone(), transactions.clone())).await;
                         (*WEB_SOCKET)
                             .lock()
