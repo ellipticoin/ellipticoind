@@ -4,7 +4,7 @@ use crate::{
     diesel::{BelongingToDsl, ExpressionMethods, QueryDsl, RunQueryDsl},
     helpers::{bytes_to_value, sha256},
     models::{self, HashOnion, Transaction},
-    schema::{blocks, blocks::dsl},
+    schema::{blocks, transactions, blocks::dsl},
     vm,
     vm::State,
     IS_CURRENT_MINER,
@@ -116,7 +116,6 @@ impl Block {
             "reveal",
             vec![bytes_to_value(HashOnion::peel(&pg_db))],
         );
-        // let current_block = CURRENT_BLOCK.lock().await.as_ref().unwrap().clone();
         Transaction::run(vm_state, &self, reveal_transaction, transaction_position);
         *IS_CURRENT_MINER.lock().await = vm_state.current_miner().map_or(false, |current_miner| {
             current_miner.address.eq(&public_key())
@@ -126,6 +125,7 @@ impl Block {
             .execute(&pg_db)
             .unwrap();
         Transaction::belonging_to(self)
+            .order(transactions::dsl::position.asc())
             .load::<Transaction>(&pg_db)
             .unwrap()
     }
