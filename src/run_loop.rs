@@ -1,6 +1,6 @@
 use crate::{
     api, api::Message, block_broadcaster::broadcast, config::public_key, constants::BLOCK_TIME,
-    models, models::Block, vm::State, VM_STATE, WEB_SOCKET,
+    models, models::Block, VM_STATE, WEB_SOCKET,
 };
 use async_std::{sync, task::sleep};
 use futures::{future::FutureExt, pin_mut, select, stream::StreamExt};
