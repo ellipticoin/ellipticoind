@@ -13,7 +13,7 @@ pub fn base64_param(req: &Request<State>, key: &str) -> Result<Vec<u8>> {
 pub async fn proxy_get(req: &Request<State>, proxy_url: String) -> Result<Response> {
     let mut url = req.url().clone();
     let host = proxy_url.split(":").next().unwrap();
-    let port = proxy_url.split(":").last().unwrap().parse().unwrap();
+    let port = proxy_url.split(":").last().unwrap().parse().unwrap_or(80);
     url.set_host(Some(&host)).unwrap();
     url.set_port(Some(port)).unwrap();
     let mut surf_res = surf::get(url).await.unwrap();
@@ -30,7 +30,7 @@ pub async fn proxy_post(
 ) -> Result<Response> {
     let mut url = req.url().clone();
     let host = proxy_url.split(":").next().unwrap();
-    let port = proxy_url.split(":").last().unwrap().parse().unwrap();
+    let port = proxy_url.split(":").last().unwrap().parse().unwrap_or(80);
     url.set_host(Some(&host)).unwrap();
     url.set_port(Some(port)).unwrap();
     let mut surf_res = surf::post(url).body_bytes(&body).await.unwrap();
