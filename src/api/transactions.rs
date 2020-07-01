@@ -52,8 +52,10 @@ pub async fn create(mut req: tide::Request<State>) -> Result<Response> {
         );
         Ok(Redirect::see_other(transaction_url).into())
     } else {
-        let mut vm_state = VM_STATE.lock().await;
-        let current_miner = vm_state.current_miner().unwrap();
+        let current_miner = {
+            let mut vm_state = VM_STATE.lock().await;
+            vm_state.current_miner().unwrap()
+        };
         let uri = format!("http://{}/transactions", current_miner.host);
         if surf::post(uri)
             .body_bytes(serde_cbor::to_vec(&transaction).unwrap())
