@@ -1,6 +1,4 @@
-use crate::{
-    vm::{backend::Backend, helpers::zero_pad_vec, redis},
-};
+use crate::vm::{backend::Backend, helpers::zero_pad_vec, redis};
 use std::{collections::HashMap, sync::Arc};
 
 pub type Changeset = HashMap<Vec<u8>, Vec<u8>>;
