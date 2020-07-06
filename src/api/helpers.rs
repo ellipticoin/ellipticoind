@@ -16,9 +16,9 @@ pub async fn proxy_get(req: &Request<State>, proxy_url: String) -> Result<Respon
     let port = proxy_url.split(":").last().unwrap().parse().unwrap_or(80);
     url.set_host(Some(&host)).unwrap();
     url.set_port(Some(port)).unwrap();
-    let mut surf_res = surf::get(url).await.unwrap();
+    let mut surf_res = surf::get(url).await?;
     let mut res = Response::new(surf_res.status());
-    let body = surf_res.body_bytes().await.unwrap();
+    let body = surf_res.body_bytes().await?;
     res.set_body(Body::from_bytes(body));
     Ok(res)
 }
@@ -33,9 +33,9 @@ pub async fn proxy_post(
     let port = proxy_url.split(":").last().unwrap().parse().unwrap_or(80);
     url.set_host(Some(&host)).unwrap();
     url.set_port(Some(port)).unwrap();
-    let mut surf_res = surf::post(url).body_bytes(&body).await.unwrap();
+    let mut surf_res = surf::post(url).body_bytes(&body).await?;
     let mut res = Response::new(surf_res.status());
-    let body = surf_res.body_bytes().await.unwrap();
+    let body = surf_res.body_bytes().await?;
     res.set_body(Body::from_bytes(body));
     Ok(res)
 }

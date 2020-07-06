@@ -10,8 +10,10 @@ use crate::{
     schema::transactions::dsl,
     vm, VM_STATE,
 };
+use async_std::task::sleep;
 use diesel::prelude::*;
 use futures::channel::oneshot;
+use std::time::Duration;
 use tide::{Redirect, Response, Result};
 
 pub async fn show(req: tide::Request<State>) -> Result<Response> {
@@ -46,7 +48,20 @@ pub async fn create(mut req: tide::Request<State>) -> Result<Response> {
     if !transaction.valid_signature() {
         return Ok(Response::new(403));
     }
+    for _ in 0..10 {
+        if let Ok(res) = post_transaction(&req, &transaction).await {
+            return Ok(res);
+        }
+        sleep(Duration::from_millis(500)).await;
+    }
+    post_transaction(&req, &transaction).await
 
+}
+
+async fn post_transaction(
+    req: &tide::Request<State>,
+    transaction: &vm::Transaction,
+) -> Result<Response> {
     let current_miner = {
         let mut vm_state = VM_STATE.lock().await;
         vm_state.current_miner().unwrap()
@@ -55,7 +70,7 @@ pub async fn create(mut req: tide::Request<State>) -> Result<Response> {
         let sender = &req.state().sender;
         let (responder, response) = oneshot::channel();
         sender
-            .send(Message::Transaction(transaction, responder))
+            .send(Message::Transaction(transaction.clone(), responder))
             .await;
         let completed_transaction = response.await.unwrap();
         let transaction_url = format!(
@@ -72,3 +87,4 @@ pub async fn create(mut req: tide::Request<State>) -> Result<Response> {
         .await
     }
 }
+
