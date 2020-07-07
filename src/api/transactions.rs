@@ -55,7 +55,6 @@ pub async fn create(mut req: tide::Request<State>) -> Result<Response> {
         sleep(Duration::from_millis(500)).await;
     }
     post_transaction(&req, &transaction).await
-
 }
 
 async fn post_transaction(
@@ -87,4 +86,3 @@ async fn post_transaction(
         .await
     }
 }
-

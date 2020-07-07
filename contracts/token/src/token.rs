@@ -42,21 +42,17 @@ mod token {
         );
     }
 
-    pub fn transfer_from(from: Vec<u8>, to: Vec<u8>, amount: u64) -> Result<Value, Error> {
-        if caller().ne(&get_miners().first().unwrap().address) {
-            return Err(errors::SENDER_IS_NOT_THE_WINNER);
-        }
-
-        if get_balance(from.clone()) < amount {
+    pub fn transfer_to_current_miner(amount: u64) -> Result<Value, Error> {
+        if get_balance(caller().clone()) < amount {
             return Err(errors::INSUFFICIENT_FUNDS);
         }
 
-        debit(from.to_vec(), amount);
-        credit(to.to_vec(), amount);
-        Ok(Value::Null)
+        debit(caller(),amount);
+        credit(get_miners().first().unwrap().address.clone(), amount);
+        Ok(get_balance(caller()).into())
     }
 
-    pub fn transfer_from_allowance(
+    pub fn transfer_from(
         from: Vec<u8>,
         to: Vec<u8>,
         amount: u64,
@@ -268,13 +264,15 @@ mod tests {
     }
 
     #[test]
-    fn test_transfer_from() {
-        set_caller(ALICE.to_vec());
+    fn test_transfer_to_current_miner() {
+        set_balance(ALICE.to_vec(), 100);
+        set_caller(BOB.to_vec());
         start_mining(HOST.to_string(), 1, vec![]).unwrap();
-        set_balance(BOB.to_vec(), 100);
-        transfer_from(BOB.to_vec(), CAROL.to_vec(), 20).unwrap();
-        assert_eq!(balance_of(CAROL.to_vec()), 20);
-        assert_eq!(balance_of(BOB.to_vec()), 80);
+        set_caller(ALICE.to_vec());
+        let result = transfer_to_current_miner(20).unwrap();
+        assert_eq!(result, Value::Integer(80));
+        assert_eq!(balance_of(ALICE.to_vec()), 80);
+        assert_eq!(balance_of(BOB.to_vec()), 20);
     }
 
     #[test]
@@ -294,12 +292,12 @@ mod tests {
     }
 
     #[test]
-    fn test_transfer_from_allowance() {
+    fn test_transfer_from() {
         set_caller(ALICE.to_vec());
         set_balance(ALICE.to_vec(), 100);
         approve(BOB.to_vec(), 50);
         set_caller(BOB.to_vec());
-        transfer_from_allowance(ALICE.to_vec(), CAROL.to_vec(), 20).unwrap();
+        transfer_from(ALICE.to_vec(), CAROL.to_vec(), 20).unwrap();
         let alices_balance = balance_of(ALICE.to_vec());
         assert_eq!(alices_balance, 80);
         let bobs_allowance = allowance(ALICE.to_vec(), BOB.to_vec());
@@ -376,7 +374,7 @@ mod tests {
         set_caller(BOB.to_vec());
         start_mining(HOST.to_string(), 1, bobs_onion.last().unwrap().to_vec()).unwrap();
 
-        // With this random seed the winners are Alice, Alice, Bob in that order
+        // With this random seed the winners are rlice, rlice, Bob in that order
         set_caller(ALICE.to_vec());
         alices_onion.pop();
         assert!(reveal(alices_onion.last().unwrap().to_vec()).is_ok());

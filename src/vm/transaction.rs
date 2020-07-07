@@ -1,6 +1,6 @@
 use crate::{
     config::{keypair, public_key, OPTS},
-    constants::TOKEN_CONTRACT,
+    constants::{FREE_FUNCTIONS, TOKEN_CONTRACT, TRANSACTION_FEE},
     helpers::random,
     system_contracts::{self, is_system_contract},
     vm::{
@@ -92,6 +92,19 @@ impl Transaction {
             return system_contracts::run(self, state);
         }
 
+        if !self.is_free() {
+            let transfer_result = system_contracts::transfer_to_current_miner(
+                TRANSACTION_FEE,
+                self.sender.clone(),
+                state,
+            );
+            if let Value::Map(result) = transfer_result.return_value.clone() {
+                if !result.contains_key(&Value::Text("Ok".to_string())) {
+                    return transfer_result;
+                }
+            }
+        };
+
         let instance = match new_module_instance(code) {
             Ok(instance) => instance,
             Err(err) => {
@@ -105,13 +118,7 @@ impl Transaction {
             }
         };
 
-        let mut vm = VM {
-            instance: &instance,
-            caller: &self.sender,
-            state: state,
-            transaction: self,
-            gas: self.gas_limit,
-        };
+        let mut vm = VM::new(state, &instance, &self);
         let (return_value, gas_left) = vm.call(&self.function, self.arguments.clone());
         self.complete(return_value, gas_left)
     }
@@ -148,5 +155,10 @@ impl Transaction {
         public_key
             .verify(&to_vec(&transaction_without_signature).unwrap(), &signature)
             .is_ok()
+    }
+
+    fn is_free(&self) -> bool {
+        return self.contract_address == *TOKEN_CONTRACT
+            && FREE_FUNCTIONS.contains(&self.function.as_ref());
     }
 }
