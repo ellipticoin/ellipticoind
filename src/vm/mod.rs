@@ -40,6 +40,22 @@ pub struct VM<'a> {
     pub caller: &'a Vec<u8>,
 }
 
+impl<'a> VM<'a> {
+    pub fn new(
+        state: &'a mut State,
+        instance: &'a ModuleRef,
+        transaction: &'a Transaction,
+    ) -> Self {
+        Self {
+            instance: instance,
+            caller: &transaction.sender,
+            state,
+            transaction: transaction,
+            gas: transaction.gas_limit,
+        }
+    }
+}
+
 pub fn new_module_instance(code: Vec<u8>) -> Result<ModuleRef, metered_wasmi::Error> {
     let module = Module::from_buffer(code)?;
 
