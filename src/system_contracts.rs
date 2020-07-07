@@ -1,6 +1,5 @@
 use crate::{
     constants::TOKEN_CONTRACT,
-    helpers::bytes_to_value,
     vm::{self, CompletedTransaction, State, Transaction},
 };
 use serde_cbor::Value;
@@ -45,17 +44,17 @@ fn run_constuctor(
     .run(state)
 }
 
-pub async fn _transfer(
+pub fn transfer_to_current_miner(
     amount: u32,
-    from: Vec<u8>,
-    to: Vec<u8>,
+    sender: Vec<u8>,
     state: &mut vm::State,
 ) -> CompletedTransaction {
-    let arguments = vec![
-        bytes_to_value(from.clone()),
-        bytes_to_value(to.clone()),
-        amount.into(),
-    ];
-    let transfer = Transaction::new(TOKEN_CONTRACT.to_vec(), "transfer_from", arguments.clone());
+    let arguments = vec![amount.into()];
+    let mut transfer = Transaction::new(
+        TOKEN_CONTRACT.to_vec(),
+        "transfer_to_current_miner",
+        arguments.clone(),
+    );
+    transfer.sender = sender;
     transfer.run(state)
 }
