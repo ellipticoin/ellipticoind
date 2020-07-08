@@ -39,8 +39,11 @@ Private Key: gNCgX1Jfs3gXHDEvd7ano6bflJR0oNscgBI1O4JEN2N06SFQL1isJysk3/ix35gkwG7
 ```
 
 6. Copy the sample `.env` file and add your private key
+
 ```
 $ cp .env.sample .env
+```
+
 ```
 # .env
 DATABASE_URL=postgres://root:@/ellipticoind
@@ -52,7 +55,6 @@ BURN_PER_BLOCK=100
 7. Create the postgres user and database
 
 ```
-#
 $ cd /
 $ su postgres -c"createuser root"
 $ su postgres -c"createdb ellipticoind"
