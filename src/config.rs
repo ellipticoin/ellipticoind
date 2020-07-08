@@ -48,6 +48,13 @@ pub struct Opts {
 pub enum SubCommand {
     #[clap(name = "generate-keypair")]
     GenerateKeypair,
+    #[clap(name = "dump-state")]
+    DumpState {
+        #[clap(long = "at-block")]
+        block_number: Option<u32>,
+        #[clap(long = "file", default_value = "genesis.cbor")]
+        file: String,
+    },
 }
 
 lazy_static! {
