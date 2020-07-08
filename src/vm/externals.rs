@@ -1,4 +1,4 @@
-use crate::vm::{gas_costs, new_module_instance, transaction::Transaction, VM};
+use crate::vm::{gas_costs, new_module_instance, VM};
 use metered_wasmi::{isa, RuntimeArgs, RuntimeValue, TrapKind};
 use serde_cbor::{from_slice, to_vec};
 use std::str;
@@ -91,7 +91,8 @@ impl<'a> VM<'a> {
             .unwrap());
         }
         let module_instance = new_module_instance(code).unwrap();
-        let transaction: Transaction = (*self.transaction).clone();
+        let mut transaction = self.transaction.clone();
+        transaction.contract_address = contract_address;
         let mut vm = VM {
             instance: &module_instance,
             caller: &self.transaction.contract_address.clone(),

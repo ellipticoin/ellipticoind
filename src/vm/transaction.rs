@@ -84,14 +84,13 @@ impl Transaction {
     }
 
     pub fn run(&self, state: &mut State) -> CompletedTransaction {
+        if is_system_contract(&self) {
+            return system_contracts::run(self, state);
+        }
         let code = state.get_code(&self.contract_address);
         if code.len() == 0 {
             return self.complete((CONTRACT_NOT_FOUND.clone()).into(), self.gas_limit);
         }
-        if is_system_contract(&self) {
-            return system_contracts::run(self, state);
-        }
-
         if !self.is_free() {
             let transfer_result = system_contracts::transfer_to_current_miner(
                 TRANSACTION_FEE,
