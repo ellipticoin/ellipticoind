@@ -10,6 +10,7 @@ use crate::{
     IS_CURRENT_MINER,
 };
 use diesel::dsl::insert_into;
+
 use serde::{Deserialize, Serialize};
 use serde_cbor::to_vec;
 

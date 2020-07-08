@@ -105,7 +105,7 @@ pub async fn set_token_contract() {
         .unwrap();
 }
 
-async fn reset_redis() {
+pub async fn reset_redis() {
     let mut redis = get_redis_connection();
     let _: () = redis::cmd("FLUSHDB").query(redis.deref_mut()).unwrap();
 }
@@ -119,7 +119,7 @@ async fn reset_pg() {
     embedded_migrations::run(&pg_db).unwrap();
 }
 
-async fn reset_rocksdb() {
+pub async fn reset_rocksdb() {
     let rocksdb = get_rocksdb();
     if OPTS.save_state {
         return;
