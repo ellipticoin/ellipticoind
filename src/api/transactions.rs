@@ -63,7 +63,21 @@ async fn post_transaction(
 ) -> Result<Response> {
     let current_miner = {
         let mut vm_state = VM_STATE.lock().await;
-        vm_state.current_miner().unwrap()
+        if let Some(current_miner) = vm_state.current_miner() {
+            current_miner
+        } else {
+            let sender = &req.state().sender;
+            let (responder, response) = oneshot::channel();
+            sender
+                .send(Message::Transaction(transaction.clone(), responder))
+                .await;
+            let completed_transaction = response.await.unwrap();
+            let transaction_url = format!(
+                "/transactions/{}",
+                base64::encode_config(&completed_transaction.hash, base64::URL_SAFE)
+            );
+            return Ok(Redirect::see_other(transaction_url).into());
+        }
     };
     if current_miner.address.eq(&public_key()) {
         let sender = &req.state().sender;
