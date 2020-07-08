@@ -72,6 +72,7 @@ pub struct TransactionWithoutHash {
     sender: Vec<u8>,
     function: String,
     gas_used: u64,
+    position: u32,
     arguments: Vec<serde_cbor::Value>,
     gas_limit: u64,
     #[serde(with = "serde_bytes")]
@@ -112,6 +113,7 @@ impl From<Transaction> for TransactionWithoutHash {
             nonce: transaction.nonce as u32,
             function: transaction.function,
             gas_used: transaction.gas_used as u64,
+            position: transaction.position as u32,
             gas_limit: transaction.gas_limit as u64,
             network_id: transaction.network_id as u64,
             sender: transaction.sender,
