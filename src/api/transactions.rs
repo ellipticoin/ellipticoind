@@ -66,6 +66,7 @@ async fn post_transaction(
         if let Some(current_miner) = vm_state.current_miner() {
             current_miner
         } else {
+	    println!("curent_miner not set");
             let sender = &req.state().sender;
             let (responder, response) = oneshot::channel();
             sender
