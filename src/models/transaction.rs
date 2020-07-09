@@ -93,7 +93,6 @@ impl Transaction {
         completed_transaction.block_hash = current_block.hash.clone();
         completed_transaction.set_hash();
         completed_transaction.position = position;
-	println!("{} {} {:?}", completed_transaction.position, completed_transaction.function, serde_cbor::from_slice::<serde_cbor::Value>(&completed_transaction.return_value));
         insert_into(transactions_table)
             .values(&completed_transaction)
             .execute(&get_pg_connection())

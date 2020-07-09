@@ -22,7 +22,7 @@ pub async fn run(mut api_receiver: sync::Receiver<Message>) {
             let sleep_fused = sleep(*BLOCK_TIME).fuse();
             pin_mut!(sleep_fused);
             loop {
-                let mut transaction_position = -1;
+                let mut transaction_position = 0;
                 let next_message_fused = api_receiver.next().map(Option::unwrap).fuse();
                 pin_mut!(next_message_fused);
                 select! {
@@ -43,10 +43,10 @@ pub async fn run(mut api_receiver: sync::Receiver<Message>) {
                                 println!("Got block while mining");
                             },
                             Message::Transaction(transaction, responder) => {
-                                transaction_position += 1;
                                 let mut vm_state = VM_STATE.lock().await;
                                 let completed_transaction =
                                     models::Transaction::run(&mut vm_state, &block, transaction, transaction_position);
+                                transaction_position += 1;
                                 responder.send(completed_transaction).unwrap();
                             },
                         }
