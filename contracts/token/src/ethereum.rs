@@ -14,7 +14,14 @@ pub fn ecrecover_address(message: &[u8], signature: &[u8]) -> Vec<u8> {
     let mut fixed_size_signature: [u8; 64] = [0; 64];
     fixed_size_signature.copy_from_slice(&signature[..64]);
     let signature_parsed = secp256k1::Signature::parse(&fixed_size_signature);
-    let recovery_id = secp256k1::RecoveryId::parse(signature[64] - 27 as u8).unwrap();
+
+    // See: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-155.md
+    let v = match signature[64] {
+        27 => 0,
+        28 => 1,
+        v => v,
+    };
+    let recovery_id = secp256k1::RecoveryId::parse(v).unwrap();
     let public_key = secp256k1::recover(&message, &signature_parsed, &recovery_id).unwrap();
     public_key_to_address(public_key)
 }
