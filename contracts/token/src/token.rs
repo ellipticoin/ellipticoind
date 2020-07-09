@@ -10,7 +10,6 @@ use ethereum;
 use hashing::sha256;
 use wasm_rpc::serde::{Deserialize, Serialize};
 
-
 enum Namespace {
     Allowances,
     Balances,
@@ -47,16 +46,12 @@ mod token {
             return Err(errors::INSUFFICIENT_FUNDS);
         }
 
-        debit(caller(),amount);
+        debit(caller(), amount);
         credit(get_miners().first().unwrap().address.clone(), amount);
         Ok(get_balance(caller()).into())
     }
 
-    pub fn transfer_from(
-        from: Vec<u8>,
-        to: Vec<u8>,
-        amount: u64,
-    ) -> Result<Value, Error> {
+    pub fn transfer_from(from: Vec<u8>, to: Vec<u8>, amount: u64) -> Result<Value, Error> {
         if get_allowance(from.clone(), caller()) < amount {
             return Err(errors::INSUFFICIENT_ALLOWANCE);
         }
@@ -181,10 +176,7 @@ mod token {
     }
 
     fn set_miners(miners: &Vec<Miner>) {
-        ellipticoin::set_storage::<_, Value>(
-            Namespace::Miners as u8,
-            to_value(miners).unwrap(),
-        );
+        ellipticoin::set_storage::<_, Value>(Namespace::Miners as u8, to_value(miners).unwrap());
     }
 
     fn settle_block_rewards() {
@@ -321,15 +313,33 @@ mod tests {
     #[test]
     fn test_unlock_ether() {
         let ethereum_address = "adfe2b5beac83382c047d977db1df977fd9a7e41";
+        let signature = hex::decode(&"e8fe080305be6153dda25cd046f022fe93fce9e9abf7443cb602236317769ea3007922a1ee66a8dc64caae93bd7073af95633bb64389b61679c83c05590d1fbf1c").unwrap();
         set_caller(ALICE.to_vec());
         set_storage(
             Namespace::EthereumBalances,
             hex::decode(ethereum_address).unwrap(),
             1000 as u64,
         );
-        unlock_ether(hex::decode(&"e8fe080305be6153dda25cd046f022fe93fce9e9abf7443cb602236317769ea3007922a1ee66a8dc64caae93bd7073af95633bb64389b61679c83c05590d1fbf1c").unwrap(), ALICE.to_vec()).unwrap();
-        let alices_balance = balance_of(ALICE.to_vec());
-        assert_eq!(alices_balance, 100000);
+        unlock_ether(signature, ALICE.to_vec()).unwrap();
+        assert_eq!(balance_of(ALICE.to_vec()), 100000);
+    }
+
+    #[test]
+    fn test_unlock_ether_legacy_signature() {
+        let ellipticoin_address =
+            hex::decode(&"7075499ca17b8459fd6ca407d4769ea51bc27edf85fe75e003e4f5f786478749")
+                .unwrap()
+                .to_vec();
+        let ethereum_address = "a3953352beab67861e5a7fff47f36611a1ff5335";
+        let signature = hex::decode(&"0578e0ba123dcf2e563cb2fb5937d01bc4c1e12d4147a8ea231d3b595b0890a4057338c379cd55b71160a7aa301642c972ba1d519b7c74b2254d8c0ebbb9bf1500").unwrap();
+        set_caller(ALICE.to_vec());
+        set_storage(
+            Namespace::EthereumBalances,
+            hex::decode(ethereum_address).unwrap(),
+            1000 as u64,
+        );
+        unlock_ether(signature, ellipticoin_address.clone()).unwrap();
+        assert_eq!(balance_of(ellipticoin_address), 100000);
     }
 
     #[test]
