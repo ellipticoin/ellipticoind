@@ -1,3 +1,4 @@
+use serde::Serialize;
 use serde_cbor::{value::to_value, Value};
 use std::collections::HashMap;
 
@@ -7,7 +8,7 @@ lazy_static! {
     };
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Clone)]
 pub struct Error {
     pub message: String,
 }

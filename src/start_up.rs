@@ -4,31 +4,22 @@ use crate::{
         ethereum_balances_path, get_pg_connection, get_redis_connection, get_rocksdb,
         random_bootnode, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
     },
-    constants::{Namespace, GENESIS_STATE_PATH, TOKEN_CONTRACT, TOKEN_WASM_PATH},
+    constants::{Namespace, GENESIS_STATE_PATH, TOKEN_CONTRACT},
     helpers::{bytes_to_value, get_block, post_transaction},
     models,
     models::{Block, HashOnion},
-    vm::{
-        redis::{self, Commands},
-        rocksdb,
-        state::db_key,
-        State, Transaction,
-    },
+    state::{db_key, Memory, State, Storage},
+    transaction::Transaction,
 };
 use diesel_migrations::revert_latest_migration;
 use indicatif::ProgressBar;
-
-use std::{
-    convert::TryInto,
-    fs::File,
-    io::{BufRead, Read},
-    ops::DerefMut,
-};
+use r2d2_redis::redis::{self};
+use std::{convert::TryInto, fs::File, io::BufRead, ops::DerefMut};
 
 pub async fn start_miner(vm_state: &mut State) {
     let pg_db = get_pg_connection();
     let start_mining_transaction = Transaction::new(
-        TOKEN_CONTRACT.to_vec(),
+        TOKEN_CONTRACT.clone(),
         "start_mining",
         vec![
             ((*HOST).clone().to_string().clone()).into(),
@@ -73,7 +64,6 @@ pub async fn reset_state() {
     import_ethereum_balances().await;
     load_genesis_state().await;
     reset_current_miner().await;
-    set_token_contract().await;
     HashOnion::generate(&pg_db);
 }
 
@@ -84,25 +74,20 @@ pub async fn reset_current_miner() {
         .unwrap();
 }
 pub async fn load_genesis_state() {
-    let mut redis = get_redis_connection();
-    let rocksdb = get_rocksdb();
+    let mut memory = Memory {
+        redis: get_redis_connection(),
+    };
+    let mut storage = Storage {
+        rocksdb: get_rocksdb(),
+    };
     let genesis_file = File::open(GENESIS_STATE_PATH).unwrap();
     let state: VMState = serde_cbor::from_reader(genesis_file).unwrap();
     for (key, value) in state.memory {
-        let _: () = redis.set(key, value).unwrap();
+        let _: () = memory.set(&key, &value);
     }
     for (key, value) in state.storage {
-        rocksdb.put(key, value).unwrap();
+        storage.set(&key, &value);
     }
-}
-pub async fn set_token_contract() {
-    let rocksdb = get_rocksdb();
-    let mut token_file = File::open(TOKEN_WASM_PATH).unwrap();
-    let mut token_wasm = Vec::new();
-    token_file.read_to_end(&mut token_wasm).unwrap();
-    rocksdb
-        .put(db_key(&TOKEN_CONTRACT, &vec![]), &token_wasm)
-        .unwrap();
 }
 
 pub async fn reset_redis() {
