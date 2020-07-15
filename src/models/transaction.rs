@@ -1,6 +1,7 @@
 use crate::{
     config::get_pg_connection,
     diesel::{ExpressionMethods, RunQueryDsl},
+    error::CONTRACT_NOT_FOUND,
     helpers::sha256,
     models,
     models::block::Block,
@@ -11,23 +12,33 @@ use crate::{
             dsl::transactions as transactions_table,
         },
     },
-    vm,
+    state::State,
+    system_contracts::{self, api::NativeAPI, is_system_contract},
+    transaction,
 };
 use diesel::{
     insert_into,
     r2d2::{ConnectionManager, PooledConnection},
     OptionalExtension, PgConnection, QueryDsl,
 };
+use ellipticoin::Address;
 use serde::{Deserialize, Serialize};
 use serde_cbor::{from_slice, to_vec};
+use std::convert::TryInto;
+use std::str;
 
-impl From<Transaction> for vm::Transaction {
-    fn from(transaction: Transaction) -> vm::Transaction {
-        vm::Transaction {
+impl From<Transaction> for transaction::Transaction {
+    fn from(transaction: Transaction) -> transaction::Transaction {
+        transaction::Transaction {
             network_id: transaction.network_id as u32,
-            sender: transaction.sender,
+            sender: transaction.sender[..].try_into().unwrap(),
             arguments: from_slice(&transaction.arguments).unwrap(),
-            contract_address: transaction.contract_address,
+            contract_address: (
+                transaction.contract_address[0..32].try_into().unwrap(),
+                str::from_utf8(&transaction.contract_address[32..])
+                    .unwrap()
+                    .to_string(),
+            ),
             function: transaction.function,
             gas_limit: transaction.gas_limit as u32,
             nonce: transaction.nonce as u32,
@@ -84,12 +95,31 @@ pub struct TransactionWithoutHash {
 
 impl Transaction {
     pub fn run(
-        vm_state: &mut vm::State,
+        state: &mut State,
         current_block: &Block,
-        vm_transaction: vm::Transaction,
+        vm_transaction: transaction::Transaction,
         position: i64,
     ) -> Self {
-        let mut completed_transaction: models::Transaction = vm_transaction.run(vm_state).into();
+        let mut completed_transaction: models::Transaction = if is_system_contract(&vm_transaction)
+        {
+            let mut api = NativeAPI {
+                transaction: vm_transaction.clone(),
+                address: vm_transaction.clone().contract_address,
+                state,
+                caller: Address::PublicKey(vm_transaction.sender),
+                sender: vm_transaction.sender.clone(),
+            };
+            system_contracts::run(&mut api, vm_transaction)
+        } else {
+            // user contracts are disabled for launch
+            return vm_transaction
+                .complete(
+                    (CONTRACT_NOT_FOUND.clone()).into(),
+                    vm_transaction.gas_limit,
+                )
+                .into();
+        }
+        .into();
         completed_transaction.block_hash = current_block.hash.clone();
         completed_transaction.set_hash();
         completed_transaction.position = position;
@@ -101,7 +131,7 @@ impl Transaction {
     }
 
     pub fn set_hash(&mut self) {
-        self.hash = sha256(to_vec(&TransactionWithoutHash::from(self.clone())).unwrap());
+        self.hash = sha256(to_vec(&TransactionWithoutHash::from(self.clone())).unwrap()).to_vec();
     }
 }
 
@@ -122,15 +152,19 @@ impl From<Transaction> for TransactionWithoutHash {
     }
 }
 
-impl From<&vm::CompletedTransaction> for Transaction {
-    fn from(transaction: &vm::CompletedTransaction) -> Self {
+impl From<&transaction::CompletedTransaction> for Transaction {
+    fn from(transaction: &transaction::CompletedTransaction) -> Self {
         Self {
             network_id: transaction.network_id as i64,
             hash: vec![],
             block_hash: vec![],
-            contract_address: transaction.contract_address.clone(),
+            contract_address: [
+                &transaction.contract_address.0[..],
+                transaction.contract_address.1.as_bytes(),
+            ]
+            .concat(),
             position: 0,
-            sender: transaction.sender.clone(),
+            sender: transaction.sender.to_vec(),
             gas_limit: transaction.gas_limit as i64,
             gas_used: transaction.gas_used as i64,
             nonce: transaction.nonce as i64,
@@ -142,12 +176,17 @@ impl From<&vm::CompletedTransaction> for Transaction {
     }
 }
 
-impl From<&Transaction> for vm::Transaction {
+impl From<&Transaction> for transaction::Transaction {
     fn from(transaction: &Transaction) -> Self {
         Self {
             network_id: transaction.network_id as u32,
-            contract_address: transaction.contract_address.clone(),
-            sender: transaction.sender.clone(),
+            contract_address: (
+                transaction.contract_address[0..32].try_into().unwrap(),
+                str::from_utf8(&transaction.contract_address[32..])
+                    .unwrap()
+                    .to_string(),
+            ),
+            sender: transaction.sender.clone()[..].try_into().unwrap(),
             gas_limit: transaction.gas_limit as u32,
             nonce: transaction.nonce as u32,
             function: transaction.function.clone(),
@@ -157,22 +196,26 @@ impl From<&Transaction> for vm::Transaction {
     }
 }
 
-impl From<vm::CompletedTransaction> for Transaction {
-    fn from(transaction: vm::CompletedTransaction) -> Self {
+impl From<transaction::CompletedTransaction> for Transaction {
+    fn from(transaction: transaction::CompletedTransaction) -> Self {
         Self {
             network_id: transaction.network_id as i64,
             hash: vec![],
             block_hash: vec![],
-            contract_address: transaction.contract_address,
+            contract_address: [
+                &transaction.contract_address.0[..],
+                transaction.contract_address.1.as_bytes(),
+            ]
+            .concat(),
             position: 0,
-            sender: transaction.sender,
+            sender: transaction.sender.to_vec(),
             gas_limit: transaction.gas_limit as i64,
             gas_used: transaction.gas_used as i64,
             nonce: transaction.nonce as i64,
             function: transaction.function,
             arguments: to_vec(&transaction.arguments).unwrap(),
             return_value: to_vec(&transaction.return_value).unwrap(),
-            signature: transaction.signature.unwrap(),
+            signature: transaction.signature.unwrap_or(vec![]),
         }
     }
 }

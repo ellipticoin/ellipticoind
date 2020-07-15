@@ -1,12 +1,18 @@
-use crate::{api::views, config::Bootnode, vm::Transaction};
+use crate::{
+    api::views,
+    config::{get_rocksdb, Bootnode},
+    state::Storage,
+    system_contracts::ellipticoin::Miner,
+    transaction::Transaction,
+};
 use rand::Rng;
 use serde_cbor::Value;
 use sha2::{Digest, Sha256};
 
-pub fn sha256(message: Vec<u8>) -> Vec<u8> {
+pub fn sha256(message: Vec<u8>) -> [u8; 32] {
     let mut hasher = Sha256::new();
-    hasher.input(message);
-    hasher.result().to_vec()
+    hasher.update(message);
+    hasher.finalize().into()
 }
 /*
  * Until Rust has [specialization](https://github.com/rust-lang/rust/issues/31844) we need to
@@ -18,6 +24,15 @@ pub fn bytes_to_value(bytes: Vec<u8>) -> Value {
         .map(|n| n.into())
         .collect::<Vec<Value>>()
         .into()
+}
+
+#[cfg(test)]
+pub fn generate_hash_onion(layers: usize, center: [u8; 32]) -> Vec<[u8; 32]> {
+    let mut onion = vec![center];
+    for _ in 1..(layers) {
+        onion.push(sha256(onion.last().unwrap().to_vec()));
+    }
+    onion
 }
 
 pub fn random() -> u32 {
@@ -43,4 +58,17 @@ pub async fn get_block(bootnode: &Bootnode, block_number: u32) -> Option<views::
     } else {
         None
     }
+}
+
+pub fn zero_pad_vec(vec: &[u8], len: usize) -> Vec<u8> {
+    let mut padded = vec![0; len];
+    padded[..vec.len()].clone_from_slice(vec);
+    padded
+}
+
+pub fn current_miner() -> Miner {
+    let mut storage = Storage {
+        rocksdb: get_rocksdb(),
+    };
+    storage.current_miner().unwrap()
 }

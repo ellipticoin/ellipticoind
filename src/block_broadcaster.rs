@@ -1,6 +1,6 @@
 use crate::{
     models::{Block, Transaction},
-    vm::state::State,
+    state::State,
 };
 
 pub async fn broadcast(vm_state: &mut State, block: (Block, Vec<Transaction>)) {

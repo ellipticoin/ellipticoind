@@ -1,41 +1,30 @@
 use crate::{
-    config::{keypair, public_key, OPTS},
-    constants::{FREE_FUNCTIONS, TOKEN_CONTRACT, TRANSACTION_FEE},
+    config::{keypair, network_id, public_key},
+    constants::TOKEN_CONTRACT,
     helpers::random,
-    system_contracts::{self, is_system_contract},
-    vm::{
-        error::{Error, CONTRACT_NOT_FOUND},
-        new_module_instance, State, VM,
-    },
 };
-use ed25519_dalek::{PublicKey, Signature};
-pub use metered_wasmi::{
-    isa, FunctionContext, ImportsBuilder, Module, ModuleInstance, NopExternals, RuntimeValue,
-};
+use ed25519_dalek::{PublicKey, Signature, Signer, Verifier};
 use serde::{Deserialize, Serialize};
 use serde_cbor::{to_vec, Value};
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct Transaction {
     pub nonce: u32,
-    #[serde(with = "serde_bytes")]
-    pub sender: Vec<u8>,
+    pub sender: [u8; 32],
     pub function: String,
     pub arguments: Vec<serde_cbor::Value>,
     pub gas_limit: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(with = "serde_bytes")]
     pub signature: Option<Vec<u8>>,
     pub network_id: u32,
-    #[serde(with = "serde_bytes")]
-    pub contract_address: Vec<u8>,
+    pub contract_address: ([u8; 32], String),
 }
 
 impl Default for Transaction {
     fn default() -> Self {
         Self {
-            network_id: OPTS.network_id,
-            contract_address: TOKEN_CONTRACT.to_vec(),
+            network_id: network_id(),
+            contract_address: TOKEN_CONTRACT.clone(),
             sender: public_key(),
             nonce: 0,
             function: "".to_string(),
@@ -49,10 +38,8 @@ impl Default for Transaction {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct CompletedTransaction {
     pub network_id: u32,
-    #[serde(with = "serde_bytes")]
-    pub contract_address: Vec<u8>,
-    #[serde(with = "serde_bytes")]
-    pub sender: Vec<u8>,
+    pub contract_address: ([u8; 32], String),
+    pub sender: [u8; 32],
     pub nonce: u32,
     pub gas_limit: u32,
     pub gas_used: u32,
@@ -64,7 +51,11 @@ pub struct CompletedTransaction {
 }
 
 impl Transaction {
-    pub fn new(contract_address: Vec<u8>, function: &str, arguments: Vec<Value>) -> Self {
+    pub fn new(
+        contract_address: ([u8; 32], String),
+        function: &str,
+        arguments: Vec<Value>,
+    ) -> Self {
         let mut transaction = Self {
             contract_address,
             nonce: random(),
@@ -83,43 +74,8 @@ impl Transaction {
         self.signature = Some(signature.to_bytes().to_vec());
     }
 
-    pub fn run(&self, state: &mut State) -> CompletedTransaction {
-        if is_system_contract(&self) {
-            return system_contracts::run(self, state);
-        }
-        let code = state.get_code(&self.contract_address);
-        if code.len() == 0 {
-            return self.complete((CONTRACT_NOT_FOUND.clone()).into(), self.gas_limit);
-        }
-        if !self.is_free() {
-            let transfer_result = system_contracts::transfer_to_current_miner(
-                TRANSACTION_FEE,
-                self.sender.clone(),
-                state,
-            );
-            if let Value::Map(result) = transfer_result.return_value.clone() {
-                if !result.contains_key(&Value::Text("Ok".to_string())) {
-                    return transfer_result;
-                }
-            }
-        };
-
-        let instance = match new_module_instance(code) {
-            Ok(instance) => instance,
-            Err(err) => {
-                return self.complete(
-                    Error {
-                        message: err.to_string(),
-                    }
-                    .into(),
-                    self.gas_limit,
-                )
-            }
-        };
-
-        let mut vm = VM::new(state, &instance, &self);
-        let (return_value, gas_left) = vm.call(&self.function, self.arguments.clone());
-        self.complete(return_value, gas_left)
+    pub fn contract_name(&self) -> String {
+        self.contract_address.clone().1
     }
 
     pub fn complete(&self, return_value: Value, gas_left: u32) -> CompletedTransaction {
@@ -145,19 +101,13 @@ impl Transaction {
             Ok(signature) => signature,
             _ => return false,
         };
-        let signature = match Signature::from_bytes(&self.signature.clone().unwrap()[..]) {
-            Ok(signature) => signature,
-            _ => return false,
-        };
+        let mut signature_bytes = [0; 64];
+        signature_bytes.clone_from_slice(&self.signature.clone().unwrap());
+        let signature = Signature::new(signature_bytes);
         let mut transaction_without_signature = self.clone();
         transaction_without_signature.signature = None;
         public_key
             .verify(&to_vec(&transaction_without_signature).unwrap(), &signature)
             .is_ok()
-    }
-
-    fn is_free(&self) -> bool {
-        return self.contract_address == *TOKEN_CONTRACT
-            && FREE_FUNCTIONS.contains(&self.function.as_ref());
     }
 }

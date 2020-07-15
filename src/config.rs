@@ -1,8 +1,5 @@
 extern crate clap;
-use crate::{
-    pg,
-    vm::{self, redis},
-};
+use crate::{pg, types};
 
 use clap::Clap;
 use diesel::{
@@ -11,6 +8,7 @@ use diesel::{
 };
 use dotenv::dotenv;
 use ed25519_dalek::{Keypair, SecretKey};
+use r2d2_redis::RedisConnectionManager;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Deserializer};
 use std::{
@@ -18,7 +16,6 @@ use std::{
     net::{IpAddr, SocketAddr},
     sync::Arc,
 };
-use vm::RedisConnectionManager;
 
 #[derive(Clap, Debug)]
 pub struct Opts {
@@ -75,9 +72,9 @@ lazy_static! {
             0
         }
     };
-    pub static ref REDIS_POOL: redis::Pool = {
+    pub static ref REDIS_POOL: types::redis::Pool = {
         let redis_manager = RedisConnectionManager::new(OPTS.redis_url.clone()).unwrap();
-        vm::r2d2_redis::r2d2::Pool::builder()
+        r2d2_redis::r2d2::Pool::builder()
             .build(redis_manager)
             .unwrap()
     };
@@ -125,11 +122,22 @@ pub fn socket() -> SocketAddr {
 }
 
 pub fn keypair() -> Keypair {
-    Keypair::from_bytes(&base64::decode(&env::var("PRIVATE_KEY").unwrap()).unwrap()).unwrap()
+    Keypair::from_bytes(
+        &base64::decode(&env::var("PRIVATE_KEY").expect("PRIVATE_KEY not set")).unwrap(),
+    )
+    .unwrap()
 }
 
-pub fn public_key() -> Vec<u8> {
-    keypair().public.to_bytes().to_vec()
+pub fn public_key() -> [u8; 32] {
+    keypair().public.to_bytes()
+}
+
+pub fn network_id() -> u32 {
+    if cfg!(test) {
+        0
+    } else {
+        OPTS.network_id
+    }
 }
 
 pub fn secret_key() -> SecretKey {
@@ -141,7 +149,7 @@ pub fn random_bootnode() -> Bootnode {
     (*bootnodes().choose(&mut rng).unwrap()).clone()
 }
 
-pub fn get_redis_connection() -> redis::Connection {
+pub fn get_redis_connection() -> types::redis::Connection {
     REDIS_POOL.get().unwrap()
 }
 

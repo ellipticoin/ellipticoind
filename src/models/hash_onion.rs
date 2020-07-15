@@ -73,7 +73,7 @@ impl HashOnion {
         for _ in (0..hash_onion_size).step_by(sql_query_size) {
             pb.inc(sql_query_size as u64);
             for _ in 1..(sql_query_size) {
-                onion.push(sha256(onion.last().unwrap().to_vec()));
+                onion.push(sha256(onion.last().unwrap().to_vec()).to_vec());
             }
             let values: Vec<HashOnion> = onion
                 .iter()

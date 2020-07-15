@@ -3,8 +3,9 @@ use crate::{
     api::helpers::to_cbor_response,
     config::{get_redis_connection, get_rocksdb},
     constants::{Namespace, TOKEN_CONTRACT},
-    vm::{redis::Commands, state::db_key},
+    state::db_key,
 };
+use r2d2_redis::redis::Commands;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tide::{Response, Result};

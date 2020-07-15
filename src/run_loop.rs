@@ -1,23 +1,24 @@
 use crate::{
-    api, api::Message, block_broadcaster::broadcast, config::public_key, constants::BLOCK_TIME,
-    models, models::Block, VM_STATE, WEB_SOCKET,
+    api::Message, block_broadcaster::broadcast, config::public_key, constants::BLOCK_TIME,
+    helpers::current_miner, models, models::Block, state::State,
 };
 use async_std::{sync, task::sleep};
+use ellipticoin::Address;
 use futures::{future::FutureExt, pin_mut, select, stream::StreamExt};
 
-pub async fn run(mut api_receiver: sync::Receiver<Message>) {
+use broadcaster::BroadcastChannel;
+
+pub async fn run(
+    mut state: State,
+    new_block_sender: BroadcastChannel<Vec<u8>>,
+    mut api_receiver: sync::Receiver<Message>,
+) {
     'run: loop {
-        let block;
-        if {
-            let mut vm_state = VM_STATE.lock().await;
-            vm_state.current_miner().map_or(false, |current_miner| {
-                current_miner.address.eq(&public_key())
-            })
-        } {
-            block = {
-                let mut vm_state = VM_STATE.lock().await;
-                Block::insert(&mut vm_state).await
-            };
+        if current_miner()
+            .address
+            .eq(&Address::PublicKey(public_key()))
+        {
+            let block = Block::insert(&mut state).await;
             println!("Won block #{}", &block.number);
             let sleep_fused = sleep(*BLOCK_TIME).fuse();
             pin_mut!(sleep_fused);
@@ -27,14 +28,9 @@ pub async fn run(mut api_receiver: sync::Receiver<Message>) {
                 pin_mut!(next_message_fused);
                 select! {
                     () = sleep_fused => {
-                        let mut vm_state = VM_STATE.lock().await;
-                        let transactions = block.seal(&mut vm_state, transaction_position + 1).await;
-                        broadcast(&mut vm_state, (block.clone(), transactions.clone())).await;
-                        (*WEB_SOCKET)
-                            .lock()
-                            .await
-                            .send::<api::views::Block>((block.clone(), transactions).into())
-                            .await;
+                        let transactions = block.seal(&mut state, transaction_position + 1).await;
+                        broadcast(&mut state, (block.clone(), transactions.clone())).await;
+                        new_block_sender.send(&block.hash).await.unwrap();
                         continue 'run;
                     },
                     (message) = next_message_fused => {
@@ -43,9 +39,8 @@ pub async fn run(mut api_receiver: sync::Receiver<Message>) {
                                 println!("Got block while mining");
                             },
                             Message::Transaction(transaction, responder) => {
-                                let mut vm_state = VM_STATE.lock().await;
                                 let completed_transaction =
-                                    models::Transaction::run(&mut vm_state, &block, transaction, transaction_position);
+                                    models::Transaction::run(&mut state, &block, transaction, transaction_position);
                                 transaction_position += 1;
                                 responder.send(completed_transaction).unwrap();
                             },
@@ -56,13 +51,8 @@ pub async fn run(mut api_receiver: sync::Receiver<Message>) {
         }
         if let Message::Block((block, transactions)) = api_receiver.next().map(Option::unwrap).await
         {
-            let mut vm_state = VM_STATE.lock().await;
-            block.clone().apply(&mut vm_state, transactions.clone());
-            (*WEB_SOCKET)
-                .lock()
-                .await
-                .send::<api::views::Block>((block, transactions).into())
-                .await;
+            block.clone().apply(&mut state, transactions.clone());
+            new_block_sender.send(&block.hash).await.unwrap();
         }
     }
 }
