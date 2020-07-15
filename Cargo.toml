@@ -7,36 +7,41 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-std = {version = "1.6.0", features = ["unstable", "attributes"]}
-async-tungstenite = {git = "https://github.com/sdroege/async-tungstenite.git" }
-base64 = "0.10.1"
-clap = { git = "https://github.com/clap-rs/clap.git" }
-diesel = { version = "1.0.0", features = ["postgres", "r2d2"] }
-diesel_migrations = "1.4.0"
-dotenv = "0.9.0"
-ed25519-dalek = "1.0.0-pre.3"
-futures = "0.3.5"
-futures-core-preview = "0.3.0-alpha.19"
-futures-timer = "2.0.2"
-futures-util = "0.3.4"
+async-std = {version = "*", features = ["unstable", "attributes"]}
+broadcaster = "*"
+base64 = "*"
+clap = "3.0.0-beta.1"
+diesel = { version = "*", features = ["postgres", "r2d2"] }
+diesel_migrations = "*"
+dotenv = "*"
+ed25519-dalek = "1.0.0-pre.4"
+ellipticoin = {version = "0.0.5"}
+futures = "*"
+hex = "*"
 http-service = "*"
-indicatif = "0.14.0"
-lazy_static = "1.4.0"
-metered_wasmi = "0.5.4"
-mime = "0.3"
+indicatif = "*"
+lazy_static = "*"
+libsecp256k1 = "*"
+num-bigint = { version = "*", features = ["serde"] }
+num-traits = "*"
 r2d2_redis = { git = "https://github.com/sorccu/r2d2-redis" }
-rand = "*"
-rocksdb = { git = "https://github.com/rust-rocksdb/rust-rocksdb"}
-serde = { version = "1.0.90", features = ["derive"] }
-serde_bytes = "0.11.1"
-serde_cbor = { git = "https://github.com/pyfisch/cbor" }
-serde_yaml = "0.8.12"
-sha2 = "0.8.0"
-surf = "2.0.0-alpha.3"
-tide = "0.11.0"
+rand = {version = "*", features = ["small_rng"]}
+rocksdb = "*"
+serde = { version = "*", features = ["derive"] }
+serde_bytes = "*"
+serde_cbor = "*"
+serde_yaml = "*"
+sha2 = "*"
+surf = "*"
+tide = {version = "*", features = ["logger"]}
 time = "*"
-tungstenite = { version = "0.10.0", default-features = false}
-warp = {git = "https://github.com/masonforest/warp.git", branch = "add-cbor-mime-type"}
+tiny-keccak = {version = "2.0.1", features = ["keccak"] }
+wasm-rpc = { version = "*"}
+wasm-rpc-macros = { version = "*"}
+
+[dev-dependencies]
+ellipticoin-test-framework = {path = "../rust-ellipticoin-test-framework"}
+
 
 [profile.dev]
 panic = 'unwind'

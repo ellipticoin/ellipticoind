@@ -1,12 +1,14 @@
 use super::{helpers::base64_param, State};
 use crate::{
-    api::helpers::{proxy_get, to_cbor_response},
-    config::public_key,
-    VM_STATE,
+    api::helpers::proxy_get,
+    config::{get_rocksdb, public_key},
+    helpers::current_miner,
+    state::{db_key, Storage},
 };
 use async_std::task::sleep;
-use std::time::Duration;
-use tide::{Response, Result};
+use ellipticoin::Address;
+use std::{convert::TryInto, str, time::Duration};
+use tide::{http::StatusCode, Body, Response, Result};
 
 pub async fn show(req: tide::Request<State>) -> Result<Response> {
     let contract_name: String = req.param("contract_name")?;
@@ -31,14 +33,21 @@ async fn get_storage(
     contract_address: &[u8],
     key_bytes: &[u8],
 ) -> Result<Response> {
-    let current_miner = {
-        let mut vm_state = VM_STATE.lock().await;
-        vm_state.current_miner().unwrap()
-    };
-    if current_miner.address.eq(&public_key()) {
-        let mut vm_state = VM_STATE.lock().await;
-        let value = vm_state.get_storage(&contract_address, &key_bytes);
-        Ok(to_cbor_response(&value))
+    let current_miner = current_miner();
+    if current_miner.address.eq(&Address::PublicKey(public_key())) {
+        let mut storage = Storage {
+            rocksdb: get_rocksdb(),
+        };
+        let value = storage.get(&db_key(
+            &((
+                contract_address[0..32].try_into().unwrap(),
+                str::from_utf8(&contract_address[32..]).unwrap().to_string(),
+            )),
+            &key_bytes,
+        ));
+        let mut res = Response::new(StatusCode::Ok);
+        res.set_body(Body::from_bytes(value));
+        Ok(res)
     } else {
         proxy_get(req, current_miner.host).await
     }

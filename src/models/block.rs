@@ -5,9 +5,8 @@ use crate::{
     helpers::{bytes_to_value, sha256},
     models::{self, HashOnion, Transaction},
     schema::{blocks, blocks::dsl, transactions},
-    vm,
-    vm::State,
-    IS_CURRENT_MINER,
+    state::State,
+    transaction,
 };
 use diesel::dsl::insert_into;
 
@@ -32,7 +31,7 @@ impl Default for Block {
             hash: vec![],
             parent_hash: Some(vec![]),
             number: 0,
-            winner: public_key(),
+            winner: public_key().to_vec(),
             memory_changeset_hash: vec![],
             storage_changeset_hash: vec![],
             sealed: false,
@@ -66,7 +65,7 @@ impl Block {
         let mut block = Self {
             hash: vec![],
             number,
-            winner: public_key(),
+            winner: public_key().to_vec(),
             memory_changeset_hash: vec![],
             storage_changeset_hash: vec![],
             parent_hash: Some(vec![]),
@@ -88,11 +87,10 @@ impl Block {
             Transaction::run(
                 vm_state,
                 &self,
-                vm::Transaction::from(transaction),
+                transaction::Transaction::from(transaction),
                 transaction.position,
             );
         });
-        vm_state.commit();
         println!("Applied block #{}", self.number);
     }
 
@@ -112,15 +110,12 @@ impl Block {
 
     pub async fn seal(&self, vm_state: &mut State, transaction_position: i64) -> Vec<Transaction> {
         let pg_db = get_pg_connection();
-        let reveal_transaction = vm::Transaction::new(
-            TOKEN_CONTRACT.to_vec(),
+        let reveal_transaction = transaction::Transaction::new(
+            TOKEN_CONTRACT.clone(),
             "reveal",
             vec![bytes_to_value(HashOnion::peel(&pg_db))],
         );
         Transaction::run(vm_state, &self, reveal_transaction, transaction_position);
-        *IS_CURRENT_MINER.lock().await = vm_state.current_miner().map_or(false, |current_miner| {
-            current_miner.address.eq(&public_key())
-        });
         diesel::update(dsl::blocks.filter(dsl::hash.eq(self.hash.clone())))
             .set(dsl::sealed.eq(true))
             .execute(&pg_db)
@@ -132,6 +127,6 @@ impl Block {
     }
 
     pub fn set_hash(&mut self) {
-        self.hash = sha256(to_vec(&BlockWithoutHash::from(self.clone())).unwrap());
+        self.hash = sha256(to_vec(&BlockWithoutHash::from(self.clone())).unwrap()).to_vec();
     }
 }

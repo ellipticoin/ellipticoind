@@ -1,7 +1,7 @@
 use crate::{
     api,
     config::{
-        get_pg_connection, get_redis_connection, get_rocksdb, socket, websocket_socket, SubCommand,
+        get_pg_connection, get_redis_connection, get_rocksdb, socket, SubCommand,
         ENABLE_MINER, GENESIS_NODE, OPTS,
     },
     constants::{Namespace, TOKEN_CONTRACT},
@@ -10,16 +10,17 @@ use crate::{
     run_loop,
     schema::{blocks::dsl as blocks_dsl, transactions::dsl as transactions_dsl},
     start_up,
-    start_up::{load_genesis_state, reset_redis, reset_rocksdb, set_token_contract},
-    vm,
-    vm::{redis::Commands, state::db_key},
-    VM_STATE, WEB_SOCKET,
+    start_up::{load_genesis_state, reset_redis, reset_rocksdb},
+    state::{db_key, Memory, State, Storage},
+    system_contracts::api::NativeAPI,
 };
 use async_std::task::spawn;
 use ed25519_dalek::Keypair;
+use ellipticoin::Address;
+use r2d2_redis::redis::Commands;
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs::File};
+use std::{collections::HashMap, convert::TryInto, fs::File, str};
 
 #[derive(Serialize, Deserialize)]
 pub struct Genesis {
@@ -53,22 +54,38 @@ pub async fn dump_state(block_number: Option<u32>) {
     reset_redis().await;
     reset_rocksdb().await;
     load_genesis_state().await;
-    set_token_contract().await;
     let transactions = Transaction::belonging_to(&blocks)
         .order(transactions_dsl::position.asc())
         .load::<Transaction>(&pg_db)
         .unwrap()
         .grouped_by(&blocks);
-    let mut vm_state = VM_STATE.lock().await;
+    let memory = Memory {
+        redis: get_redis_connection(),
+    };
+    let storage = Storage {
+        rocksdb: get_rocksdb(),
+    };
+    let mut state = State::new(memory, storage);
     blocks
         .into_iter()
         .zip(transactions)
         .for_each(|(block, transactions)| {
             transactions.iter().for_each(|transaction| {
-                let res = vm::Transaction::from(transaction).run(&mut vm_state);
+                let mut api = NativeAPI {
+                    transaction: transaction.clone().into(),
+                    address: (
+                        transaction.contract_address[0..32].try_into().unwrap(),
+                        str::from_utf8(&transaction.contract_address[32..])
+                            .unwrap()
+                            .to_string(),
+                    ),
+                    state: &mut state,
+                    caller: Address::PublicKey(transaction.sender[0..32].try_into().unwrap()),
+                    sender: transaction.sender.clone()[..].try_into().unwrap(),
+                };
+                let res = crate::system_contracts::run(&mut api, transaction.into());
                 println!("{:?}", res);
             });
-            vm_state.commit();
             println!("Applied block #{}", block.number);
         });
     let mut redis = get_redis_connection();
@@ -103,24 +120,39 @@ pub async fn dump_state(block_number: Option<u32>) {
 }
 
 pub async fn main() {
+    let memory = Memory {
+        redis: get_redis_connection(),
+    };
+    let storage = Storage {
+        rocksdb: get_rocksdb(),
+    };
+    let mut state = State::new(memory, storage);
     start_up::reset_state().await;
-    {
-        let mut vm_state = VM_STATE.lock().await;
-        if !*GENESIS_NODE {
-            start_up::catch_up(&mut vm_state).await;
-        }
-        if *ENABLE_MINER {
-            start_up::start_miner(&mut vm_state).await;
-        }
+    if !*GENESIS_NODE {
+        start_up::catch_up(&mut state).await;
     }
-    let (api_receiver, api_state) = api::API::new();
+    if *ENABLE_MINER {
+        start_up::start_miner(&mut state).await;
+    }
+    let (new_block_sender, api_receiver, api_state) = api::API::new();
+    
+
+    // let new_block_sender2 = new_block_sender.clone();
+
+//     spawn(async move {
+//         for i in 0u32.. {
+//
+// task::sleep(Duration::from_secs(1)).await;
+//         new_block_sender2.send(i.to_le_bytes().to_vec()).await;
+//         }
+//     });
     spawn(api_state.listen(socket()));
-    spawn(
-        (*WEB_SOCKET)
-            .lock()
-            .await
-            .clone()
-            .bind(websocket_socket().await),
-    );
-    run_loop::run(api_receiver).await
+    // spawn(
+    //     (*WEB_SOCKET)
+    //         .lock()
+    //         .await
+    //         .clone()
+    //         .bind(websocket_socket().await),
+    // );
+    run_loop::run(state, new_block_sender, api_receiver).await
 }
