@@ -30,7 +30,7 @@ pub async fn run(
                     () = sleep_fused => {
                         let transactions = block.seal(&mut state, transaction_position + 1).await;
                         broadcast(&mut state, (block.clone(), transactions.clone())).await;
-                        new_block_sender.send(&block.hash).await.unwrap();
+                        let _ = new_block_sender.send(&block.hash).await;
                         continue 'run;
                     },
                     (message) = next_message_fused => {
@@ -52,7 +52,7 @@ pub async fn run(
         if let Message::Block((block, transactions)) = api_receiver.next().map(Option::unwrap).await
         {
             block.clone().apply(&mut state, transactions.clone());
-            new_block_sender.send(&block.hash).await.unwrap();
+            let _ = new_block_sender.send(&block.hash).await;
         }
     }
 }
