@@ -10,6 +10,14 @@ pub fn base64_param(req: &Request<State>, key: &str) -> Result<Vec<u8>> {
         .map_err(|err| Error::new(StatusCode::BadRequest, err))
 }
 
+pub fn base64_encode(data: &[u8]) -> String {
+    base64::encode_config(&data, base64::URL_SAFE)
+}
+
+pub fn base64_decode(string: &str) -> std::result::Result<Vec<u8>, base64::DecodeError> {
+    base64::decode_config(&string, base64::URL_SAFE)
+}
+
 pub async fn proxy_get(req: &Request<State>, proxy_url: String) -> Result<Response> {
     let mut url = req.url().clone();
     let host = proxy_url.split(":").next().unwrap();

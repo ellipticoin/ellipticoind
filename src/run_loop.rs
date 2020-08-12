@@ -10,7 +10,7 @@ use broadcaster::BroadcastChannel;
 
 pub async fn run(
     mut state: State,
-    new_block_sender: BroadcastChannel<Vec<u8>>,
+    new_block_broadcaster: BroadcastChannel<Vec<u8>>,
     mut api_receiver: sync::Receiver<Message>,
 ) {
     'run: loop {
@@ -30,7 +30,7 @@ pub async fn run(
                     () = sleep_fused => {
                         let transactions = block.seal(&mut state, transaction_position + 1).await;
                         broadcast(&mut state, (block.clone(), transactions.clone())).await;
-                        let _ = new_block_sender.send(&block.hash).await;
+                        let _ = new_block_broadcaster.send(&block.hash).await;
                         continue 'run;
                     },
                     (message) = next_message_fused => {
@@ -52,7 +52,7 @@ pub async fn run(
         if let Message::Block((block, transactions)) = api_receiver.next().map(Option::unwrap).await
         {
             block.clone().apply(&mut state, transactions.clone());
-            let _ = new_block_sender.send(&block.hash).await;
+            let _ = new_block_broadcaster.send(&block.hash).await;
         }
     }
 }

@@ -24,8 +24,7 @@ use diesel::{
 use ellipticoin::Address;
 use serde::{Deserialize, Serialize};
 use serde_cbor::{from_slice, to_vec};
-use std::convert::TryInto;
-use std::str;
+use std::{convert::TryInto, str};
 
 impl From<Transaction> for transaction::Transaction {
     fn from(transaction: Transaction) -> transaction::Transaction {

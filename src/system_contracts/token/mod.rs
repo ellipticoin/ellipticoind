@@ -194,8 +194,7 @@ export_native! {
 mod tests {
     use super::*;
     use crate::system_contracts::api::{TestAPI, TestState};
-    use ellipticoin::constants::SYSTEM_ADDRESS;
-    use ellipticoin::API;
+    use ellipticoin::{constants::SYSTEM_ADDRESS, API};
     use std::env;
 
     use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB, CAROL};

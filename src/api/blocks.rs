@@ -1,6 +1,9 @@
-use super::{helpers::to_cbor_response, State};
+use super::{
+    helpers::{base64_decode, to_cbor_response},
+    State,
+};
 use crate::{
-    api::{views::Block, Message},
+    api::{helpers::base64_encode, views::Block, Message},
     config::get_pg_connection,
     diesel::{ExpressionMethods, GroupedBy, OptionalExtension, QueryDsl, RunQueryDsl},
     models,
@@ -13,6 +16,16 @@ use tide::{http::StatusCode, Response};
 #[derive(Deserialize, Debug)]
 struct QueryParams {
     limit: Option<i64>,
+}
+
+pub async fn broadcaster(req: tide::Request<State>, sender: tide::sse::Sender) -> tide::Result<()> {
+    let mut new_block_broadcaster = req.state().new_block_broacaster.clone();
+    while let Some(event) = new_block_broadcaster.recv().await {
+        sender
+            .send("block", base64_encode(&event), Some(&base64_encode(&event)))
+            .await?;
+    }
+    Ok(())
 }
 
 pub async fn create(mut req: tide::Request<State>) -> tide::Result<tide::Response> {
@@ -61,7 +74,7 @@ pub async fn show(req: tide::Request<State>) -> tide::Result<Response> {
         }
         Err(_) => {
             if let Ok(block) = blocks::dsl::blocks
-                .find(base64::decode_config(&block_param, base64::URL_SAFE).unwrap_or(vec![]))
+                .find(base64_decode(&block_param).unwrap_or(vec![]))
                 .first::<models::Block>(&con)
                 .optional()
             {

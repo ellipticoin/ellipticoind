@@ -1,7 +1,7 @@
 use super::{views::Transaction, State};
 use crate::{
     api::{
-        helpers::{body, proxy_get, proxy_post, to_cbor_response},
+        helpers::{base64_decode, body, proxy_get, proxy_post, to_cbor_response},
         Message,
     },
     config::{get_pg_connection, public_key},
@@ -23,7 +23,7 @@ pub async fn show(req: tide::Request<State>) -> Result<Response> {
     let current_miner = current_miner();
     if current_miner.address.eq(&Address::PublicKey(public_key())) {
         let transaction = dsl::transactions
-            .find(base64::decode_config(&transaction_hash, base64::URL_SAFE).unwrap())
+            .find(base64_decode(&transaction_hash).unwrap())
             .first::<models::Transaction>(&get_pg_connection())
             .optional()
             .unwrap();
