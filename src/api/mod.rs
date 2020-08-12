@@ -1,7 +1,7 @@
 use crate::{models, models::Transaction, transaction};
 use async_std::sync::{channel, Receiver, Sender};
-use futures::channel::oneshot;
 use broadcaster::BroadcastChannel;
+use futures::channel::oneshot;
 pub use futures::stream::StreamExt;
 
 use std::net::SocketAddr;
@@ -52,10 +52,7 @@ pub struct State {
     pub new_block_broacaster: BroadcastChannel<Vec<u8>>,
 }
 impl State {
-    pub fn new(
-        sender: Sender<Message>,
-        new_block_broacaster: BroadcastChannel<Vec<u8>>,
-    ) -> Self {
+    pub fn new(sender: Sender<Message>, new_block_broacaster: BroadcastChannel<Vec<u8>>) -> Self {
         Self {
             sender,
             new_block_broacaster,

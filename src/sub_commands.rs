@@ -1,8 +1,8 @@
 use crate::{
     api,
     config::{
-        get_pg_connection, get_redis_connection, get_rocksdb, socket, SubCommand,
-        ENABLE_MINER, GENESIS_NODE, OPTS,
+        get_pg_connection, get_redis_connection, get_rocksdb, socket, SubCommand, ENABLE_MINER,
+        GENESIS_NODE, OPTS,
     },
     constants::{Namespace, TOKEN_CONTRACT},
     diesel::{BelongingToDsl, ExpressionMethods, GroupedBy, QueryDsl, RunQueryDsl},
@@ -134,25 +134,7 @@ pub async fn main() {
     if *ENABLE_MINER {
         start_up::start_miner(&mut state).await;
     }
-    let (new_block_sender, api_receiver, api_state) = api::API::new();
-    
-
-    // let new_block_sender2 = new_block_sender.clone();
-
-//     spawn(async move {
-//         for i in 0u32.. {
-//
-// task::sleep(Duration::from_secs(1)).await;
-//         new_block_sender2.send(i.to_le_bytes().to_vec()).await;
-//         }
-//     });
+    let (new_block_broadcaster, api_receiver, api_state) = api::API::new();
     spawn(api_state.listen(socket()));
-    // spawn(
-    //     (*WEB_SOCKET)
-    //         .lock()
-    //         .await
-    //         .clone()
-    //         .bind(websocket_socket().await),
-    // );
-    run_loop::run(state, new_block_sender, api_receiver).await
+    run_loop::run(state, new_block_broadcaster, api_receiver).await
 }
