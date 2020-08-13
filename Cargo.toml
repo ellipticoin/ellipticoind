@@ -25,7 +25,7 @@ libsecp256k1 = "*"
 num-bigint = { version = "*", features = ["serde"] }
 num-traits = "*"
 r2d2_redis = { git = "https://github.com/sorccu/r2d2-redis" }
-rand = {version = "*", features = ["small_rng"]}
+rand = {version = "0.7.3", features = ["small_rng"]}
 rocksdb = "*"
 serde = { version = "*", features = ["derive"] }
 serde_bytes = "*"
@@ -40,7 +40,7 @@ wasm-rpc = { version = "*"}
 wasm-rpc-macros = { version = "*"}
 
 [dev-dependencies]
-ellipticoin-test-framework = {path = "../rust-ellipticoin-test-framework"}
+ellipticoin-test-framework = "0.1.4"
 
 
 [profile.dev]
