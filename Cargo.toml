@@ -15,7 +15,7 @@ diesel = { version = "*", features = ["postgres", "r2d2"] }
 diesel_migrations = "*"
 dotenv = "*"
 ed25519-dalek = "1.0.0-pre.4"
-ellipticoin = {version = "0.0.5"}
+ellipticoin = {path = "../rust-ellipticoin"}
 futures = "*"
 hex = "*"
 http-service = "*"

@@ -1,16 +1,16 @@
 mod errors;
 
-use crate::helpers::sha256;
-use ellipticoin::Address;
+use ellipticoin::{constants::SYSTEM_ADDRESS, Address, Token};
 use errors::Error;
-use num_traits::cast::ToPrimitive;
 use serde_cbor::Value;
 use wasm_rpc_macros::export_native;
 
-enum Namespace {
+pub enum Namespace {
     Allowances,
     Balances,
 }
+
+pub const BASE_FACTOR: u64 = 1_000_000;
 
 export_native! {
     pub fn mint<API: ellipticoin::API>(
@@ -19,21 +19,24 @@ export_native! {
         to: Address,
         amount: u64
     ) -> Result<Value, Box<Error>> {
-        credit(api, api.caller(), token_id.clone(), to, amount).unwrap();
+        let token = Token {
+            issuer: api.caller(),
+            token_id,
+        };
+        credit(api, token, to, amount).unwrap();
         Ok(serde_cbor::Value::Null)
     }
 
     pub fn transfer<API: ellipticoin::API>(
         api: &mut API,
-        issuer: Address,
-        token_id: [u8; 32],
+        token: Token,
         to: Address,
         amount: u64
-    ) -> Result<Value, Box<Error>> {
-        if get_balance(api, issuer.clone(), token_id.clone(), api.caller()) >= amount {
-            debit(api, issuer.clone(), token_id.clone(), api.caller(), amount.clone()).unwrap();
-            credit(api, issuer.clone(), token_id.clone(), to, amount).unwrap();
-            Ok(get_balance(api, issuer, token_id, api.caller()).to_u32().unwrap().into())
+    ) -> Result<(), Box<Error>> {
+        if get_balance(api, token.clone(), api.caller()) >= amount {
+            debit(api, token.clone(), api.caller(), amount.clone()).unwrap();
+            credit(api, token.clone(), to, amount).unwrap();
+            Ok(())
         } else {
             Err(Box::new(errors::INSUFFICIENT_FUNDS.clone()))
         }
@@ -41,94 +44,92 @@ export_native! {
 
     pub fn approve<API: ellipticoin::API>(
         api: &mut API,
-        issuer: Address,
-        token_id: [u8; 32],
+        token: Token,
         spender: Address,
         amount: u64
-    ) -> Result<Value, Box<Error>> {
-        set_allowance(api, issuer, token_id,api.caller(), spender, amount);
-        Ok(serde_cbor::Value::Null)
+    ) -> Result<(), Box<Error>> {
+        set_allowance(api, token,api.caller(), spender, amount);
+        Ok(())
     }
 
     pub fn transfer_from<API: ellipticoin::API>(
         api: &mut API,
-        issuer: Address,
-        token_id: [u8; 32],
+        token: Token,
         from: Address,
         to: Address,
         amount: u64
-    ) -> Result<Value, Box<Error>> {
-        if get_allowance(api, issuer.clone(), token_id.clone(), from.clone(), api.caller()) < amount {
+    ) -> Result<(), Box<Error>> {
+        if get_allowance(api, token.clone(), from.clone(), api.caller()) < amount {
             return Err(Box::new(errors::INSUFFICIENT_ALLOWANCE.clone()));
         }
 
-        if get_balance(api, issuer.clone(), token_id.clone(), from.clone()) < amount {
+        let balance = get_balance(api, token.clone(), from.clone());
+        if balance < amount {
             return Err(Box::new(errors::INSUFFICIENT_FUNDS.clone()));
         }
 
-        debit_allowance(api, issuer.clone(), token_id.clone(), from.clone(), api.caller(), amount.clone());
-        debit(api, issuer.clone(), token_id.clone(), from, amount.clone()).unwrap();
-        credit(api, issuer, token_id, to, amount).unwrap();
-        Ok(Value::Null)
+        debit_allowance(api, token.clone(), from.clone(), api.caller(), amount.clone());
+        debit(api, token.clone(), from, amount.clone()).unwrap();
+        credit(api, token.clone(), to.clone(), amount).unwrap();
+        Ok(())
     }
 
     fn debit_allowance<API: ellipticoin::API>(
         api: &mut API,
-        issuer: Address,
-        token_id: [u8; 32],
+        token: Token,
         from: Address,
         to: Address,
         amount: u64
     ) {
-        let allowance = get_allowance(api, issuer.clone(), token_id.clone(), from.clone(), to.clone());
-        set_allowance(api, issuer, token_id, from, to, allowance - amount);
+        let allowance = get_allowance(api, token.clone(), from.clone(), to.clone());
+        set_allowance(api, token, from, to, allowance - amount);
     }
 
     pub fn get_balance<API: ellipticoin::API>(
         api: &mut API,
-        mut issuer: Address,
-        token_id: [u8; 32],
+        token: Token,
         mut address: Address
     ) -> u64 {
-        api.get_memory(&[
-            &[
+        api.get_memory([
+            [
                 Namespace::Balances as u8].to_vec(),
-                &sha256(issuer.to_vec())[..],
-                &token_id,
-                &address.to_vec()[..]
+                token.into(),
+                address.to_vec()
             ].concat()
         ).unwrap_or(0u8.into())
     }
 
     fn get_allowance<API: ellipticoin::API>(
         api: &mut API,
-        mut issuer: Address,
-        token_id: [u8; 32],
+        token: Token,
         mut from: Address,
         mut to: Address
     ) -> u64 {
-        api.get_memory(&[
-            &[Namespace::Allowances as u8],
-            &sha256(issuer.to_vec())[..],
-            &token_id,
-            &from.to_vec()[..],
-            &to.to_vec()[..]
+        #[allow(non_snake_case)]
+        if matches!(to, Address::Contract((_SYSTEM_ADDRESS,_))) {
+            return u64::MAX
+        }else {
+};
+
+        api.get_memory([
+            [Namespace::Allowances as u8].to_vec(),
+            token.into(),
+            from.to_vec(),
+            to.to_vec()
             ].concat(),
         ).unwrap_or(0u8.into())
     }
 
     fn set_allowance<API: ellipticoin::API>(
         api: &mut API,
-        mut issuer: Address,
-        token_id: [u8; 32],
+        token: Token,
         mut from: Address,
         mut to: Address,
         value: u64
     ) {
-        api.set_memory(&[
+        api.set_memory([
             [Namespace::Allowances as u8].to_vec(),
-            sha256(issuer.to_vec()).to_vec(),
-            token_id.to_vec(),
+            token.into(),
             from.to_vec(), to.to_vec()].concat(),
             value,
         );
@@ -136,20 +137,18 @@ export_native! {
 
     pub fn credit<API: ellipticoin::API>(
         api: &mut API,
-        mut issuer: Address,
-        token_id: [u8; 32],
+        token: Token,
         mut address: Address,
         amount: u64
     ) -> Result<(), Box<Error>> {
-        check_caller(api, &issuer)?;
-        let balance: u64 = get_balance(api, issuer.clone(), token_id, address.clone());
+        check_caller(api, &token.issuer)?;
+        let balance: u64 = get_balance(api, token.clone(), address.clone());
         api.set_memory(
-&[
-            &[
-                Namespace::Balances as u8][..],
-            &sha256(issuer.to_vec())[..],
-            &token_id,
-            &address.to_vec()[..]
+[
+            [
+                Namespace::Balances as u8].to_vec(),
+            token.into(),
+            address.to_vec()
 ].concat()
 , balance + amount);
         Ok(())
@@ -157,19 +156,17 @@ export_native! {
 
     pub fn debit<API: ellipticoin::API>(
         api: &mut API,
-        mut issuer: Address,
-        token_id: [u8; 32],
+        token: Token,
         mut address: Address,
         amount: u64
     ) -> Result<(), Box<Error>> {
-        check_caller(api, &issuer)?;
-        let balance: u64 = get_balance(api, issuer.clone(), token_id, address.clone());
-        api.set_memory(&[
-            &[
-                Namespace::Balances as u8][..],
-            &sha256(issuer.to_vec())[..],
-            &token_id,
-            &address.to_vec()[..]
+        check_caller(api, &token.issuer)?;
+        let balance: u64 = get_balance(api, token.clone(), address.clone());
+        api.set_memory([
+            [
+                Namespace::Balances as u8].to_vec(),
+            token.into(),
+            address.to_vec()
 ].concat(), balance - amount);
         Ok(())
     }
@@ -178,7 +175,7 @@ export_native! {
         api: &mut API,
         caller: &Address
 ) -> Result<(), Box<Error>> {
-        if api.caller() == *caller || api.caller() == ellipticoin::Address::PublicKey(api.sender()) {
+        if api.caller() == *caller || api.caller() == ellipticoin::Address::PublicKey(api.sender()) || matches!(api.caller(), Address::Contract((SYSTEM_ADDRESS, _))) {
             Ok(())
         } else {
             return Err(Box::new(wasm_rpc::error::Error{
@@ -193,70 +190,42 @@ export_native! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::system_contracts::api::{TestAPI, TestState};
-    use ellipticoin::{constants::SYSTEM_ADDRESS, API};
+    use crate::system_contracts::test_api::{TestAPI, TestState};
+    use ellipticoin::constants::SYSTEM_ADDRESS;
     use std::env;
 
     use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB, CAROL};
-
+    lazy_static! {
+        static ref TOKEN: Token = Token {
+            issuer: Address::PublicKey(*ALICE),
+            token_id: [0; 32]
+        };
+    }
     #[test]
     fn test_transfer() {
-        let token_id = [0; 32];
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
         let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
-        set_balance(
-            &mut api,
-            Address::PublicKey(*ALICE),
-            token_id.clone(),
-            *ALICE,
-            100,
-        );
-        let result = transfer(
-            &mut api,
-            Address::PublicKey(*ALICE),
-            token_id.clone(),
-            Address::PublicKey(*BOB),
-            20,
-        )
-        .unwrap();
-        assert_eq!(result, Value::Integer(80u8.into()));
+        api.set_balance(TOKEN.clone(), *ALICE, 100);
+        transfer(&mut api, TOKEN.clone(), Address::PublicKey(*BOB), 20).unwrap();
         assert_eq!(
-            get_balance(
-                &mut api,
-                Address::PublicKey(*ALICE),
-                token_id.clone(),
-                Address::PublicKey(*ALICE)
-            ),
+            get_balance(&mut api, TOKEN.clone(), Address::PublicKey(*ALICE)),
             80
         );
         assert_eq!(
-            get_balance(
-                &mut api,
-                Address::PublicKey(*ALICE),
-                token_id,
-                Address::PublicKey(*BOB)
-            ),
+            get_balance(&mut api, TOKEN.clone(), Address::PublicKey(*BOB)),
             20
         );
     }
     #[test]
     fn test_transfer_insufficient_funds() {
-        let token_id = [0; 32];
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
         let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
-        set_balance(
-            &mut api,
-            Address::PublicKey(*ALICE),
-            token_id.clone(),
-            *ALICE,
-            100,
-        );
+        api.set_balance(TOKEN.clone(), *ALICE, 100);
         assert!(transfer(
             &mut api,
-            Address::PublicKey(*ALICE),
-            token_id,
+            TOKEN.clone(),
             Address::PublicKey(*BOB),
             120u8.into()
         )
@@ -265,21 +234,13 @@ mod tests {
 
     #[test]
     fn test_transfer_from_insufficient_funds() {
-        let token_id = [0; 32];
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
         let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
-        set_balance(
-            &mut api,
-            Address::PublicKey(*ALICE),
-            token_id.clone(),
-            *BOB,
-            100,
-        );
+        api.set_balance(TOKEN.clone(), *BOB, 100);
         assert!(transfer_from(
             &mut api,
-            Address::PublicKey(*ALICE),
-            token_id,
+            TOKEN.clone(),
             Address::PublicKey(*BOB),
             Address::PublicKey(*CAROL),
             120
@@ -289,21 +250,13 @@ mod tests {
 
     #[test]
     fn test_transfer_from() {
-        let token_id = [0; 32];
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
         let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
-        set_balance(
-            &mut api,
-            Address::PublicKey(*ALICE),
-            token_id.clone(),
-            *ALICE,
-            100,
-        );
+        api.set_balance(TOKEN.clone(), *ALICE, 100);
         approve(
             &mut api,
-            ellipticoin::Address::PublicKey(*ALICE),
-            token_id.clone(),
+            TOKEN.clone(),
             ellipticoin::Address::PublicKey(*BOB),
             50,
         )
@@ -312,49 +265,19 @@ mod tests {
         api.caller = Address::PublicKey(*BOB);
         transfer_from(
             &mut api,
-            Address::PublicKey(*ALICE),
-            token_id.clone(),
+            TOKEN.clone(),
             Address::PublicKey(*ALICE),
             Address::PublicKey(*CAROL),
             20,
         )
         .unwrap();
         assert_eq!(
-            get_balance(
-                &mut api,
-                Address::PublicKey(*ALICE),
-                token_id.clone(),
-                Address::PublicKey(*ALICE)
-            ),
+            get_balance(&mut api, TOKEN.clone(), Address::PublicKey(*ALICE)),
             80
         );
         assert_eq!(
-            get_balance(
-                &mut api,
-                Address::PublicKey(*ALICE),
-                token_id,
-                Address::PublicKey(*CAROL)
-            ),
+            get_balance(&mut api, TOKEN.clone(), Address::PublicKey(*CAROL)),
             20
-        );
-    }
-
-    pub fn set_balance(
-        api: &mut TestAPI,
-        mut issuer: Address,
-        token_id: [u8; 32],
-        address: [u8; 32],
-        balance: u64,
-    ) {
-        api.set_memory(
-            &[
-                &[Namespace::Balances as u8][..],
-                &sha256(issuer.to_vec())[..],
-                &token_id,
-                &address[..],
-            ]
-            .concat(),
-            balance,
         );
     }
 }
