@@ -1,3 +1,4 @@
+use crate::config::HOST;
 use crate::{
     constants::{Namespace, TOKEN_CONTRACT},
     helpers::sha256,
@@ -99,16 +100,15 @@ impl State {
     }
 
     pub async fn peers(&mut self) -> Vec<String> {
-        vec![]
-        // let miners: Vec<Miner> = serde_cbor::from_slice(
-        //     &self.get_storage(&TOKEN_CONTRACT, &vec![Namespace::Miners as u8]),
-        // )
-        // .unwrap();
-        // miners
-        //     .iter()
-        //     .map(|miner| miner.host.clone())
-        //     .filter(|host| host.to_string() != *HOST)
-        //     .collect()
+        let miners: Vec<Miner> = serde_cbor::from_slice(
+            &self.get_storage(&TOKEN_CONTRACT, &vec![Namespace::Miners as u8]),
+        )
+        .unwrap();
+        miners
+            .iter()
+            .map(|miner| miner.host.clone())
+            .filter(|host| host.to_string() != *HOST)
+            .collect()
     }
 }
 
