@@ -1,5 +1,5 @@
-use crate::config::HOST;
 use crate::{
+    config::HOST,
     constants::{Namespace, TOKEN_CONTRACT},
     helpers::sha256,
     system_contracts::ellipticoin::Miner,

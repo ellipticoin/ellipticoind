@@ -216,9 +216,9 @@ checksum = "c17772156ef2829aadc587461c7753af20b7e8db1529bc66855add962a3b35d3"
 
 [[package]]
 name = "async-trait"
-version = "0.1.37"
+version = "0.1.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caae68055714ff28740f310927e04f2eba76ff580b16fb18ed90073ee71646f7"
+checksum = "a265e3abeffdce30b2e26b7a11b222fe37c6067404001b434101457d0385eb92"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -886,6 +886,18 @@ checksum = "cd56b59865bce947ac5958779cfa508f6c3b9497cc762b7e24a12d11ccde2c4f"
 [[package]]
 name = "ellipticoin"
 version = "0.0.5"
+dependencies = [
+ "ellipticoin_macros",
+ "lazy_static",
+ "serde",
+ "sha2 0.9.1",
+ "wasm-rpc",
+ "wasm-rpc-macros",
+]
+
+[[package]]
+name = "ellipticoin"
+version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "182e3dd68a1daa1238a0475243c8182e27418ca39ce5d04188d5e3f3263c0eb7"
 dependencies = [
@@ -902,7 +914,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c84a7b57b69ec140ef44b73d8b765c8c7094c579953510f39903c4a6b0b12545"
 dependencies = [
  "ed25519-dalek",
- "ellipticoin",
+ "ellipticoin 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2",
  "hex-literal",
  "lazy_static",
@@ -910,6 +922,16 @@ dependencies = [
  "secp256k1",
  "sha2 0.8.2",
  "wasm-rpc",
+]
+
+[[package]]
+name = "ellipticoin_macros"
+version = "0.1.0"
+dependencies = [
+ "heck",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -924,7 +946,7 @@ dependencies = [
  "diesel_migrations",
  "dotenv",
  "ed25519-dalek",
- "ellipticoin",
+ "ellipticoin 0.0.5",
  "ellipticoin-test-framework",
  "futures 0.3.5",
  "hex 0.4.2",

@@ -78,17 +78,14 @@ pub struct Transaction {
 #[derive(Serialize, Debug)]
 pub struct TransactionWithoutHash {
     nonce: u32,
-    #[serde(with = "serde_bytes")]
     sender: Vec<u8>,
     function: String,
     gas_used: u64,
     position: u32,
     arguments: Vec<serde_cbor::Value>,
     gas_limit: u64,
-    #[serde(with = "serde_bytes")]
     signature: Option<Vec<u8>>,
     network_id: u64,
-    #[serde(with = "serde_bytes")]
     contract_address: Vec<u8>,
 }
 
