@@ -3,7 +3,7 @@ mod ethereum;
 mod hashing;
 
 use crate::helpers::zero_pad_vec;
-use ellipticoin::{constants::SYSTEM_ADDRESS, Address};
+use ellipticoin::{constants::SYSTEM_ADDRESS, Address, Token};
 use errors::Error;
 use hashing::sha256;
 use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
@@ -57,25 +57,25 @@ export_native! {
             encoded_ellipticoin_adress
         );
         let address = ethereum::ecrecover_address(message.as_bytes(), &unlock_signature);
-        if api.get_storage(&[[Namespace::UnlockedEthereumBalances as u8].to_vec(), address.clone()].concat()).unwrap_or(false) {
+        if api.get_storage([[Namespace::UnlockedEthereumBalances as u8].to_vec(), address.clone()].concat()).unwrap_or(false) {
             return Err(Box::new(errors::BALANCE_ALREADY_UNLOCKED.clone()));
         };
         let balance: u64 =
-            api.get_storage::<u64>(&[[Namespace::EthereumBalances as u8].to_vec(), address.clone()].concat()).unwrap_or(0) * 100;
+            api.get_storage::<_, u64>([[Namespace::EthereumBalances as u8].to_vec(), address.clone()].concat()).unwrap_or(0) * 100;
 
         let mut total_unlocked_ethereum: u64 =
-            api.get_storage::<u64>(&[Namespace::TotalUnlockedEthereum as u8].to_vec()).unwrap_or(0);
+            api.get_storage::<_, u64>([Namespace::TotalUnlockedEthereum as u8].to_vec()).unwrap_or(0);
         if total_unlocked_ethereum + balance > 1000000 * 10000 {
             return Err(Box::new(errors::BALANCE_EXCEEDS_THIS_PHASE.clone()));
         } else {
             total_unlocked_ethereum += balance;
-            api.set_storage::<u64>(
-                &[Namespace::TotalUnlockedEthereum as u8].to_vec(),
+            api.set_storage::<_, u64>(
+                [Namespace::TotalUnlockedEthereum as u8].to_vec(),
                 total_unlocked_ethereum,
             );
         }
         credit(api, Address::PublicKey(ellipticoin_address), balance);
-        api.set_storage(&[
+        api.set_storage([
             [Namespace::UnlockedEthereumBalances as u8].to_vec(),
             address].concat(),
             true
@@ -124,8 +124,8 @@ export_native! {
     }
 
     fn increment_block_number<API: ellipticoin::API>(api: &mut API) {
-        let block_number = api.get_storage::<u32>(&[Namespace::BlockNumber as u8]).unwrap_or(0);
-        api.set_storage::<u32>(&[Namespace::BlockNumber as u8], block_number + 1);
+        let block_number = api.get_storage::<_, u32>([Namespace::BlockNumber as u8].to_vec()).unwrap_or(0);
+        api.set_storage::<_, u32>([Namespace::BlockNumber as u8].to_vec(), block_number + 1);
     }
 
     fn shuffle_miners<API: ellipticoin::API>(api: &mut API, mut miners: Vec<Miner>, value: [u8; 32]) {
@@ -143,11 +143,11 @@ export_native! {
     }
 
     pub fn get_miners<API: ellipticoin::API>(api: &mut API) -> Vec<Miner> {
-        api.get_storage::<Vec<Miner>>(&[Namespace::Miners as u8]).unwrap_or(vec![])
+        api.get_storage::<_, Vec<Miner>>([Namespace::Miners as u8].to_vec()).unwrap_or(vec![])
     }
 
     fn set_miners<API: ellipticoin::API>(api: &mut API, miners: &Vec<Miner>) {
-        api.set_storage::<Value>(&[Namespace::Miners as u8], to_value(miners).unwrap());
+        api.set_storage::<_, Value>([Namespace::Miners as u8].to_vec(), to_value(miners).unwrap());
     }
 
     fn settle_block_rewards<API: ellipticoin::API>(api: &mut API) {
@@ -166,8 +166,10 @@ export_native! {
             "Token",
             "get_balance",
             vec![
-                serde_cbor::value::to_value(Address::Contract(SYSTEM_ADDRESS, "Ellipticoin".to_string())).unwrap(),
-                serde_cbor::value::to_value(token_id).unwrap(),
+                serde_cbor::value::to_value(Token{
+                    issuer: Address::Contract((SYSTEM_ADDRESS, "Ellipticoin".to_string())),
+                    token_id
+                }).unwrap(),
                 to_value(address).unwrap()
             ]).unwrap_or(0)
     }
@@ -179,8 +181,10 @@ export_native! {
             "Token",
             "credit",
             vec![
-                serde_cbor::value::to_value(Address::Contract(SYSTEM_ADDRESS, "Ellipticoin".to_string())).unwrap(),
-                serde_cbor::value::to_value(token_id).unwrap(),
+                serde_cbor::value::to_value(Token{
+                    issuer: Address::Contract((SYSTEM_ADDRESS, "Ellipticoin".to_string())),
+                    token_id
+                }).unwrap(),
                 to_value(address).unwrap(),
                 to_value(amount).unwrap()
             ]).unwrap();
@@ -193,12 +197,28 @@ export_native! {
             "Token",
             "debit",
             vec![
-                serde_cbor::value::to_value(Address::Contract(SYSTEM_ADDRESS, "Ellipticoin".to_string())).unwrap(),
-                serde_cbor::value::to_value(token_id).unwrap(),
+                serde_cbor::value::to_value(Token{
+                    issuer: Address::Contract((SYSTEM_ADDRESS, "Ellipticoin".to_string())),
+                    token_id
+                }).unwrap(),
                 to_value(address).unwrap(),
                 to_value(amount).unwrap()
             ]).unwrap();
     }
+}
+
+fn _distribute(mut amount: u64, mut values: Vec<u64>) -> Vec<u64> {
+    let mut rest = values.clone();
+    let mut distributions: Vec<u64> = Default::default();
+    values.reverse();
+    for balance in values.clone() {
+        let distribution = (amount * balance) / rest.iter().sum::<u64>();
+        amount -= distribution;
+        distributions.push(distribution);
+        rest.pop();
+    }
+    distributions.reverse();
+    distributions
 }
 
 #[cfg(test)]
@@ -207,7 +227,7 @@ mod tests {
     use crate::{
         config::HOST,
         helpers::generate_hash_onion,
-        system_contracts::api::{TestAPI, TestState},
+        system_contracts::test_api::{TestAPI, TestState},
     };
     use ellipticoin::API;
     use std::env;
@@ -260,7 +280,7 @@ mod tests {
         assert_eq!(get_balance(&mut api, Address::PublicKey(*ALICE)), 6);
         assert_eq!(get_balance(&mut api, Address::PublicKey(*BOB)), 4);
         assert_eq!(
-            api.get_storage::<u64>(&[Namespace::BlockNumber as u8][..])
+            api.get_storage::<_, u64>([Namespace::BlockNumber as u8].to_vec())
                 .unwrap(),
             3
         );

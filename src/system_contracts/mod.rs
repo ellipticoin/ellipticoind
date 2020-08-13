@@ -8,6 +8,9 @@ use crate::{
 pub mod macros;
 pub mod api;
 pub mod ellipticoin;
+pub mod exchange;
+#[cfg(test)]
+pub mod test_api;
 pub mod token;
 
 pub fn is_system_contract(transaction: &Transaction) -> bool {
@@ -25,6 +28,7 @@ pub fn run<API: ::ellipticoin::API>(
 pub fn run2<API: ::ellipticoin::API>(api: &mut API, transaction: Transaction) -> serde_cbor::Value {
     let f = match &transaction.contract_name()[..] {
         "Ellipticoin" => ellipticoin::call,
+        "Exchange" => exchange::call,
         "Token" => token::call,
         _ => {
             return serde_cbor::value::to_value(Err::<(), crate::error::Error>(
