@@ -120,8 +120,8 @@ impl Transaction {
         }
         .into();
         completed_transaction.block_hash = current_block.hash.clone();
-        completed_transaction.set_hash();
         completed_transaction.position = position;
+        completed_transaction.set_hash();
         insert_into(transactions_table)
             .values(&completed_transaction)
             .execute(&get_pg_connection())
