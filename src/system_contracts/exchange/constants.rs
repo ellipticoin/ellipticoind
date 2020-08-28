@@ -12,7 +12,7 @@ lazy_static! {
                 .unwrap()
         ),
         token_id: zero_pad_vec(
-            &hex::decode("6b175474e89094c44da98b954eedeac495271d0f").unwrap(),
+            &hex::decode("4748b2e6DB310512Ff9085E533b6C4151ff10746").unwrap(),
             32
         )[..]
             .try_into()

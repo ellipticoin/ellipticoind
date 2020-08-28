@@ -4,7 +4,7 @@ use crate::{
         ethereum_balances_path, get_pg_connection, get_redis_connection, get_rocksdb,
         random_bootnode, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
     },
-    constants::{Namespace, GENESIS_STATE_PATH, TOKEN_CONTRACT},
+    constants::{Namespace, TOKEN_CONTRACT},
     helpers::{bytes_to_value, get_block, post_transaction},
     models,
     models::{Block, HashOnion},
@@ -80,7 +80,10 @@ pub async fn load_genesis_state() {
     let mut storage = Storage {
         rocksdb: get_rocksdb(),
     };
-    let genesis_file = File::open(GENESIS_STATE_PATH).unwrap();
+    let genesis_file = File::open(OPTS.genesis_state_path.clone()).expect(&format!(
+        "Genesis file {} not found",
+        &OPTS.genesis_state_path
+    ));
     let state: VMState = serde_cbor::from_reader(genesis_file).unwrap();
     for (key, value) in state.memory {
         let _: () = memory.set(&key, &value);

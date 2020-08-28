@@ -35,14 +35,22 @@ pub struct Miner {
 
 export_native! {
     pub fn transfer_to_current_miner<API: ellipticoin::API>(api: &mut API, amount: u64) -> Result<u64, Box<Error>> {
-        if get_balance(api, api.caller()) < amount {
-            return Err(Box::new(errors::INSUFFICIENT_FUNDS.clone()));
-        }
-
-        let miners = get_miners(api, );
-        debit(api, api.caller(), amount);
-        credit(api, miners.first().unwrap().address.clone(), amount);
-        Ok(get_balance(api, api.caller()).into())
+        let token_id: [u8; 32] = zero_pad_vec("ELC".as_bytes(), 32)[..].try_into().unwrap();
+        let miners = get_miners(api);
+        let current_miner = miners.first().unwrap().address.clone();
+        api.call(
+            SYSTEM_ADDRESS,
+            "Token",
+            "transfer_from",
+            vec![
+                serde_cbor::value::to_value(Token{
+                    issuer: Address::Contract((SYSTEM_ADDRESS, "Ellipticoin".to_string())),
+                    token_id
+                }).unwrap(),
+                to_value(api.caller()).unwrap(),
+                to_value(current_miner).unwrap(),
+                to_value(amount).unwrap()
+            ])?
     }
 
     pub fn unlock_ether<API: ellipticoin::API>(
@@ -90,7 +98,7 @@ export_native! {
         burn_per_block: u64,
         hash_onion_skin: [u8; 32],
     ) -> Result<Value, Box<Error>> {
-        let mut miners = get_miners(api, );
+        let mut miners = get_miners(api);
         miners.push(Miner {
             address: api.caller(),
             host,
@@ -159,21 +167,6 @@ export_native! {
         }
     }
 
-    fn get_balance<API: ellipticoin::API>(api: &mut API, address: Address) -> u64 {
-        let token_id: [u8; 32] = zero_pad_vec("ELC".as_bytes(), 32)[..].try_into().unwrap();
-        api.call(
-            SYSTEM_ADDRESS,
-            "Token",
-            "get_balance",
-            vec![
-                serde_cbor::value::to_value(Token{
-                    issuer: Address::Contract((SYSTEM_ADDRESS, "Ellipticoin".to_string())),
-                    token_id
-                }).unwrap(),
-                to_value(address).unwrap()
-            ]).unwrap_or(0)
-    }
-
     fn credit<API: ellipticoin::API>(api: &mut API, address: Address, amount: u64) {
         let token_id: [u8; 32] = zero_pad_vec("ELC".as_bytes(), 32)[..].try_into().unwrap();
         api.call::<Value>(
@@ -234,20 +227,13 @@ mod tests {
 
     use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB};
 
-    // #[test]
-    // fn test_transfer() {
-    //     env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
-    //     let mut state = TestState::new();
-    //     let mut api = TestAPI::new(&mut state, *ALICE);
-    //     set_balance(&mut api, *ALICE, 100);
-    //     let result = transfer(&mut api, **BOB, 20).unwrap();
-    //     assert_eq!(result, Value::Integer(80u8.into()));
-    //     assert_eq!(get_balance(&mut api, &ALICE[..]), 80);
-    //     assert_eq!(get_balance(&mut api, &*BOB[..]), 20);
-    // }
-
     #[test]
     fn test_commit_and_reveal() {
+        let token_id: [u8; 32] = zero_pad_vec("ELC".as_bytes(), 32)[..].try_into().unwrap();
+        let token = Token {
+            issuer: Address::Contract((SYSTEM_ADDRESS, "Ellipticoin".to_string())),
+            token_id,
+        };
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         env::set_var("HOST", "localhost");
         let mut state = TestState::new();
@@ -276,9 +262,8 @@ mod tests {
         api.caller = Address::PublicKey(*BOB);
         bobs_onion.pop();
         assert!(reveal(&mut api, *bobs_onion.last().unwrap()).is_ok());
-
-        assert_eq!(get_balance(&mut api, Address::PublicKey(*ALICE)), 6);
-        assert_eq!(get_balance(&mut api, Address::PublicKey(*BOB)), 4);
+        assert_eq!(api.get_balance(token.clone(), *ALICE), 6);
+        assert_eq!(api.get_balance(token, *BOB), 4);
         assert_eq!(
             api.get_storage::<_, u64>([Namespace::BlockNumber as u8].to_vec())
                 .unwrap(),

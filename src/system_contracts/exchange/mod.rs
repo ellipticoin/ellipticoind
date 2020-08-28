@@ -11,19 +11,19 @@ use std::boxed::Box;
 use wasm_rpc::error::Error;
 use wasm_rpc_macros::export_native;
 
-memory_accessors!(balance: u64, reserves: u64, base_token_reserves: u64);
+memory_accessors!(balance: u64, base_token_reserves: u64, reserves: u64);
 
 export_native! {
     pub fn create_pool<API: ellipticoin::API>(
         api: &mut API,
         token: Token,
         amount: u64,
-        price: u64,
+        starting_price: u64,
     ) -> Result<(), Box<Error>> {
         charge(api, token.clone(), api.caller(), amount)?;
         credit_reserves(api, token.clone(), amount);
         credit_balance(api, token.clone(), api.caller(), amount);
-        charge(api, BASE_TOKEN.clone(), api.caller(), amount * (price / BASE_FACTOR))?;
+        charge(api, BASE_TOKEN.clone(), api.caller(), amount * (starting_price / BASE_FACTOR))?;
         Ok(credit_base_token_reserves(api, token, amount))
     }
 

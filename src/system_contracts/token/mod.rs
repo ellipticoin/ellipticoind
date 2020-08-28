@@ -1,16 +1,13 @@
 mod errors;
 
-use ellipticoin::{constants::SYSTEM_ADDRESS, Address, Token};
+use ellipticoin::{helpers::is_system_address, memory_accessors, Address, Token};
 use errors::Error;
 use serde_cbor::Value;
 use wasm_rpc_macros::export_native;
 
-pub enum Namespace {
-    Allowances,
-    Balances,
-}
-
 pub const BASE_FACTOR: u64 = 1_000_000;
+
+memory_accessors!(allowance: u64, balance: u64);
 
 export_native! {
     pub fn mint<API: ellipticoin::API>(
@@ -33,107 +30,33 @@ export_native! {
         to: Address,
         amount: u64
     ) -> Result<(), Box<Error>> {
-        if get_balance(api, token.clone(), api.caller()) >= amount {
-            debit(api, token.clone(), api.caller(), amount.clone()).unwrap();
-            credit(api, token.clone(), to, amount).unwrap();
-            Ok(())
-        } else {
-            Err(Box::new(errors::INSUFFICIENT_FUNDS.clone()))
-        }
+        debit(api, token.clone(), api.caller(), amount.clone())?;
+        Ok(credit(api, token.clone(), to, amount).unwrap())
     }
 
     pub fn approve<API: ellipticoin::API>(
         api: &mut API,
         token: Token,
-        spender: Address,
+        mut spender: Address,
         amount: u64
     ) -> Result<(), Box<Error>> {
-        set_allowance(api, token,api.caller(), spender, amount);
+        set_allowance(api, [token.into(),api.caller().to_vec(), spender.to_vec()].concat(), amount);
         Ok(())
     }
 
     pub fn transfer_from<API: ellipticoin::API>(
         api: &mut API,
         token: Token,
-        from: Address,
-        to: Address,
+        sender: Address,
+        recipient: Address,
         amount: u64
     ) -> Result<(), Box<Error>> {
-        if get_allowance(api, token.clone(), from.clone(), api.caller()) < amount {
-            return Err(Box::new(errors::INSUFFICIENT_ALLOWANCE.clone()));
-        }
-
-        let balance = get_balance(api, token.clone(), from.clone());
-        if balance < amount {
-            return Err(Box::new(errors::INSUFFICIENT_FUNDS.clone()));
-        }
-
-        debit_allowance(api, token.clone(), from.clone(), api.caller(), amount.clone());
-        debit(api, token.clone(), from, amount.clone()).unwrap();
-        credit(api, token.clone(), to.clone(), amount).unwrap();
+        debit_allowance(api, token.clone(), sender.clone(), api.caller(), amount.clone())?;
+        debit(api, token.clone(), sender, amount.clone())?;
+        credit(api, token.clone(), recipient.clone(), amount).unwrap();
         Ok(())
     }
 
-    fn debit_allowance<API: ellipticoin::API>(
-        api: &mut API,
-        token: Token,
-        from: Address,
-        to: Address,
-        amount: u64
-    ) {
-        let allowance = get_allowance(api, token.clone(), from.clone(), to.clone());
-        set_allowance(api, token, from, to, allowance - amount);
-    }
-
-    pub fn get_balance<API: ellipticoin::API>(
-        api: &mut API,
-        token: Token,
-        mut address: Address
-    ) -> u64 {
-        api.get_memory([
-            [
-                Namespace::Balances as u8].to_vec(),
-                token.into(),
-                address.to_vec()
-            ].concat()
-        ).unwrap_or(0u8.into())
-    }
-
-    fn get_allowance<API: ellipticoin::API>(
-        api: &mut API,
-        token: Token,
-        mut from: Address,
-        mut to: Address
-    ) -> u64 {
-        #[allow(non_snake_case)]
-        if matches!(to, Address::Contract((_SYSTEM_ADDRESS,_))) {
-            return u64::MAX
-        }else {
-};
-
-        api.get_memory([
-            [Namespace::Allowances as u8].to_vec(),
-            token.into(),
-            from.to_vec(),
-            to.to_vec()
-            ].concat(),
-        ).unwrap_or(0u8.into())
-    }
-
-    fn set_allowance<API: ellipticoin::API>(
-        api: &mut API,
-        token: Token,
-        mut from: Address,
-        mut to: Address,
-        value: u64
-    ) {
-        api.set_memory([
-            [Namespace::Allowances as u8].to_vec(),
-            token.into(),
-            from.to_vec(), to.to_vec()].concat(),
-            value,
-        );
-    }
 
     pub fn credit<API: ellipticoin::API>(
         api: &mut API,
@@ -142,16 +65,8 @@ export_native! {
         amount: u64
     ) -> Result<(), Box<Error>> {
         check_caller(api, &token.issuer)?;
-        let balance: u64 = get_balance(api, token.clone(), address.clone());
-        api.set_memory(
-[
-            [
-                Namespace::Balances as u8].to_vec(),
-            token.into(),
-            address.to_vec()
-].concat()
-, balance + amount);
-        Ok(())
+        let balance = get_balance(api, [token.clone().into(), address.to_vec()].concat());
+        Ok(set_balance(api, [token.clone().into(), address.to_vec()].concat(), balance + amount))
     }
 
     pub fn debit<API: ellipticoin::API>(
@@ -161,21 +76,20 @@ export_native! {
         amount: u64
     ) -> Result<(), Box<Error>> {
         check_caller(api, &token.issuer)?;
-        let balance: u64 = get_balance(api, token.clone(), address.clone());
-        api.set_memory([
-            [
-                Namespace::Balances as u8].to_vec(),
-            token.into(),
-            address.to_vec()
-].concat(), balance - amount);
-        Ok(())
+        let balance = get_balance(api, [token.clone().into(), address.to_vec()].concat());
+        if amount <= balance {
+
+        Ok(set_balance(api, [token.clone().into(), address.to_vec()].concat(), balance - amount))
+        } else {
+            Err(Box::new(errors::INSUFFICIENT_FUNDS.clone()))
+        }
     }
 
     fn check_caller<API: ellipticoin::API>(
         api: &mut API,
         caller: &Address
 ) -> Result<(), Box<Error>> {
-        if api.caller() == *caller || api.caller() == ellipticoin::Address::PublicKey(api.sender()) || matches!(api.caller(), Address::Contract((SYSTEM_ADDRESS, _))) {
+        if api.caller() == *caller || api.caller() == ellipticoin::Address::PublicKey(api.sender()) || is_system_address(api.caller()) {
             Ok(())
         } else {
             return Err(Box::new(wasm_rpc::error::Error{
@@ -184,7 +98,37 @@ export_native! {
             }));
         }
     }
+}
 
+fn debit_allowance<API: ellipticoin::API>(
+    api: &mut API,
+    token: Token,
+    mut owner: Address,
+    mut spender: Address,
+    amount: u64,
+) -> Result<(), Box<Error>> {
+    if is_system_address(spender.clone()) {
+        return Ok(());
+    }
+
+    let allowance = get_allowance(
+        api,
+        [
+            token.clone().into(),
+            owner.clone().to_vec(),
+            spender.clone().to_vec(),
+        ]
+        .concat(),
+    );
+    if amount <= allowance {
+        Ok(set_allowance(
+            api,
+            [token.into(), owner.to_vec(), spender.to_vec()].concat(),
+            allowance - amount,
+        ))
+    } else {
+        Err(Box::new(errors::INSUFFICIENT_ALLOWANCE.clone()))
+    }
 }
 
 #[cfg(test)]
@@ -209,11 +153,17 @@ mod tests {
         api.set_balance(TOKEN.clone(), *ALICE, 100);
         transfer(&mut api, TOKEN.clone(), Address::PublicKey(*BOB), 20).unwrap();
         assert_eq!(
-            get_balance(&mut api, TOKEN.clone(), Address::PublicKey(*ALICE)),
+            get_balance(
+                &mut api,
+                [TOKEN.clone().into(), Address::PublicKey(*ALICE).to_vec()].concat()
+            ),
             80
         );
         assert_eq!(
-            get_balance(&mut api, TOKEN.clone(), Address::PublicKey(*BOB)),
+            get_balance(
+                &mut api,
+                [TOKEN.clone().into(), Address::PublicKey(*BOB).to_vec()].concat()
+            ),
             20
         );
     }
@@ -272,11 +222,17 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            get_balance(&mut api, TOKEN.clone(), Address::PublicKey(*ALICE)),
+            get_balance(
+                &mut api,
+                [TOKEN.clone().into(), Address::PublicKey(*ALICE).to_vec()].concat()
+            ),
             80
         );
         assert_eq!(
-            get_balance(&mut api, TOKEN.clone(), Address::PublicKey(*CAROL)),
+            get_balance(
+                &mut api,
+                [TOKEN.clone().into(), Address::PublicKey(*CAROL).to_vec()].concat()
+            ),
             20
         );
     }

@@ -48,7 +48,7 @@ impl<'a> TestAPI<'a> {
     pub fn set_balance(&mut self, token: Token, address: [u8; 32], balance: u64) {
         self.state.memory.insert(
             [
-                [token::Namespace::Balances as u8].to_vec(),
+                [token::MemoryNamespace::Balance as u8].to_vec(),
                 token.into(),
                 address.to_vec(),
             ]
@@ -63,7 +63,7 @@ impl<'a> TestAPI<'a> {
                 .memory
                 .get(
                     &[
-                        [token::Namespace::Balances as u8].to_vec(),
+                        [token::MemoryNamespace::Balance as u8].to_vec(),
                         token.into(),
                         address.to_vec(),
                     ]
