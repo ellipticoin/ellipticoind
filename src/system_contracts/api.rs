@@ -52,13 +52,19 @@ impl<'a> ellipticoin::API for NativeAPI<'a> {
         function_name: &str,
         arguments: Vec<Value>,
     ) -> Result<D, Box<ellipticoin::wasm_rpc::error::Error>> {
+        let mut api = NativeAPI {
+            state: &mut self.state,
+            address: (legislator, contract_name.to_string()),
+            caller: Address::Contract(self.address.clone()),
+            sender: self.sender,
+            transaction: self.transaction.clone(),
+        };
         let mut transaction = self.transaction.clone();
-        // self.caller = Address::Contract(SYSTEM_ADDRESS.to_vec(), "Ellipticoin".to_string());
         transaction.contract_address = (legislator, contract_name.to_string());
         transaction.arguments = arguments;
         transaction.function = function_name.to_string();
         let return_value: serde_cbor::Value = if is_system_contract(&transaction) {
-            system_contracts::run2(self, transaction).into()
+            system_contracts::run2(&mut api, transaction).into()
         } else {
             // transaction.complete((CONTRACT_NOT_FOUND.clone()).into(), transaction.gas_limit).into()
             panic!();

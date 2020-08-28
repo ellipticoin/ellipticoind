@@ -31,6 +31,8 @@ pub struct Opts {
     pub port: u16,
     #[clap(long = "rocksdb-path", default_value = "./db")]
     pub rocksdb_path: String,
+    #[clap(long = "genesis-path", default_value = "./dist/genesis.cbor")]
+    pub genesis_state_path: String,
     #[clap(long = "save-state")]
     pub save_state: bool,
     #[clap(long = "redis-url", default_value = "redis://127.0.0.1")]
