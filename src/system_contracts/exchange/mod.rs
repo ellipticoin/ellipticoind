@@ -11,7 +11,12 @@ use std::boxed::Box;
 use wasm_rpc::error::Error;
 use wasm_rpc_macros::export_native;
 
-memory_accessors!(balance: u64, base_token_reserves: u64, reserves: u64);
+memory_accessors!(
+    balance: u64,
+    base_token_reserves: u64,
+    reserves: u64,
+    total_shares: u64
+);
 
 export_native! {
     pub fn create_pool<API: ellipticoin::API>(
@@ -21,10 +26,12 @@ export_native! {
         starting_price: u64,
     ) -> Result<(), Box<Error>> {
         charge(api, token.clone(), api.caller(), amount)?;
-        credit_reserves(api, token.clone(), amount);
-        credit_balance(api, token.clone(), api.caller(), amount);
         charge(api, BASE_TOKEN.clone(), api.caller(), amount * (starting_price / BASE_FACTOR))?;
-        Ok(credit_base_token_reserves(api, token, amount))
+        credit_reserves(api, token.clone(), amount);
+        credit_base_token_reserves(api, token.clone(), amount);
+        credit_total_shares(api, token.clone(), amount);
+        credit_balance(api, token, api.caller(), amount);
+        Ok(())
     }
 
     pub fn add_liqidity<API: ellipticoin::API>(
@@ -34,10 +41,27 @@ export_native! {
     ) -> Result<(), Box<Error>> {
         let ratio = get_ratio(api, token.clone())?;
         charge(api, token.clone(), api.caller(), amount)?;
+        charge(api, BASE_TOKEN.clone(), api.caller(), amount * (ratio/BASE_FACTOR))?;
         credit_reserves(api, token.clone(), amount);
         credit_balance(api, token.clone(), api.caller(), amount);
-        charge(api, BASE_TOKEN.clone(), api.caller(), amount * (ratio/BASE_FACTOR))?;
-        Ok(credit_base_token_reserves(api, token, amount))
+        credit_total_shares(api, token.clone(), amount);
+        credit_base_token_reserves(api, token, amount);
+        Ok(())
+    }
+
+    pub fn remove_liqidity<API: ellipticoin::API>(
+        api: &mut API,
+        token: Token,
+        amount: u64,
+    ) -> Result<(), Box<Error>> {
+        let reserves = get_reserves(api, token.clone());
+        let base_token_reserves = get_base_token_reserves(api, token.clone());
+        let total_shares = get_total_shares(api, token.clone());
+        debit_balance(api, token.clone(), api.caller(), amount)?;
+        debit_total_shares(api, token.clone(), amount);
+        pay(api, token.clone(), api.caller(), (reserves * amount) / total_shares)?;
+        pay(api, BASE_TOKEN.clone(), api.caller(), (base_token_reserves * amount) / total_shares)?;
+        Ok(())
     }
 
     pub fn swap<API: ellipticoin::API>(
@@ -48,7 +72,6 @@ export_native! {
     ) -> Result<(), Box<Error>> {
         let base_token_amount = rebalance_base_token(api, input_token.clone(), apply_fee(input_amount))?;
         charge(api, input_token.clone(), api.caller(), input_amount)?;
-        credit_reserves(api, input_token.clone(), input_amount);
         credit_balance(api, input_token.clone(), api.caller(), input_amount);
         debit_base_token_reserves(api, input_token, base_token_amount);
         let token_amount = rebalance(api, output_token.clone(), apply_fee(base_token_amount))?;
@@ -134,6 +157,37 @@ fn credit_balance<API: ellipticoin::API>(
     );
 }
 
+fn credit_total_shares<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) {
+    let total_shares = get_total_shares::<_, Vec<u8>>(api, token.clone().into());
+    set_total_shares::<_, Vec<u8>>(api, token.into(), total_shares + amount);
+}
+
+fn debit_total_shares<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) {
+    let total_shares = get_total_shares::<_, Vec<u8>>(api, token.clone().into());
+    set_total_shares::<_, Vec<u8>>(api, token.into(), total_shares - amount);
+}
+
+fn debit_balance<API: ellipticoin::API>(
+    api: &mut API,
+    token: Token,
+    mut address: Address,
+    amount: u64,
+) -> Result<(), Box<Error>> {
+    let balance = get_balance(
+        api,
+        [token.clone().into(), address.clone().to_vec()].concat(),
+    );
+    if amount <= balance {
+        Ok(set_balance(
+            api,
+            [token.into(), address.to_vec()].concat(),
+            balance - amount,
+        ))
+    } else {
+        Err(Box::new(errors::INSUFFICIENT_BALANCE.clone()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -185,5 +239,24 @@ mod tests {
         api.set_balance(BANANAS.clone(), *BOB, 100 * BASE_FACTOR);
         swap(&mut api, BANANAS.clone(), APPLES.clone(), 100 * BASE_FACTOR).unwrap();
         assert_eq!(api.get_balance(APPLES.clone(), *BOB), 33_249_931);
+    }
+
+    #[test]
+    fn test_remove_liqidity() {
+        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+        let mut state = TestState::new();
+        let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
+        api.set_balance(APPLES.clone(), *ALICE, 100 * BASE_FACTOR);
+        api.set_balance(BANANAS.clone(), *ALICE, 100 * BASE_FACTOR);
+        api.set_balance(BASE_TOKEN.clone(), *ALICE, 200 * BASE_FACTOR);
+        create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
+        create_pool(&mut api, BANANAS.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
+        api.caller = Address::PublicKey(BOB.clone());
+        api.set_balance(BANANAS.clone(), *BOB, 100 * BASE_FACTOR);
+        swap(&mut api, BANANAS.clone(), APPLES.clone(), 100 * BASE_FACTOR).unwrap();
+        api.caller = Address::PublicKey(ALICE.clone());
+        remove_liqidity(&mut api, APPLES.clone(), 100 * BASE_FACTOR).unwrap();
+        assert_eq!(api.get_balance(APPLES.clone(), *ALICE), 66750069);
+        assert_eq!(api.get_balance(BASE_TOKEN.clone(), *ALICE), 199750001);
     }
 }
