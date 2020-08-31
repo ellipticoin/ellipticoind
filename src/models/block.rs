@@ -9,7 +9,6 @@ use crate::{
     transaction,
 };
 use diesel::dsl::insert_into;
-
 use serde::{Deserialize, Serialize};
 use serde_cbor::to_vec;
 
@@ -110,10 +109,11 @@ impl Block {
 
     pub async fn seal(&self, vm_state: &mut State, transaction_position: i64) -> Vec<Transaction> {
         let pg_db = get_pg_connection();
+        let skin = HashOnion::peel(&pg_db);
         let reveal_transaction = transaction::Transaction::new(
             TOKEN_CONTRACT.clone(),
             "reveal",
-            vec![bytes_to_value(HashOnion::peel(&pg_db))],
+            vec![bytes_to_value(skin.clone())],
         );
         Transaction::run(vm_state, &self, reveal_transaction, transaction_position);
         diesel::update(dsl::blocks.filter(dsl::hash.eq(self.hash.clone())))
