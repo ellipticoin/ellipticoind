@@ -1,6 +1,6 @@
 use crate::{
-    models::{Block, Transaction},
     helpers::peers,
+    models::{Block, Transaction},
 };
 
 pub async fn broadcast(block: (Block, Vec<Transaction>)) {

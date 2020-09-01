@@ -37,7 +37,7 @@ tide = {version = "*", features = ["logger"]}
 time = "*"
 tiny-keccak = {version = "2.0.1", features = ["keccak"] }
 wasm-rpc = { version = "*"}
-wasm-rpc-macros = { version = "*"}
+wasm-rpc-macros = {path = "../rust-wasm-rpc/wasm-rpc-macros"}
 
 [dev-dependencies]
 ellipticoin-test-framework = "0.1.4"

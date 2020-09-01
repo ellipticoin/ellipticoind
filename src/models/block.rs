@@ -9,10 +9,11 @@ use crate::{
     system_contracts::ellipticoin::Miner,
     transaction,
 };
+
+use crate::state::BLOCK_NUMBER;
 use diesel::dsl::insert_into;
 use serde::{Deserialize, Serialize};
 use serde_cbor::to_vec;
-
 
 #[derive(Queryable, Identifiable, Insertable, Clone, Debug, Serialize, Deserialize)]
 #[primary_key(hash)]
@@ -80,6 +81,7 @@ impl Block {
         let pg_db = get_pg_connection();
         self.set_hash();
         self.sealed = true;
+        BLOCK_NUMBER.increment();
         insert_into(dsl::blocks)
             .values(&self)
             .execute(&pg_db)
@@ -87,13 +89,14 @@ impl Block {
         let completed_transactions: Vec<Transaction> = transactions
             .iter()
             .map(|transaction| {
-            Transaction::run(
-                vm_state,
-                &self,
-                transaction::Transaction::from(transaction),
-                transaction.position,
-            )
-        }).collect();
+                Transaction::run(
+                    vm_state,
+                    &self,
+                    transaction::Transaction::from(transaction),
+                    transaction.position,
+                )
+            })
+            .collect();
         *MINERS.lock().await =
             serde_cbor::from_slice::<Result<Vec<Miner>, wasm_rpc::error::Error>>(
                 &completed_transactions.last().unwrap().return_value,
@@ -103,9 +106,9 @@ impl Block {
         println!("Applied block #{}", self.number);
     }
 
-    pub async fn insert(vm_state: &mut State) -> Block {
+    pub fn insert() -> Block {
         let pg_db = get_pg_connection();
-        let block = Self::new(vm_state.block_number() as i64);
+        let block = Self::new(BLOCK_NUMBER.increment() as i64);
         insert_into(dsl::blocks)
             .values(&block)
             .execute(&pg_db)

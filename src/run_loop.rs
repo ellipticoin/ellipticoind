@@ -15,7 +15,7 @@ pub async fn run(
 ) {
     'run: loop {
         if current_miner().await.address.eq(&public_key()) {
-            let block = Block::insert(&mut state).await;
+            let block = Block::insert();
             println!("Won block #{}", &block.number);
             let sleep_fused = sleep(*BLOCK_TIME).fuse();
             pin_mut!(sleep_fused);
