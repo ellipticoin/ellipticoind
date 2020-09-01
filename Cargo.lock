@@ -892,7 +892,7 @@ dependencies = [
  "serde",
  "sha2 0.9.1",
  "wasm-rpc",
- "wasm-rpc-macros",
+ "wasm-rpc-macros 0.2.16 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -904,7 +904,7 @@ dependencies = [
  "lazy_static",
  "serde",
  "wasm-rpc",
- "wasm-rpc-macros",
+ "wasm-rpc-macros 0.2.16 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -969,7 +969,7 @@ dependencies = [
  "time 0.2.16",
  "tiny-keccak",
  "wasm-rpc",
- "wasm-rpc-macros",
+ "wasm-rpc-macros 0.2.16",
 ]
 
 [[package]]
@@ -3228,6 +3228,15 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_cbor",
+]
+
+[[package]]
+name = "wasm-rpc-macros"
+version = "0.2.16"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

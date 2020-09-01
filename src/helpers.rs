@@ -71,9 +71,12 @@ pub async fn current_miner() -> Miner {
 }
 
 pub async fn peers() -> Vec<String> {
-    MINERS.lock().await.clone()
-            .iter()
-            .map(|miner| miner.host.clone())
-            .filter(|host| host.to_string() != *HOST)
-            .collect()
+    MINERS
+        .lock()
+        .await
+        .clone()
+        .iter()
+        .map(|miner| miner.host.clone())
+        .filter(|host| host.to_string() != *HOST)
+        .collect()
 }
