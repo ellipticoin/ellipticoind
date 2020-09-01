@@ -17,28 +17,25 @@ pub struct NativeAPI<'a> {
 
 impl<'a> ellipticoin::MemoryAPI for NativeAPI<'a> {
     fn get(&mut self, key: &[u8]) -> Vec<u8> {
-        self.state.get_memory(&self.address, key)
+        self.state.get_memory(key)
     }
 
     fn set(&mut self, key: &[u8], value: &[u8]) {
-        self.state.set_memory(&self.address, key, value)
+        self.state.set_memory(key, value)
     }
 }
 
 impl<'a> ellipticoin::StorageAPI for NativeAPI<'a> {
     fn get(&mut self, key: &[u8]) -> Vec<u8> {
-        self.state.get_storage(&self.address, key)
+        self.state.get_storage(key)
     }
 
     fn set(&mut self, key: &[u8], value: &[u8]) {
-        self.state.set_storage(&self.address, key, value)
+        self.state.set_storage(key, value)
     }
 }
 
 impl<'a> ellipticoin::API for NativeAPI<'a> {
-    fn contract_address(&self) -> ([u8; 32], String) {
-        self.address.clone()
-    }
     fn sender(&self) -> [u8; 32] {
         self.sender.clone()
     }

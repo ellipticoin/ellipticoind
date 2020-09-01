@@ -27,9 +27,9 @@ pub fn run<API: ::ellipticoin::API>(
 
 pub fn run2<API: ::ellipticoin::API>(api: &mut API, transaction: Transaction) -> serde_cbor::Value {
     let f = match &transaction.contract_name()[..] {
-        "Ellipticoin" => ellipticoin::call,
-        "Exchange" => exchange::call,
-        "Token" => token::call,
+        "Ellipticoin" => ellipticoin::native::call,
+        "Exchange" => exchange::native::call,
+        "Token" => token::native::call,
         _ => {
             return serde_cbor::value::to_value(Err::<(), crate::error::Error>(
                 CONTRACT_NOT_FOUND.clone(),

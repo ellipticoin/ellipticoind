@@ -1,10 +1,9 @@
 use crate::{
-    system_contracts::{self, is_system_contract, token},
+    system_contracts::{self, is_system_contract},
     transaction::Transaction,
 };
-use ellipticoin::{Address, Token};
+use ellipticoin::Address;
 use serde::de::DeserializeOwned;
-use serde_cbor::{from_slice, to_vec};
 use std::{collections::BTreeMap, convert::TryInto};
 pub struct TestState {
     pub memory: BTreeMap<Vec<u8>, Vec<u8>>,
@@ -44,35 +43,6 @@ impl<'a> TestAPI<'a> {
             sender: transaction.sender.try_into().unwrap(),
         }
     }
-
-    pub fn set_balance(&mut self, token: Token, address: [u8; 32], balance: u64) {
-        self.state.memory.insert(
-            [
-                [token::MemoryNamespace::Balance as u8].to_vec(),
-                token.into(),
-                address.to_vec(),
-            ]
-            .concat(),
-            to_vec(&balance).unwrap(),
-        );
-    }
-
-    pub fn get_balance(&mut self, token: Token, address: [u8; 32]) -> u64 {
-        from_slice::<u64>(
-            self.state
-                .memory
-                .get(
-                    &[
-                        [token::MemoryNamespace::Balance as u8].to_vec(),
-                        token.into(),
-                        address.to_vec(),
-                    ]
-                    .concat(),
-                )
-                .unwrap_or(&vec![]),
-        )
-        .unwrap_or(0)
-    }
 }
 impl<'a> ellipticoin::MemoryAPI for TestAPI<'a> {
     fn get(&mut self, key: &[u8]) -> Vec<u8> {
@@ -95,9 +65,6 @@ impl<'a> ellipticoin::StorageAPI for TestAPI<'a> {
 }
 
 impl<'a> ellipticoin::API for TestAPI<'a> {
-    fn contract_address(&self) -> ([u8; 32], String) {
-        self.address.clone()
-    }
     fn sender(&self) -> [u8; 32] {
         self.sender
     }

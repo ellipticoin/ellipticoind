@@ -30,7 +30,7 @@ pub async fn start_miner(vm_state: &mut State) {
         ],
     );
     if *GENESIS_NODE {
-        let block = Block::insert(vm_state).await;
+        let block = Block::insert();
         models::Transaction::run(vm_state, &block, start_mining_transaction, 0);
         block.seal(vm_state, 1).await;
     } else {
