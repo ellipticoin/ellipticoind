@@ -3,7 +3,7 @@ use crate::{
     helpers::current_miner, models, models::Block, state::State,
 };
 use async_std::{sync, task::sleep};
-use ellipticoin::Address;
+
 use futures::{future::FutureExt, pin_mut, select, stream::StreamExt};
 
 use broadcaster::BroadcastChannel;
@@ -14,10 +14,7 @@ pub async fn run(
     mut api_receiver: sync::Receiver<Message>,
 ) {
     'run: loop {
-        if current_miner()
-            .address
-            .eq(&Address::PublicKey(public_key()))
-        {
+        if current_miner().address.eq(&public_key()) {
             let block = Block::insert(&mut state).await;
             println!("Won block #{}", &block.number);
             let sleep_fused = sleep(*BLOCK_TIME).fuse();

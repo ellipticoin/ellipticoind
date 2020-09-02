@@ -63,16 +63,9 @@ pub async fn reset_state() {
     reset_rocksdb().await;
     import_ethereum_balances().await;
     load_genesis_state().await;
-    reset_current_miner().await;
     HashOnion::generate(&pg_db);
 }
 
-pub async fn reset_current_miner() {
-    let rocksdb = get_rocksdb();
-    rocksdb
-        .delete(db_key(&TOKEN_CONTRACT, &vec![Namespace::Miners as u8]))
-        .unwrap();
-}
 pub async fn load_genesis_state() {
     let mut memory = Memory {
         redis: get_redis_connection(),
