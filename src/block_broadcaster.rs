@@ -1,10 +1,10 @@
 use crate::{
     models::{Block, Transaction},
-    state::State,
+    helpers::peers,
 };
 
-pub async fn broadcast(vm_state: &mut State, block: (Block, Vec<Transaction>)) {
-    for peer in vm_state.peers().await {
+pub async fn broadcast(block: (Block, Vec<Transaction>)) {
+    for peer in peers().await {
         let uri = format!("http://{}/blocks", peer);
         if surf::post(uri)
             .body_bytes(serde_cbor::to_vec(&block).unwrap())

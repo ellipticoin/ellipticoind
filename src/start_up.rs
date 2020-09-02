@@ -12,19 +12,21 @@ use crate::{
     transaction::Transaction,
 };
 use diesel_migrations::revert_latest_migration;
+
 use indicatif::ProgressBar;
 use r2d2_redis::redis::{self};
 use std::{convert::TryInto, fs::File, io::BufRead, ops::DerefMut};
 
 pub async fn start_miner(vm_state: &mut State) {
     let pg_db = get_pg_connection();
+    let skin = HashOnion::peel(&pg_db);
     let start_mining_transaction = Transaction::new(
         TOKEN_CONTRACT.clone(),
         "start_mining",
         vec![
             ((*HOST).clone().to_string().clone()).into(),
             (*BURN_PER_BLOCK).into(),
-            bytes_to_value(HashOnion::peel(&pg_db)),
+            bytes_to_value(skin),
         ],
     );
     if *GENESIS_NODE {
@@ -44,7 +46,7 @@ pub async fn catch_up(vm_state: &mut State) {
             }
 
             let (block, transactions) = block.into();
-            block.apply(vm_state, transactions);
+            block.apply(vm_state, transactions).await;
         } else {
             break;
         }

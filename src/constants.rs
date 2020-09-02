@@ -19,7 +19,7 @@ pub enum Namespace {
     _Balances,
     BlockNumber,
     EthereumBalances,
-    Miners,
+    _Miners,
     UnlockedEthereumBalances,
     _TotalUnlockedEthereum,
 }
