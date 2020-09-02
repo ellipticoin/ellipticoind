@@ -32,7 +32,7 @@ async fn get_storage(
     contract_address: &[u8],
     key_bytes: &[u8],
 ) -> Result<Response> {
-    let current_miner = current_miner();
+    let current_miner = current_miner().await;
     if current_miner.address.eq(&public_key()) {
         let mut storage = Storage {
             rocksdb: get_rocksdb(),

@@ -5,12 +5,14 @@ use crate::{
     helpers::{bytes_to_value, sha256},
     models::{self, HashOnion, Transaction},
     schema::{blocks, blocks::dsl, transactions},
-    state::State,
+    state::{State, MINERS},
+    system_contracts::ellipticoin::Miner,
     transaction,
 };
 use diesel::dsl::insert_into;
 use serde::{Deserialize, Serialize};
 use serde_cbor::to_vec;
+
 
 #[derive(Queryable, Identifiable, Insertable, Clone, Debug, Serialize, Deserialize)]
 #[primary_key(hash)]
@@ -74,7 +76,7 @@ impl Block {
         block
     }
 
-    pub fn apply(mut self, vm_state: &mut State, transactions: Vec<models::Transaction>) {
+    pub async fn apply(mut self, vm_state: &mut State, transactions: Vec<models::Transaction>) {
         let pg_db = get_pg_connection();
         self.set_hash();
         self.sealed = true;
@@ -82,14 +84,22 @@ impl Block {
             .values(&self)
             .execute(&pg_db)
             .unwrap();
-        transactions.iter().for_each(|transaction| {
+        let completed_transactions: Vec<Transaction> = transactions
+            .iter()
+            .map(|transaction| {
             Transaction::run(
                 vm_state,
                 &self,
                 transaction::Transaction::from(transaction),
                 transaction.position,
-            );
-        });
+            )
+        }).collect();
+        *MINERS.lock().await =
+            serde_cbor::from_slice::<Result<Vec<Miner>, wasm_rpc::error::Error>>(
+                &completed_transactions.last().unwrap().return_value,
+            )
+            .unwrap()
+            .unwrap();
         println!("Applied block #{}", self.number);
     }
 
@@ -115,7 +125,14 @@ impl Block {
             "reveal",
             vec![bytes_to_value(skin.clone())],
         );
-        Transaction::run(vm_state, &self, reveal_transaction, transaction_position);
+        let completed_transaction =
+            Transaction::run(vm_state, &self, reveal_transaction, transaction_position);
+        *MINERS.lock().await =
+            serde_cbor::from_slice::<Result<Vec<Miner>, wasm_rpc::error::Error>>(
+                &completed_transaction.return_value,
+            )
+            .unwrap()
+            .unwrap();
         diesel::update(dsl::blocks.filter(dsl::hash.eq(self.hash.clone())))
             .set(dsl::sealed.eq(true))
             .execute(&pg_db)

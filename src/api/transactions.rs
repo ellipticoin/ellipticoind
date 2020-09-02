@@ -20,7 +20,7 @@ use tide::{Redirect, Response, Result};
 
 pub async fn show(req: tide::Request<State>) -> Result<Response> {
     let transaction_hash: String = req.param("transaction_hash").unwrap();
-    let current_miner = current_miner();
+    let current_miner = current_miner().await;
     if current_miner.address.eq(&public_key()) {
         let transaction = dsl::transactions
             .find(base64_decode(&transaction_hash).unwrap())
@@ -62,7 +62,7 @@ async fn post_transaction(
     req: &tide::Request<State>,
     transaction: &transaction::Transaction,
 ) -> Result<Response> {
-    let current_miner = current_miner();
+    let current_miner = current_miner().await;
     if current_miner.address.eq(&public_key()) {
         let sender = &req.state().sender;
         let (responder, response) = oneshot::channel();

@@ -1,12 +1,17 @@
 use crate::{
-    config::HOST,
     constants::{Namespace, TOKEN_CONTRACT},
     helpers::sha256,
     system_contracts::ellipticoin::Miner,
     types,
 };
+use async_std::sync::Mutex;
 use serde_cbor::from_slice;
 use std::{collections::HashMap, ops::DerefMut};
+
+lazy_static! {
+    pub static ref MINERS: async_std::sync::Arc<Mutex<Vec<Miner>>> =
+        async_std::sync::Arc::new(Mutex::new(vec![]));
+}
 
 pub type Changeset = HashMap<Vec<u8>, Vec<u8>>;
 pub struct State {
@@ -46,13 +51,6 @@ impl Storage {
             .and_then(|value| Some(value))
             .unwrap_or(vec![])
     }
-
-    pub fn current_miner(&mut self) -> Option<Miner> {
-        let miners: Vec<Miner> =
-            from_slice(&self.get(&db_key(&TOKEN_CONTRACT, &vec![Namespace::Miners as u8])))
-                .unwrap_or(vec![]);
-        miners.first().map(|miner| (*miner).clone())
-    }
 }
 
 impl State {
@@ -86,29 +84,9 @@ impl State {
         self.storage.set(&db_key(contract_address, key), value);
     }
 
-    pub fn current_miner(&mut self) -> Option<Miner> {
-        // let miners: Vec<Miner> =
-        //     from_slice(&self.get_storage(&TOKEN_CONTRACT, &vec![Namespace::Miners as u8]))
-        //         .unwrap_or(vec![]);
-        // miners.first().map(|miner| (*miner).clone())
-        None
-    }
-
     pub fn block_number(&mut self) -> u32 {
         let bytes = self.get_storage(&TOKEN_CONTRACT, &vec![Namespace::BlockNumber as u8]);
         from_slice(&bytes).unwrap_or(0)
-    }
-
-    pub async fn peers(&mut self) -> Vec<String> {
-        let miners: Vec<Miner> = serde_cbor::from_slice(
-            &self.get_storage(&TOKEN_CONTRACT, &vec![Namespace::Miners as u8]),
-        )
-        .unwrap();
-        miners
-            .iter()
-            .map(|miner| miner.host.clone())
-            .filter(|host| host.to_string() != *HOST)
-            .collect()
     }
 }
 
