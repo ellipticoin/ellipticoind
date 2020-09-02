@@ -28,7 +28,7 @@ enum Namespace {
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub struct Miner {
     pub host: String,
-    pub address: Address,
+    pub address: [u8; 32],
     pub burn_per_block: u64,
     pub hash_onion_skin: [u8; 32],
 }
@@ -100,7 +100,7 @@ export_native! {
     ) -> Result<Value, Box<Error>> {
         let mut miners = get_miners(api);
         miners.push(Miner {
-            address: api.caller(),
+            address: api.caller().as_public_key().unwrap(),
             host,
             burn_per_block,
             hash_onion_skin,
@@ -111,7 +111,7 @@ export_native! {
 
     pub fn reveal<API: ellipticoin::API>(api: &mut API, value: [u8; 32]) -> Result<Value, Box<Error>> {
         let mut miners = get_miners(api, );
-        if api.caller() != miners.first().unwrap().address {
+        if api.caller() != ellipticoin::Address::PublicKey(miners.first().unwrap().address) {
             return Err(Box::new(errors::SENDER_IS_NOT_THE_WINNER.clone()));
         }
         if !miners
@@ -162,8 +162,8 @@ export_native! {
         let miners = get_miners(api);
         let winner = miners.first().as_ref().unwrap().clone();
         for miner in &miners {
-            credit(api, winner.address.clone(), miner.burn_per_block);
-            debit(api, miner.address.clone(), miner.burn_per_block);
+            credit(api, ellipticoin::Address::PublicKey(winner.address.clone()), miner.burn_per_block);
+            debit(api, ellipticoin::Address::PublicKey(miner.address.clone()), miner.burn_per_block);
         }
     }
 

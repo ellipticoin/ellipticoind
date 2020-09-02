@@ -13,7 +13,7 @@ use crate::{
 };
 use async_std::task::sleep;
 use diesel::prelude::*;
-use ellipticoin::Address;
+
 use futures::channel::oneshot;
 use std::time::Duration;
 use tide::{Redirect, Response, Result};
@@ -21,7 +21,7 @@ use tide::{Redirect, Response, Result};
 pub async fn show(req: tide::Request<State>) -> Result<Response> {
     let transaction_hash: String = req.param("transaction_hash").unwrap();
     let current_miner = current_miner();
-    if current_miner.address.eq(&Address::PublicKey(public_key())) {
+    if current_miner.address.eq(&public_key()) {
         let transaction = dsl::transactions
             .find(base64_decode(&transaction_hash).unwrap())
             .first::<models::Transaction>(&get_pg_connection())
@@ -63,7 +63,7 @@ async fn post_transaction(
     transaction: &transaction::Transaction,
 ) -> Result<Response> {
     let current_miner = current_miner();
-    if current_miner.address.eq(&Address::PublicKey(public_key())) {
+    if current_miner.address.eq(&public_key()) {
         let sender = &req.state().sender;
         let (responder, response) = oneshot::channel();
         sender

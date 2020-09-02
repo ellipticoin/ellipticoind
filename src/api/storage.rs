@@ -6,7 +6,6 @@ use crate::{
     state::{db_key, Storage},
 };
 use async_std::task::sleep;
-use ellipticoin::Address;
 use std::{convert::TryInto, str, time::Duration};
 use tide::{http::StatusCode, Body, Response, Result};
 
@@ -34,7 +33,7 @@ async fn get_storage(
     key_bytes: &[u8],
 ) -> Result<Response> {
     let current_miner = current_miner();
-    if current_miner.address.eq(&Address::PublicKey(public_key())) {
+    if current_miner.address.eq(&public_key()) {
         let mut storage = Storage {
             rocksdb: get_rocksdb(),
         };
