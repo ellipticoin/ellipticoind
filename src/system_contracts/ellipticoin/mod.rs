@@ -109,7 +109,7 @@ export_native! {
         Ok(Value::Null)
     }
 
-    pub fn reveal<API: ellipticoin::API>(api: &mut API, value: [u8; 32]) -> Result<Value, Box<Error>> {
+    pub fn reveal<API: ellipticoin::API>(api: &mut API, value: [u8; 32]) -> Result<Vec<Miner>, Box<Error>> {
         let mut miners = get_miners(api, );
         if api.caller() != ellipticoin::Address::PublicKey(miners.first().unwrap().address) {
             return Err(Box::new(errors::SENDER_IS_NOT_THE_WINNER.clone()));
@@ -125,10 +125,10 @@ export_native! {
         }
         settle_block_rewards(api);
         miners.first_mut().unwrap().hash_onion_skin = value.clone();
-        shuffle_miners(api, miners, value);
+        shuffle_miners(api, &mut miners, value);
         increment_block_number(api);
 
-        Ok(Value::Null)
+        Ok(miners)
     }
 
     fn increment_block_number<API: ellipticoin::API>(api: &mut API) {
@@ -136,7 +136,7 @@ export_native! {
         api.set_storage::<_, u32>([Namespace::BlockNumber as u8].to_vec(), block_number + 1);
     }
 
-    fn shuffle_miners<API: ellipticoin::API>(api: &mut API, mut miners: Vec<Miner>, value: [u8; 32]) {
+    fn shuffle_miners<API: ellipticoin::API>(api: &mut API, miners: &mut Vec<Miner>, value: [u8; 32]) {
         let mut rng = SmallRng::from_seed(value[0..16].try_into().unwrap());
         let mut shuffled_miners = vec![];
         while !miners.is_empty() {
@@ -147,7 +147,8 @@ export_native! {
             shuffled_miners.push(random_miner.clone());
             miners.retain(|miner| miner.clone() != random_miner);
         }
-        set_miners(api, &shuffled_miners)
+        set_miners(api, &shuffled_miners);
+        *miners = shuffled_miners;
     }
 
     pub fn get_miners<API: ellipticoin::API>(api: &mut API) -> Vec<Miner> {

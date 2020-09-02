@@ -14,7 +14,7 @@ pub async fn run(
     mut api_receiver: sync::Receiver<Message>,
 ) {
     'run: loop {
-        if current_miner().address.eq(&public_key()) {
+        if current_miner().await.address.eq(&public_key()) {
             let block = Block::insert(&mut state).await;
             println!("Won block #{}", &block.number);
             let sleep_fused = sleep(*BLOCK_TIME).fuse();
@@ -26,7 +26,7 @@ pub async fn run(
                 select! {
                     () = sleep_fused => {
                         let transactions = block.seal(&mut state, transaction_position + 1).await;
-                        broadcast(&mut state, (block.clone(), transactions.clone())).await;
+                        broadcast((block.clone(), transactions.clone())).await;
                         let _ = new_block_broadcaster.send(&block.hash).await;
                         continue 'run;
                     },
@@ -48,7 +48,7 @@ pub async fn run(
         }
         if let Message::Block((block, transactions)) = api_receiver.next().map(Option::unwrap).await
         {
-            block.clone().apply(&mut state, transactions.clone());
+            block.clone().apply(&mut state, transactions.clone()).await;
             let _ = new_block_broadcaster.send(&block.hash).await;
         }
     }

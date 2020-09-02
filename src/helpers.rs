@@ -1,7 +1,7 @@
 use crate::{
     api::views,
-    config::{get_rocksdb, Bootnode},
-    state::Storage,
+    config::{Bootnode, HOST},
+    state::MINERS,
     system_contracts::ellipticoin::Miner,
     transaction::Transaction,
 };
@@ -66,9 +66,14 @@ pub fn zero_pad_vec(vec: &[u8], len: usize) -> Vec<u8> {
     padded
 }
 
-pub fn current_miner() -> Miner {
-    let mut storage = Storage {
-        rocksdb: get_rocksdb(),
-    };
-    storage.current_miner().unwrap()
+pub async fn current_miner() -> Miner {
+    MINERS.lock().await.clone().first().unwrap().clone()
+}
+
+pub async fn peers() -> Vec<String> {
+    MINERS.lock().await.clone()
+            .iter()
+            .map(|miner| miner.host.clone())
+            .filter(|host| host.to_string() != *HOST)
+            .collect()
 }
