@@ -2,7 +2,7 @@ use crate::helpers::zero_pad_vec;
 use ellipticoin::{Address, Token};
 use std::convert::TryInto;
 
-pub const FEE: u64 = 2500;
+pub const FEE: u64 = 3000;
 
 lazy_static! {
     pub static ref BASE_TOKEN: Token = Token {
