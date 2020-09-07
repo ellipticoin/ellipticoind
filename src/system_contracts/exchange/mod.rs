@@ -261,18 +261,18 @@ mod tests {
         api.caller = Address::PublicKey(BOB.clone());
         token::set_balance(
             &mut api,
-            BANANAS.clone().into(),
+            APPLES.clone().into(),
             ellipticoin::Address::PublicKey(*BOB),
             100 * BASE_FACTOR,
         );
-        native::swap(&mut api, BANANAS.clone(), APPLES.clone(), 100 * BASE_FACTOR).unwrap();
+        native::swap(&mut api, APPLES.clone(), BANANAS.clone(), 100 * BASE_FACTOR).unwrap();
         assert_eq!(
             token::get_balance(
                 &mut api,
-                APPLES.clone(),
+                BANANAS.clone(),
                 ellipticoin::Address::PublicKey(*BOB)
             ),
-            33_249_931
+            33_233_234
         );
     }
 
@@ -314,7 +314,7 @@ mod tests {
                 APPLES.clone(),
                 ellipticoin::Address::PublicKey(*BOB)
             ),
-            49_937_422
+            49_924_888
         );
     }
 
@@ -356,7 +356,7 @@ mod tests {
                 BASE_TOKEN.clone(),
                 ellipticoin::Address::PublicKey(*BOB)
             ),
-            49_937_422
+            49_924_888
         );
     }
 
@@ -401,7 +401,7 @@ mod tests {
                 APPLES.clone().into(),
                 ellipticoin::Address::PublicKey(*ALICE)
             ),
-            66750069
+            66_766_766
         );
         assert_eq!(
             token::get_balance(
@@ -409,7 +409,7 @@ mod tests {
                 BASE_TOKEN.clone(),
                 ellipticoin::Address::PublicKey(*ALICE)
             ),
-            199750001
+            199_700_002
         );
     }
 }
