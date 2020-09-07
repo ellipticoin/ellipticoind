@@ -1,4 +1,8 @@
-use crate::{constants::Namespace, helpers::sha256, system_contracts::ellipticoin::Miner, types};
+use crate::{
+    helpers::sha256,
+    system_contracts::{ellipticoin, ellipticoin::Miner},
+    types,
+};
 use async_std::sync::Mutex;
 use serde_cbor::from_slice;
 use std::{
@@ -93,7 +97,7 @@ impl State {
     }
 
     pub fn block_number(&mut self) -> u32 {
-        let bytes = self.get_storage(&vec![Namespace::BlockNumber as u8]);
+        let bytes = self.get_storage(&vec![ellipticoin::StorageNamespace::BlockNumber as u8]);
         from_slice(&bytes).unwrap_or(0)
     }
 }

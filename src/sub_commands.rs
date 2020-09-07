@@ -4,7 +4,7 @@ use crate::{
         get_pg_connection, get_redis_connection, get_rocksdb, socket, SubCommand, ENABLE_MINER,
         GENESIS_NODE, OPTS,
     },
-    constants::{Namespace, TOKEN_CONTRACT},
+    constants::TOKEN_CONTRACT,
     diesel::{BelongingToDsl, ExpressionMethods, GroupedBy, QueryDsl, RunQueryDsl},
     models::{Block, Transaction},
     run_loop,
@@ -12,6 +12,7 @@ use crate::{
     start_up,
     start_up::{load_genesis_state, reset_redis, reset_rocksdb},
     state::{db_key, Memory, State, Storage},
+    system_contracts,
     system_contracts::api::NativeAPI,
 };
 use async_std::task::spawn;
@@ -104,7 +105,7 @@ pub async fn dump_state(block_number: Option<u32>) {
         .filter(|(key, _value)| {
             !key.starts_with(&db_key(
                 &TOKEN_CONTRACT,
-                &vec![Namespace::EthereumBalances as u8],
+                &vec![system_contracts::ellipticoin::StorageNamespace::EthereumBalances as u8],
             ))
         })
         .map(|(key, value)| (key.to_vec(), value.to_vec()))

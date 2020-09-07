@@ -7,6 +7,7 @@ use crate::{
 #[macro_use]
 pub mod macros;
 pub mod api;
+pub mod bridge;
 pub mod ellipticoin;
 pub mod exchange;
 #[cfg(test)]
@@ -27,6 +28,7 @@ pub fn run<API: ::ellipticoin::API>(
 
 pub fn run2<API: ::ellipticoin::API>(api: &mut API, transaction: Transaction) -> serde_cbor::Value {
     let f = match &transaction.contract_name()[..] {
+        "Bridge" => bridge::native::call,
         "Ellipticoin" => ellipticoin::native::call,
         "Exchange" => exchange::native::call,
         "Token" => token::native::call,

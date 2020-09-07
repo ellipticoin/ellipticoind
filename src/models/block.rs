@@ -123,13 +123,13 @@ impl Block {
     pub async fn seal(&self, vm_state: &mut State, transaction_position: i64) -> Vec<Transaction> {
         let pg_db = get_pg_connection();
         let skin = HashOnion::peel(&pg_db);
-        let reveal_transaction = transaction::Transaction::new(
+        let seal_transaction = transaction::Transaction::new(
             TOKEN_CONTRACT.clone(),
-            "reveal",
+            "seal",
             vec![bytes_to_value(skin.clone())],
         );
         let completed_transaction =
-            Transaction::run(vm_state, &self, reveal_transaction, transaction_position);
+            Transaction::run(vm_state, &self, seal_transaction, transaction_position);
         *MINERS.lock().await =
             serde_cbor::from_slice::<Result<Vec<Miner>, wasm_rpc::error::Error>>(
                 &completed_transaction.return_value,

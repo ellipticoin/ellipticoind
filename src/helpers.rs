@@ -60,12 +60,6 @@ pub async fn get_block(bootnode: &Bootnode, block_number: u32) -> Option<views::
     }
 }
 
-pub fn zero_pad_vec(vec: &[u8], len: usize) -> Vec<u8> {
-    let mut padded = vec![0; len];
-    padded[..vec.len()].clone_from_slice(vec);
-    padded
-}
-
 pub async fn current_miner() -> Miner {
     MINERS.lock().await.clone().first().unwrap().clone()
 }
