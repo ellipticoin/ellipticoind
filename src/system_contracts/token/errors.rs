@@ -9,4 +9,8 @@ lazy_static! {
         code: 2,
         message: "Insufficient allowance".to_string(),
     };
+    pub static ref NOT_TOKEN_ISSUER: Error = Error {
+        code: 3,
+        message: "Only the token issuer can issue tokens".to_string(),
+    };
 }

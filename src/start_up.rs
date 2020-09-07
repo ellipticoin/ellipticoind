@@ -1,21 +1,28 @@
 use crate::{
-    api::state::VMState,
     config::{
         ethereum_balances_path, get_pg_connection, get_redis_connection, get_rocksdb,
         random_bootnode, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
     },
-    constants::{Namespace, TOKEN_CONTRACT},
+    constants::TOKEN_CONTRACT,
     helpers::{bytes_to_value, get_block, post_transaction},
     models,
     models::{Block, HashOnion},
     state::{db_key, Memory, State, Storage},
+    system_contracts,
     transaction::Transaction,
 };
 use diesel_migrations::revert_latest_migration;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use indicatif::ProgressBar;
 use r2d2_redis::redis::{self};
 use std::{convert::TryInto, fs::File, io::BufRead, ops::DerefMut};
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct VMState {
+    pub memory: HashMap<Vec<u8>, Vec<u8>>,
+    pub storage: HashMap<Vec<u8>, Vec<u8>>,
+}
 
 pub async fn start_miner(vm_state: &mut State) {
     let pg_db = get_pg_connection();
@@ -55,10 +62,6 @@ pub async fn catch_up(vm_state: &mut State) {
 }
 
 pub async fn reset_state() {
-    let rocksdb = get_rocksdb();
-    rocksdb
-        .delete(db_key(&TOKEN_CONTRACT, &vec![Namespace::BlockNumber as u8]))
-        .unwrap();
     let pg_db = get_pg_connection();
     reset_redis().await;
     reset_pg().await;
@@ -113,7 +116,7 @@ pub async fn reset_rocksdb() {
         .filter(|(key, _value)| {
             !key.starts_with(&db_key(
                 &TOKEN_CONTRACT,
-                &vec![Namespace::EthereumBalances as u8],
+                &vec![system_contracts::ellipticoin::StorageNamespace::EthereumBalances as u8],
             ))
         })
         .for_each(|(key, _value)| {
@@ -127,7 +130,7 @@ async fn import_ethereum_balances() {
     if rocksdb
         .prefix_iterator(db_key(
             &TOKEN_CONTRACT,
-            &vec![Namespace::EthereumBalances as u8],
+            &vec![system_contracts::ellipticoin::StorageNamespace::EthereumBalances as u8],
         ))
         .next()
         .is_some()
@@ -157,7 +160,10 @@ async fn import_ethereum_balances() {
                     db_key(
                         &TOKEN_CONTRACT,
                         &[
-                            vec![Namespace::EthereumBalances as u8],
+                            vec![
+                                system_contracts::ellipticoin::StorageNamespace::EthereumBalances
+                                    as u8,
+                            ],
                             chunk[0..20].to_vec(),
                         ]
                         .concat(),

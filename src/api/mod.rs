@@ -13,7 +13,6 @@ mod helpers;
 mod memory;
 mod middleware;
 mod routes;
-pub mod state;
 mod storage;
 mod transactions;
 pub mod views;

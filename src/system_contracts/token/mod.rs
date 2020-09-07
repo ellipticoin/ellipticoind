@@ -1,3 +1,4 @@
+pub mod constants;
 mod errors;
 
 use ellipticoin::{memory_accessors, Address, Token};
@@ -6,6 +7,12 @@ use wasm_rpc_macros::export_native;
 
 pub const BASE_FACTOR: u64 = 1_000_000;
 const CONTRACT_NAME: &'static str = "Token";
+lazy_static! {
+    pub static ref ADDRESS: ([u8; 32], std::string::String) = (
+        ellipticoin::constants::SYSTEM_ADDRESS,
+        CONTRACT_NAME.to_string()
+    );
+}
 
 memory_accessors!(
     allowance(token: Token, address: Address, spender: Address) -> u64;
@@ -14,38 +21,61 @@ memory_accessors!(
 );
 
 export_native! {
-    pub fn transfer<API: ellipticoin::API>(
-        api: &mut API,
-        token: Token,
-        to: Address,
-        amount: u64
-    ) -> Result<(), Box<Error>> {
-        debit(api, token.clone(), api.caller(), amount.clone())?;
-        credit(api, token, to, amount);
-        Ok(())
-    }
+pub fn transfer<API: ellipticoin::API>(
+    api: &mut API,
+    token: Token,
+    to: Address,
+    amount: u64,
+) -> Result<(), Box<Error>> {
+    debit(api, token.clone(), api.caller(), amount.clone())?;
+    credit(api, token, to, amount);
+    Ok(())
+}
 
-    pub fn approve<API: ellipticoin::API>(
-        api: &mut API,
-        token: Token,
-        spender: Address,
-        amount: u64
-    ) -> Result<(), Box<Error>> {
-        set_allowance(api, token,api.caller(), spender, amount);
-        Ok(())
-    }
+pub fn approve<API: ellipticoin::API>(
+    api: &mut API,
+    token: Token,
+    spender: Address,
+    amount: u64,
+) -> Result<(), Box<Error>> {
+    set_allowance(api, token, api.caller(), spender, amount);
+    Ok(())
+}
 
-    pub fn transfer_from<API: ellipticoin::API>(
-        api: &mut API,
-        token: Token,
-        sender: Address,
-        recipient: Address,
-        amount: u64
-    ) -> Result<(), Box<Error>> {
-        debit_allowance(api, token.clone(), sender.clone(), api.caller(), amount.clone())?;
-        transfer_from(api, token, sender, recipient, amount)?;
-        Ok(())
-    }
+pub fn mint<API: ellipticoin::API>(
+    api: &mut API,
+    token_id: [u8; 32],
+    address: Address,
+    amount: u64,
+) -> Result<(), Box<Error>> {
+    super::mint(
+        api,
+        Token {
+            issuer: api.caller(),
+            id: token_id,
+        },
+        address,
+        amount,
+    )
+}
+
+pub fn transfer_from<API: ellipticoin::API>(
+    api: &mut API,
+    token: Token,
+    sender: Address,
+    recipient: Address,
+    amount: u64,
+) -> Result<(), Box<Error>> {
+    debit_allowance(
+        api,
+        token.clone(),
+        sender.clone(),
+        api.caller(),
+        amount.clone(),
+    )?;
+    transfer_from(api, token, sender, recipient, amount)?;
+    Ok(())
+}
 
 }
 pub fn transfer_from<API: ellipticoin::API>(
@@ -92,16 +122,13 @@ pub fn credit<API: ellipticoin::API>(api: &mut API, token: Token, address: Addre
 pub fn debit<API: ellipticoin::API>(
     api: &mut API,
     token: Token,
-    mut address: Address,
+    address: Address,
     amount: u64,
 ) -> Result<(), Box<Error>> {
     let balance = get_balance(api, token.clone(), address.clone());
     if amount <= balance {
         Ok(set_balance(api, token.clone(), address, balance - amount))
     } else {
-        println!("here here here");
-        println!("balance: {}", balance);
-        println!("{:?} {}", token, base64::encode(&address.to_vec()));
         Err(Box::new(errors::INSUFFICIENT_FUNDS.clone()))
     }
 }
@@ -138,7 +165,7 @@ mod tests {
     lazy_static! {
         static ref TOKEN: Token = Token {
             issuer: Address::PublicKey(*ALICE),
-            token_id: [0; 32]
+            id: [0; 32]
         };
     }
     #[test]
@@ -223,6 +250,17 @@ mod tests {
         assert_eq!(
             get_balance(&mut api, TOKEN.clone(), Address::PublicKey(*CAROL)),
             20
+        );
+    }
+    #[test]
+    fn test_mint() {
+        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+        let mut state = TestState::new();
+        let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
+        native::mint(&mut api, TOKEN.id, Address::PublicKey(*ALICE), 50).unwrap();
+        assert_eq!(
+            get_balance(&mut api, TOKEN.clone(), Address::PublicKey(*ALICE)),
+            50
         );
     }
 }

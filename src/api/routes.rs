@@ -1,4 +1,4 @@
-use crate::api::{addresses, blocks, memory, state, storage, transactions, API};
+use crate::api::{addresses, blocks, memory, storage, transactions, API};
 use tide::sse;
 
 impl API {
@@ -18,7 +18,6 @@ impl API {
         self.app
             .at("/storage/:contract_owner/:contract_name/:key")
             .get(storage::show);
-        self.app.at("/state").get(state::show);
         self.app.at("/addresses/:address").get(addresses::show);
     }
 }
