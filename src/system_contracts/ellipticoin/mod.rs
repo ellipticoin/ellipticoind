@@ -1,11 +1,19 @@
 mod errors;
 mod ethereum;
 mod hashing;
+mod issuance;
 
 use super::token;
-use ellipticoin::{constants::ELC, storage_accessors, Address};
+use crate::system_contracts::{
+    ellipticoin::issuance::INCENTIVISED_POOLS, exchange, exchange::pool_token, token::mint,
+};
+use ellipticoin::{
+    constants::{ELC, SYSTEM_ADDRESS},
+    memory_accessors, pay, storage_accessors, Address,
+};
 use errors::Error;
 use hashing::sha256;
+use issuance::block_reward_at;
 use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_cbor::Value;
@@ -14,11 +22,22 @@ use wasm_rpc_macros::export_native;
 
 const CONTRACT_NAME: &'static str = "Ellipticoin";
 
+lazy_static! {
+    pub static ref ADDRESS: ([u8; 32], std::string::String) = (
+        ellipticoin::constants::SYSTEM_ADDRESS,
+        CONTRACT_NAME.to_string()
+    );
+}
+
 storage_accessors!(
+    block_number() -> u32;
     ethereum_balances(address: Vec<u8>) -> u64;
     miners() -> Vec<Miner>;
-    unlocked_ethereum_balances(ethereum_address: Vec<u8>) -> bool;
     total_unlocked_ethereum() -> u64;
+    unlocked_ethereum_balances(ethereum_address: Vec<u8>) -> bool;
+);
+memory_accessors!(
+    issuance_rewards(address: Address) -> u64;
 );
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -30,6 +49,12 @@ pub struct Miner {
 }
 
 export_native! {
+    pub fn harvest<API: ellipticoin::API>(api: &mut API) {
+        let issuance_rewards = get_issuance_rewards(api, api.caller());
+        debit_issuance_rewards(api, api.caller(), issuance_rewards);
+        pay!(api, ELC.clone(), api.caller(), issuance_rewards).unwrap();
+    }
+
     pub fn transfer_to_current_miner<API: ellipticoin::API>(api: &mut API, amount: u64) -> Result<(), Box<Error>> {
         let miners = get_miners(api);
         let current_miner = miners.first().unwrap().address.clone();
@@ -83,7 +108,7 @@ export_native! {
         Ok(Value::Null)
     }
 
-    pub fn reveal<API: ellipticoin::API>(api: &mut API, value: [u8; 32]) -> Result<Vec<Miner>, Box<Error>> {
+    pub fn seal<API: ellipticoin::API>(api: &mut API, value: [u8; 32]) -> Result<Vec<Miner>, Box<Error>> {
         let mut miners = get_miners(api);
         if api.caller() != ellipticoin::Address::PublicKey(miners.first().unwrap().address) {
             return Err(Box::new(errors::SENDER_IS_NOT_THE_WINNER.clone()));
@@ -97,38 +122,88 @@ export_native! {
         {
             return Err(Box::new(errors::INVALID_VALUE.clone()));
         }
-        settle_block_rewards(api)?;
         miners.first_mut().unwrap().hash_onion_skin = value.clone();
+        settle_block_rewards(api)?;
         shuffle_miners(api, &mut miners, value);
+        issue_block_rewards(api)?;
+        increment_block_number(api);
 
         Ok(miners)
     }
 
-    fn shuffle_miners<API: ellipticoin::API>(api: &mut API, miners: &mut Vec<Miner>, value: [u8; 32]) {
-        let mut rng = SmallRng::from_seed(value[0..16].try_into().unwrap());
-        let mut shuffled_miners = vec![];
-        while !miners.is_empty() {
-            let random_miner = miners
-                .choose_weighted(&mut rng, |miner| miner.burn_per_block)
-                .unwrap()
-                .clone();
-            shuffled_miners.push(random_miner.clone());
-            miners.retain(|miner| miner.clone() != random_miner);
-        }
-        *miners = shuffled_miners.clone();
-        set_miners(api, shuffled_miners);
-    }
 
-    fn settle_block_rewards<API: ellipticoin::API>(api: &mut API) -> Result<(), Box<Error>> {
-        let miners = get_miners(api);
-        let winner = miners.first().as_ref().unwrap().clone();
-        for miner in &miners {
-            credit(api, ellipticoin::Address::PublicKey(winner.address.clone()), miner.burn_per_block);
-            debit(api, ellipticoin::Address::PublicKey(miner.address.clone()), miner.burn_per_block)?;
-        }
-        Ok(())
-    }
+}
+fn issue_block_rewards<API: ellipticoin::API>(api: &mut API) -> Result<(), Box<Error>> {
+    let block_reward = block_reward_at(get_block_number(api));
+    mint(
+        api,
+        ELC.clone(),
+        Address::Contract(ADDRESS.clone()),
+        block_reward,
+    )?;
+    let reward_per_pool = block_reward / INCENTIVISED_POOLS.len() as u64;
+    for token in INCENTIVISED_POOLS.clone() {
+        let share_holders = exchange::get_share_holders(api, token.clone());
+        let (addresses, balances): (Vec<_>, Vec<_>) = share_holders
+            .iter()
+            .cloned()
+            .map(|address| {
+                (
+                    address.clone(),
+                    token::get_balance(api, pool_token(token.clone()), address),
+                )
+            })
+            .collect::<Vec<(Address, u64)>>()
+            .iter()
+            .cloned()
+            .unzip();
 
+        for (address, issuance) in addresses
+            .iter()
+            .zip(distribute(reward_per_pool, balances).iter())
+        {
+            credit_issuance_rewards(api, address.clone(), *issuance);
+        }
+    }
+    Ok(())
+}
+
+fn increment_block_number<API: ellipticoin::API>(api: &mut API) {
+    let block_number = get_block_number(api);
+    set_block_number(api, block_number + 1);
+}
+
+fn shuffle_miners<API: ellipticoin::API>(api: &mut API, miners: &mut Vec<Miner>, value: [u8; 32]) {
+    let mut rng = SmallRng::from_seed(value[0..16].try_into().unwrap());
+    let mut shuffled_miners = vec![];
+    while !miners.is_empty() {
+        let random_miner = miners
+            .choose_weighted(&mut rng, |miner| miner.burn_per_block)
+            .unwrap()
+            .clone();
+        shuffled_miners.push(random_miner.clone());
+        miners.retain(|miner| miner.clone() != random_miner);
+    }
+    *miners = shuffled_miners.clone();
+    set_miners(api, shuffled_miners);
+}
+
+fn settle_block_rewards<API: ellipticoin::API>(api: &mut API) -> Result<(), Box<Error>> {
+    let miners = get_miners(api);
+    let winner = miners.first().as_ref().unwrap().clone();
+    for miner in &miners {
+        credit(
+            api,
+            ellipticoin::Address::PublicKey(winner.address.clone()),
+            miner.burn_per_block,
+        );
+        debit(
+            api,
+            ellipticoin::Address::PublicKey(miner.address.clone()),
+            miner.burn_per_block,
+        )?;
+    }
+    Ok(())
 }
 
 fn credit<API: ellipticoin::API>(api: &mut API, address: Address, amount: u64) {
@@ -144,7 +219,17 @@ fn debit<API: ellipticoin::API>(
     Ok(())
 }
 
-fn _distribute(mut amount: u64, mut values: Vec<u64>) -> Vec<u64> {
+fn credit_issuance_rewards<API: ellipticoin::API>(api: &mut API, address: Address, amount: u64) {
+    let issuance_rewards = get_issuance_rewards(api, address.clone());
+    set_issuance_rewards(api, address, issuance_rewards + amount);
+}
+
+fn debit_issuance_rewards<API: ellipticoin::API>(api: &mut API, address: Address, amount: u64) {
+    let issuance_rewards = get_issuance_rewards(api, address.clone());
+    set_issuance_rewards(api, address, issuance_rewards - amount);
+}
+
+fn distribute(mut amount: u64, mut values: Vec<u64>) -> Vec<u64> {
     let mut rest = values.clone();
     let mut distributions: Vec<u64> = Default::default();
     values.reverse();
@@ -165,8 +250,9 @@ mod tests {
         config::HOST,
         helpers::generate_hash_onion,
         system_contracts::{
+            exchange::constants::BASE_TOKEN,
             test_api::{TestAPI, TestState},
-            token::get_balance,
+            token::{constants::ETH, get_balance, BASE_FACTOR},
         },
     };
     use ellipticoin::constants::SYSTEM_ADDRESS;
@@ -175,7 +261,26 @@ mod tests {
     use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB};
 
     #[test]
-    fn test_commit_and_reveal() {
+    fn test_harvest() {
+        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+        env::set_var("HOST", "localhost");
+        let mut state = TestState::new();
+        let mut api = TestAPI::new(
+            &mut state,
+            *ALICE,
+            (SYSTEM_ADDRESS, "Ellipticoin".to_string()),
+        );
+        mint(&mut api, ELC.clone(), Address::Contract(ADDRESS.clone()), 1).unwrap();
+        credit_issuance_rewards(&mut api, Address::PublicKey(*ALICE), 1);
+        native::harvest(&mut api);
+        assert_eq!(
+            get_balance(&mut api, ELC.clone(), Address::PublicKey(*ALICE)),
+            1
+        );
+    }
+
+    #[test]
+    fn test_commit_and_seal() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         env::set_var("HOST", "localhost");
         let mut state = TestState::new();
@@ -190,6 +295,35 @@ mod tests {
         let bobs_center = [1; 32];
         let mut alices_onion = generate_hash_onion(3, alices_center.clone());
         let mut bobs_onion = generate_hash_onion(3, bobs_center.clone());
+        token::set_balance(
+            &mut api,
+            ETH.clone(),
+            ellipticoin::Address::PublicKey(*ALICE),
+            1 * BASE_FACTOR,
+        );
+        token::set_balance(
+            &mut api,
+            BASE_TOKEN.clone(),
+            ellipticoin::Address::PublicKey(*ALICE),
+            1 * BASE_FACTOR,
+        );
+        token::set_balance(
+            &mut api,
+            ETH.clone(),
+            ellipticoin::Address::PublicKey(*BOB),
+            1 * BASE_FACTOR,
+        );
+        token::set_balance(
+            &mut api,
+            BASE_TOKEN.clone(),
+            ellipticoin::Address::PublicKey(*BOB),
+            1 * BASE_FACTOR,
+        );
+        api.caller = Address::PublicKey(*ALICE);
+        exchange::native::create_pool(&mut api, ETH.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR)
+            .unwrap();
+        api.caller = Address::PublicKey(*BOB);
+        exchange::native::add_liqidity(&mut api, ETH.clone(), 1 * BASE_FACTOR).unwrap();
         api.caller = Address::PublicKey(*ALICE);
         native::start_mining(&mut api, HOST.to_string(), 1, *alices_onion.last().unwrap()).unwrap();
         api.caller = Address::PublicKey(*BOB);
@@ -198,12 +332,12 @@ mod tests {
         // With this random seed the winners are Alice, Alice, Bob in that order
         api.caller = Address::PublicKey(*ALICE);
         alices_onion.pop();
-        assert!(native::reveal(&mut api, *alices_onion.last().unwrap()).is_ok());
+        assert!(native::seal(&mut api, *alices_onion.last().unwrap()).is_ok());
         alices_onion.pop();
-        assert!(native::reveal(&mut api, *alices_onion.last().unwrap()).is_ok());
+        assert!(native::seal(&mut api, *alices_onion.last().unwrap()).is_ok());
         api.caller = Address::PublicKey(*BOB);
         bobs_onion.pop();
-        assert!(native::reveal(&mut api, *bobs_onion.last().unwrap()).is_ok());
+        assert!(native::seal(&mut api, *bobs_onion.last().unwrap()).is_ok());
         assert_eq!(
             get_balance(&mut api, ELC.clone(), Address::PublicKey(*ALICE)),
             6
@@ -212,5 +346,18 @@ mod tests {
             get_balance(&mut api, ELC.clone(), Address::PublicKey(*BOB)),
             4
         );
+        assert_eq!(
+            get_balance(&mut api, ELC.clone(), Address::PublicKey(*BOB)),
+            4
+        );
+        assert_eq!(
+            get_issuance_rewards(&mut api, Address::PublicKey(*ALICE)),
+            960_000
+        );
+        assert_eq!(
+            get_issuance_rewards(&mut api, Address::PublicKey(*BOB)),
+            960_000
+        );
+        assert_eq!(get_block_number(&mut api), 3);
     }
 }

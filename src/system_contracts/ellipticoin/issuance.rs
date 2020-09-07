@@ -1,45 +1,46 @@
-const YEARS_PER_ERA: u64 = 2;
-const NUMBER_OF_ERAS: u64 = 7;
-const SECONDS_PER_BLOCK: u64 = 5;
-const LOG_BASE: u64 = 2;
-const SCALE: u64 = 10000;
+use crate::system_contracts::token::{
+    constants::{BTC, ETH},
+    BASE_FACTOR,
+};
+use ellipticoin::Token;
+
 lazy_static! {
-    static ref SECONDS_IN_A_YEAR: u64 = 60 * 60 * 24 * 365;
-    static ref BLOCKS_PER_ERA: u64 = (YEARS_PER_ERA * *SECONDS_IN_A_YEAR) / SECONDS_PER_BLOCK;
+    pub static ref INCENTIVISED_POOLS: Vec<Token> = vec![BTC.clone(), ETH.clone()];
 }
 
-pub fn block_reward(block_number: u64) -> u64 {
-    if era(block_number) < NUMBER_OF_ERAS {
-        LOG_BASE.pow((NUMBER_OF_ERAS - era(block_number) - 1) as u32) * SCALE
-    } else {
-        0
+const BLOCKS_PER_ERA: u32 = 8_000_000;
+const NUMBER_OF_ERAS: u32 = 8;
+
+pub fn block_reward_at(block: u32) -> u64 {
+    if block > BLOCKS_PER_ERA * NUMBER_OF_ERAS {
+        return 0;
     }
-}
-
-fn era(block_number: u64) -> u64 {
-    block_number / *BLOCKS_PER_ERA
+    let era = block / BLOCKS_PER_ERA;
+    BASE_FACTOR * 128 * 10u64.pow(6) / 2u64.pow(era) / 10u64.pow(8)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::block_reward;
+    use super::*;
+    use crate::constants::BLOCK_TIME;
+    use std::time::Duration;
+    const NUMBER_OF_ERAS: u32 = 8;
+    const SECONDS_IN_A_YEAR: u64 = 31556952;
 
     #[test]
-    fn test_block_reward() {
-        for (block_number, reward) in vec![
-            (0, 640000),
-            (1, 640000),
-            (12614399, 640000),
-            (12614400, 320000),
-            (12614401, 320000),
-            (25228800, 160000),
-            (37843200, 80000),
-            (50457600, 40000),
-            (63072000, 20000),
-            (75686400, 10000),
-            (88300800, 0),
-        ] {
-            assert!(block_reward(block_number) == reward);
+    fn test_total_supply() {
+        let mut total_issuance = 0;
+        let mut total_time: Duration = Default::default();
+        for era in 0..=NUMBER_OF_ERAS - 1 {
+            let reward = block_reward_at(era * BLOCKS_PER_ERA);
+            total_issuance += reward * BLOCKS_PER_ERA as u64;
+            total_time += BLOCKS_PER_ERA * BLOCK_TIME.clone();
         }
+        assert_eq!(
+            block_reward_at((NUMBER_OF_ERAS as u32 * BLOCKS_PER_ERA) + 1),
+            0
+        );
+        assert_eq!(total_issuance, 20400000 * BASE_FACTOR);
+        assert_eq!(total_time.as_secs() / SECONDS_IN_A_YEAR, 8);
     }
 }
