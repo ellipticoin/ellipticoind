@@ -6,17 +6,14 @@ use crate::{
     system_contracts::token::{self, BASE_FACTOR},
 };
 use constants::{BASE_TOKEN, FEE};
-use ellipticoin::{charge, constants::SYSTEM_ADDRESS, memory_accessors, pay, Address, Token};
+use ellipticoin::{charge, memory_accessors, pay, Address, Token};
 use std::{boxed::Box, collections::HashSet};
 use wasm_rpc::error::Error;
 use wasm_rpc_macros::export_native;
 
 const CONTRACT_NAME: &'static str = "Exchange";
 lazy_static! {
-    pub static ref ADDRESS: ([u8; 32], std::string::String) = (
-        ellipticoin::constants::SYSTEM_ADDRESS,
-        CONTRACT_NAME.to_string()
-    );
+    pub static ref ADDRESS: std::string::String = CONTRACT_NAME.to_string();
 }
 
 memory_accessors!(
@@ -174,7 +171,7 @@ fn debit_reserves<API: ellipticoin::API>(api: &mut API, token: Token, amount: u6
 
 pub fn pool_token(token: Token) -> Token {
     Token {
-        issuer: Address::Contract((SYSTEM_ADDRESS, CONTRACT_NAME.to_string())),
+        issuer: Address::Contract(CONTRACT_NAME.to_string()),
         id: sha256(token.into()),
     }
 }
@@ -204,7 +201,7 @@ mod tests {
     fn test_add_liqidity() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
+        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
         token::set_balance(
             &mut api,
             APPLES.clone(),
@@ -241,7 +238,7 @@ mod tests {
     fn test_swap() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
+        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
         token::set_balance(
             &mut api,
             APPLES.clone(),
@@ -284,7 +281,7 @@ mod tests {
     fn test_swap_base_token() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
+        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
         token::set_balance(
             &mut api,
             APPLES.clone(),
@@ -326,7 +323,7 @@ mod tests {
     fn test_swap_for_base_token() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
+        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
         token::set_balance(
             &mut api,
             APPLES.clone(),
@@ -368,7 +365,7 @@ mod tests {
     fn test_remove_liqidity() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
+        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
         token::set_balance(
             &mut api,
             APPLES.clone(),

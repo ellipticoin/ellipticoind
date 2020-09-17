@@ -8,7 +8,7 @@ use crate::system_contracts::{
     ellipticoin::issuance::INCENTIVISED_POOLS, exchange, exchange::pool_token, token::mint,
 };
 use ellipticoin::{
-    constants::{ELC, SYSTEM_ADDRESS},
+    constants::{ELC},
     memory_accessors, pay, storage_accessors, Address,
 };
 use errors::Error;
@@ -23,10 +23,7 @@ use wasm_rpc_macros::export_native;
 const CONTRACT_NAME: &'static str = "Ellipticoin";
 
 lazy_static! {
-    pub static ref ADDRESS: ([u8; 32], std::string::String) = (
-        ellipticoin::constants::SYSTEM_ADDRESS,
-        CONTRACT_NAME.to_string()
-    );
+    pub static ref ADDRESS: std::string::String = CONTRACT_NAME.to_string();
 }
 
 storage_accessors!(
@@ -268,7 +265,7 @@ mod tests {
         let mut api = TestAPI::new(
             &mut state,
             *ALICE,
-            (SYSTEM_ADDRESS, "Ellipticoin".to_string()),
+            "Ellipticoin".to_string(),
         );
         mint(&mut api, ELC.clone(), Address::Contract(ADDRESS.clone()), 1).unwrap();
         credit_issuance_rewards(&mut api, Address::PublicKey(*ALICE), 1);
@@ -287,7 +284,7 @@ mod tests {
         let mut api = TestAPI::new(
             &mut state,
             *ALICE,
-            (SYSTEM_ADDRESS, "Ellipticoin".to_string()),
+            "Ellipticoin".to_string(),
         );
         credit(&mut api, Address::PublicKey(*ALICE), 5);
         credit(&mut api, Address::PublicKey(*BOB), 5);

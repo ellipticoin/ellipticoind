@@ -74,12 +74,7 @@ pub async fn dump_state(block_number: Option<u32>) {
             transactions.iter().for_each(|transaction| {
                 let mut api = NativeAPI {
                     transaction: transaction.clone().into(),
-                    address: (
-                        transaction.contract_address[0..32].try_into().unwrap(),
-                        str::from_utf8(&transaction.contract_address[32..])
-                            .unwrap()
-                            .to_string(),
-                    ),
+                    contract: transaction.contract.clone(),
                     state: &mut state,
                     caller: Address::PublicKey(transaction.sender[0..32].try_into().unwrap()),
                     sender: transaction.sender.clone()[..].try_into().unwrap(),

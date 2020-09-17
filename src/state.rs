@@ -102,9 +102,9 @@ impl State {
     }
 }
 
-pub fn db_key(contract_address: &([u8; 32], String), key: &[u8]) -> Vec<u8> {
+pub fn db_key(contract: &str, key: &[u8]) -> Vec<u8> {
     [
-        &sha256([&contract_address.0[..], contract_address.1.as_bytes()].concat())[..],
+        &sha256(contract.as_bytes().to_vec())[..],
         key,
     ]
     .concat()

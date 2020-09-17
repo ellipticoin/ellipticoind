@@ -1,6 +1,6 @@
 use crate::{
     state::State,
-    system_contracts::{self, is_system_contract},
+    system_contracts::{self},
     transaction::Transaction,
 };
 use ellipticoin::Address;
@@ -10,7 +10,7 @@ use serde_cbor::Value;
 pub struct NativeAPI<'a> {
     pub state: &'a mut State,
     pub transaction: Transaction,
-    pub address: ([u8; 32], String),
+    pub contract: String,
     pub sender: [u8; 32],
     pub caller: Address,
 }
@@ -44,28 +44,22 @@ impl<'a> ellipticoin::API for NativeAPI<'a> {
     }
     fn call<D: DeserializeOwned>(
         &mut self,
-        legislator: [u8; 32],
-        contract_name: &str,
+        contract: &str,
         function_name: &str,
         arguments: Vec<Value>,
     ) -> Result<D, Box<ellipticoin::wasm_rpc::error::Error>> {
         let mut api = NativeAPI {
             state: &mut self.state,
-            address: (legislator, contract_name.to_string()),
-            caller: Address::Contract(self.address.clone()),
+            contract: contract.to_string(),
+            caller: Address::Contract(self.contract.to_string()),
             sender: self.sender,
             transaction: self.transaction.clone(),
         };
         let mut transaction = self.transaction.clone();
-        transaction.contract_address = (legislator, contract_name.to_string());
+        transaction.contract = contract.to_string();
         transaction.arguments = arguments;
         transaction.function = function_name.to_string();
-        let return_value: serde_cbor::Value = if is_system_contract(&transaction) {
-            system_contracts::run2(&mut api, transaction).into()
-        } else {
-            // transaction.complete((CONTRACT_NOT_FOUND.clone()).into(), transaction.gas_limit).into()
-            panic!();
-        };
+        let return_value: serde_cbor::Value = system_contracts::run2(&mut api, transaction).into();
         Ok(serde_cbor::from_slice(&serde_cbor::to_vec(&return_value).unwrap()).unwrap())
     }
 }

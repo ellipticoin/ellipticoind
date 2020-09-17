@@ -6,30 +6,24 @@ use crate::{
     state::{db_key, Memory},
 };
 use async_std::task::sleep;
-use std::{convert::TryInto, str, time::Duration};
+use std::{str, time::Duration};
 use tide::{http::StatusCode, Body, Response, Result};
 
 pub async fn show(req: tide::Request<State>) -> Result<Response> {
-    let contract_name: String = req.param("contract_name")?;
-    let contract_owner_bytes = base64_param(&req, "contract_owner")?;
-    let contract_address = [
-        contract_owner_bytes.clone(),
-        contract_name.as_bytes().to_vec(),
-    ]
-    .concat();
+    let contract: String = req.param("contract")?;
     let key_bytes = base64_param(&req, "key")?;
     for _ in 0..10 {
-        if let Ok(res) = get_memory(&req, &contract_address, &key_bytes).await {
+        if let Ok(res) = get_memory(&req, &contract, &key_bytes).await {
             return Ok(res);
         }
         sleep(Duration::from_millis(500)).await;
     }
-    get_memory(&req, &contract_address, &key_bytes).await
+    get_memory(&req, &contract, &key_bytes).await
 }
 
 async fn get_memory(
     req: &tide::Request<State>,
-    contract_address: &[u8],
+    contract: &str,
     key_bytes: &[u8],
 ) -> Result<Response> {
     let current_miner = current_miner().await;
@@ -38,10 +32,7 @@ async fn get_memory(
             redis: get_redis_connection(),
         };
         let value = memory.get(&db_key(
-            &((
-                contract_address[0..32].try_into().unwrap(),
-                str::from_utf8(&contract_address[32..]).unwrap().to_string(),
-            )),
+            contract,
             &key_bytes,
         ));
         let mut res = Response::new(StatusCode::Ok);
