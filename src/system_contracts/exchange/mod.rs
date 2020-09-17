@@ -48,8 +48,8 @@ export_native! {
         let ratio = get_ratio(api, token.clone())?;
         charge!(api, token.clone(), api.caller(), amount)?;
         credit_reserves(api, token.clone(), amount);
-        charge!(api, BASE_TOKEN.clone(), api.caller(), amount * (ratio/BASE_FACTOR.pow(2)))?;
-        credit_base_token_reserves(api, token.clone(), amount * (ratio/BASE_FACTOR.pow(2)));
+        charge!(api, BASE_TOKEN.clone(), api.caller(), (amount * ratio)/BASE_FACTOR)?;
+        credit_base_token_reserves(api, token.clone(), (amount * ratio)/BASE_FACTOR);
         mint(api, token, amount)?;
         Ok(())
     }
