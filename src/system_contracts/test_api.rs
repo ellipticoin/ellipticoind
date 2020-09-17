@@ -1,5 +1,5 @@
 use crate::{
-    system_contracts::{self, is_system_contract},
+    system_contracts::{self},
     transaction::Transaction,
 };
 use ellipticoin::Address;
@@ -23,21 +23,21 @@ impl TestState {
 }
 pub struct TestAPI<'a> {
     pub state: &'a mut TestState,
-    pub address: ([u8; 32], String),
+    pub contract: String,
     pub transaction: Transaction,
     pub sender: [u8; 32],
     pub caller: Address,
 }
 
 impl<'a> TestAPI<'a> {
-    pub fn new(state: &'a mut TestState, sender: [u8; 32], address: ([u8; 32], String)) -> Self {
+    pub fn new(state: &'a mut TestState, sender: [u8; 32], contract: String) -> Self {
         let transaction = Transaction {
             sender,
             ..Default::default()
         };
         Self {
             state,
-            address,
+            contract,
             transaction: transaction.clone(),
             caller: Address::PublicKey(transaction.sender),
             sender: transaction.sender.try_into().unwrap(),
@@ -73,28 +73,22 @@ impl<'a> ellipticoin::API for TestAPI<'a> {
     }
     fn call<D: DeserializeOwned>(
         &mut self,
-        legislator: [u8; 32],
-        contract_name: &str,
+        contract: &str,
         function_name: &str,
         arguments: Vec<ellipticoin::wasm_rpc::serde_cbor::Value>,
     ) -> Result<D, Box<ellipticoin::wasm_rpc::error::Error>> {
         let mut transaction = self.transaction.clone();
-        transaction.contract_address = (legislator, contract_name.to_string());
+        transaction.contract = contract.to_string();
         transaction.arguments = arguments;
         transaction.function = function_name.to_string();
         let mut api = TestAPI {
             state: &mut self.state,
-            address: (legislator, contract_name.to_string()),
-            caller: Address::Contract(self.address.clone()),
+            contract: contract.to_string(),
+            caller: Address::Contract(self.contract.clone()),
             sender: self.sender,
             transaction: transaction.clone(),
         };
-        let return_value: serde_cbor::Value = if is_system_contract(&transaction) {
-            system_contracts::run2(&mut api, transaction).into()
-        } else {
-            // transaction.complete((CONTRACT_NOT_FOUND.clone()).into(), transaction.gas_limit).into()
-            panic!();
-        };
+        let return_value: serde_cbor::Value = system_contracts::run2(&mut api, transaction).into();
         Ok(serde_cbor::from_slice(&serde_cbor::to_vec(&return_value).unwrap()).unwrap())
     }
 }

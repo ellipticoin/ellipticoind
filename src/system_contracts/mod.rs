@@ -1,5 +1,4 @@
 use crate::{
-    constants::SYSTEM_ADDRESS,
     error::CONTRACT_NOT_FOUND,
     transaction::{CompletedTransaction, Transaction},
 };
@@ -14,20 +13,16 @@ pub mod exchange;
 pub mod test_api;
 pub mod token;
 
-pub fn is_system_contract(transaction: &Transaction) -> bool {
-    transaction.contract_address.0 == SYSTEM_ADDRESS
-}
-
 pub fn run<API: ::ellipticoin::API>(
     api: &mut API,
     transaction: Transaction,
 ) -> CompletedTransaction {
     let return_value = run2(api, transaction.clone());
-    transaction.complete(return_value, transaction.gas_limit)
+    transaction.complete(return_value)
 }
 
 pub fn run2<API: ::ellipticoin::API>(api: &mut API, transaction: Transaction) -> serde_cbor::Value {
-    let f = match &transaction.contract_name()[..] {
+    let f = match &transaction.contract[..] {
         "Bridge" => bridge::native::call,
         "Ellipticoin" => ellipticoin::native::call,
         "Exchange" => exchange::native::call,

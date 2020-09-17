@@ -3,7 +3,7 @@ mod errors;
 
 use crate::system_contracts::token::{self};
 use constants::SIGNERS;
-use ellipticoin::{constants::SYSTEM_ADDRESS, Address, Token};
+use ellipticoin::{Address, Token};
 use std::boxed::Box;
 use wasm_rpc::error::Error;
 use wasm_rpc_macros::export_native;
@@ -41,7 +41,7 @@ export_native! {
 
 pub fn token(token_id: [u8; 32]) -> Token {
     Token {
-        issuer: Address::Contract((SYSTEM_ADDRESS, CONTRACT_NAME.to_string())),
+        issuer: Address::Contract(CONTRACT_NAME.to_string()),
         id: token_id,
     }
 }
@@ -67,7 +67,7 @@ mod tests {
         let mut api = TestAPI::new(
             &mut state,
             SIGNERS[0],
-            (SYSTEM_ADDRESS, "Token".to_string()),
+            "Token".to_string(),
         );
         native::mint(&mut api, BTC, Address::PublicKey(*ALICE), 1 * BASE_FACTOR).unwrap();
         assert_eq!(
@@ -80,7 +80,7 @@ mod tests {
     fn test_mint_invalid_sender() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
+        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
         assert!(native::mint(&mut api, BTC, Address::PublicKey(*ALICE), 1 * BASE_FACTOR).is_err());
     }
 
@@ -91,7 +91,7 @@ mod tests {
         let mut api = TestAPI::new(
             &mut state,
             SIGNERS[0],
-            (SYSTEM_ADDRESS, "Token".to_string()),
+            "Token".to_string(),
         );
         native::mint(&mut api, BTC, Address::PublicKey(*ALICE), 1 * BASE_FACTOR).unwrap();
         api.caller = Address::PublicKey(ALICE.clone());

@@ -24,11 +24,8 @@ pub struct Transaction {
     #[serde(with = "serde_bytes")]
     pub block_hash: Vec<u8>,
     pub position: u32,
-    #[serde(with = "serde_bytes")]
-    pub contract_address: Vec<u8>,
+    pub contract: String,
     pub function: String,
-    pub gas_limit: u64,
-    pub gas_used: u64,
     pub nonce: u32,
     return_value: serde_cbor::Value,
     #[serde(with = "serde_bytes")]
@@ -60,13 +57,11 @@ impl From<models::Transaction> for Transaction {
     fn from(transaction: models::Transaction) -> Self {
         Self {
             network_id: transaction.network_id as u32,
-            contract_address: transaction.contract_address.clone(),
+            contract: transaction.contract.clone(),
             block_hash: transaction.block_hash.clone(),
             position: transaction.position as u32,
             sender: transaction.sender.clone(),
             nonce: transaction.nonce as u32,
-            gas_limit: transaction.gas_limit as u64,
-            gas_used: transaction.gas_used as u64,
             function: transaction.function.clone(),
             arguments: serde_cbor::from_slice(&transaction.arguments).unwrap(),
             return_value: serde_cbor::from_slice(&transaction.return_value).unwrap(),
@@ -101,13 +96,11 @@ impl From<Transaction> for models::Transaction {
         Self {
             network_id: transaction.network_id as i64,
             hash: vec![],
-            contract_address: transaction.contract_address.clone(),
+            contract: transaction.contract.clone(),
             block_hash: transaction.block_hash.clone(),
             position: transaction.position as i64,
             sender: transaction.sender.clone(),
             nonce: transaction.nonce as i64,
-            gas_limit: transaction.gas_limit as i64,
-            gas_used: transaction.gas_used as i64,
             function: transaction.function.clone(),
             arguments: serde_cbor::to_vec(&transaction.arguments).unwrap(),
             return_value: serde_cbor::to_vec(&transaction.return_value).unwrap(),
