@@ -7,12 +7,6 @@ use wasm_rpc_macros::export_native;
 
 pub const BASE_FACTOR: u64 = 1_000_000;
 const CONTRACT_NAME: &'static str = "Token";
-lazy_static! {
-    pub static ref ADDRESS: ([u8; 32], std::string::String) = (
-        ellipticoin::constants::SYSTEM_ADDRESS,
-        CONTRACT_NAME.to_string()
-    );
-}
 
 memory_accessors!(
     allowance(token: Token, address: Address, spender: Address) -> u64;
@@ -158,7 +152,6 @@ fn debit_allowance<API: ellipticoin::API>(
 mod tests {
     use super::{native, *};
     use crate::system_contracts::test_api::{TestAPI, TestState};
-    use ellipticoin::constants::SYSTEM_ADDRESS;
     use std::env;
 
     use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB, CAROL};
@@ -172,7 +165,7 @@ mod tests {
     fn test_transfer() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
+        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
         set_balance(&mut api, TOKEN.clone(), Address::PublicKey(*ALICE), 100);
         native::transfer(&mut api, TOKEN.clone(), Address::PublicKey(*BOB), 20).unwrap();
         assert_eq!(
@@ -188,7 +181,7 @@ mod tests {
     fn test_transfer_insufficient_funds() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
+        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
         set_balance(&mut api, TOKEN.clone(), Address::PublicKey(*ALICE), 100);
         assert!(native::transfer(
             &mut api,
@@ -203,7 +196,7 @@ mod tests {
     fn test_transfer_from_insufficient_funds() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
+        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
         set_balance(&mut api, TOKEN.clone(), Address::PublicKey(*BOB), 100);
         assert!(transfer_from(
             &mut api,
@@ -219,7 +212,7 @@ mod tests {
     fn test_transfer_from() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
+        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
         set_balance(
             &mut api,
             TOKEN.clone().into(),
@@ -256,7 +249,7 @@ mod tests {
     fn test_mint() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, (SYSTEM_ADDRESS, "Token".to_string()));
+        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
         native::mint(&mut api, TOKEN.id, Address::PublicKey(*ALICE), 50).unwrap();
         assert_eq!(
             get_balance(&mut api, TOKEN.clone(), Address::PublicKey(*ALICE)),

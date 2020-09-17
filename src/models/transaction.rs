@@ -1,7 +1,6 @@
 use crate::{
     config::get_pg_connection,
     diesel::{ExpressionMethods, RunQueryDsl},
-    error::CONTRACT_NOT_FOUND,
     helpers::sha256,
     models,
     models::block::Block,
@@ -13,7 +12,7 @@ use crate::{
         },
     },
     state::State,
-    system_contracts::{self, api::NativeAPI, is_system_contract},
+    system_contracts::{self, api::NativeAPI},
     transaction,
 };
 use diesel::{
@@ -32,14 +31,8 @@ impl From<Transaction> for transaction::Transaction {
             network_id: transaction.network_id as u32,
             sender: transaction.sender[..].try_into().unwrap(),
             arguments: from_slice(&transaction.arguments).unwrap(),
-            contract_address: (
-                transaction.contract_address[0..32].try_into().unwrap(),
-                str::from_utf8(&transaction.contract_address[32..])
-                    .unwrap()
-                    .to_string(),
-            ),
+            contract: transaction.contract,
             function: transaction.function,
-            gas_limit: transaction.gas_limit as u32,
             nonce: transaction.nonce as u32,
             signature: Some(transaction.signature),
         }
@@ -64,10 +57,8 @@ pub struct Transaction {
     pub block_hash: Vec<u8>,
     pub hash: Vec<u8>,
     pub position: i64,
-    pub contract_address: Vec<u8>,
+    pub contract: String,
     pub sender: Vec<u8>,
-    pub gas_limit: i64,
-    pub gas_used: i64,
     pub nonce: i64,
     pub function: String,
     pub arguments: Vec<u8>,
@@ -80,13 +71,11 @@ pub struct TransactionWithoutHash {
     nonce: u32,
     sender: Vec<u8>,
     function: String,
-    gas_used: u64,
     position: u32,
     arguments: Vec<serde_cbor::Value>,
-    gas_limit: u64,
     signature: Option<Vec<u8>>,
     network_id: u64,
-    contract_address: Vec<u8>,
+    contract: String,
 }
 
 impl Transaction {
@@ -96,26 +85,14 @@ impl Transaction {
         vm_transaction: transaction::Transaction,
         position: i64,
     ) -> Self {
-        let mut completed_transaction: models::Transaction = if is_system_contract(&vm_transaction)
-        {
             let mut api = NativeAPI {
                 transaction: vm_transaction.clone(),
-                address: vm_transaction.clone().contract_address,
+                contract: vm_transaction.clone().contract,
                 state,
                 caller: Address::PublicKey(vm_transaction.sender),
                 sender: vm_transaction.sender.clone(),
             };
-            system_contracts::run(&mut api, vm_transaction)
-        } else {
-            // user contracts are disabled for launch
-            return vm_transaction
-                .complete(
-                    (CONTRACT_NOT_FOUND.clone()).into(),
-                    vm_transaction.gas_limit,
-                )
-                .into();
-        }
-        .into();
+        let mut completed_transaction: models::Transaction = system_contracts::run(&mut api, vm_transaction).into();
         completed_transaction.block_hash = current_block.hash.clone();
         completed_transaction.position = position;
         completed_transaction.set_hash();
@@ -135,12 +112,10 @@ impl From<Transaction> for TransactionWithoutHash {
     fn from(transaction: Transaction) -> Self {
         Self {
             arguments: from_slice(&transaction.arguments).unwrap(),
-            contract_address: transaction.contract_address,
+            contract: transaction.contract,
             nonce: transaction.nonce as u32,
             function: transaction.function,
-            gas_used: transaction.gas_used as u64,
             position: transaction.position as u32,
-            gas_limit: transaction.gas_limit as u64,
             network_id: transaction.network_id as u64,
             sender: transaction.sender,
             signature: Some(transaction.signature),
@@ -154,15 +129,9 @@ impl From<&transaction::CompletedTransaction> for Transaction {
             network_id: transaction.network_id as i64,
             hash: vec![],
             block_hash: vec![],
-            contract_address: [
-                &transaction.contract_address.0[..],
-                transaction.contract_address.1.as_bytes(),
-            ]
-            .concat(),
+            contract: transaction.contract.clone(),
             position: 0,
             sender: transaction.sender.to_vec(),
-            gas_limit: transaction.gas_limit as i64,
-            gas_used: transaction.gas_used as i64,
             nonce: transaction.nonce as i64,
             function: transaction.function.clone(),
             arguments: to_vec(&transaction.arguments).unwrap(),
@@ -176,14 +145,8 @@ impl From<&Transaction> for transaction::Transaction {
     fn from(transaction: &Transaction) -> Self {
         Self {
             network_id: transaction.network_id as u32,
-            contract_address: (
-                transaction.contract_address[0..32].try_into().unwrap(),
-                str::from_utf8(&transaction.contract_address[32..])
-                    .unwrap()
-                    .to_string(),
-            ),
+            contract: transaction.contract.clone(),
             sender: transaction.sender.clone()[..].try_into().unwrap(),
-            gas_limit: transaction.gas_limit as u32,
             nonce: transaction.nonce as u32,
             function: transaction.function.clone(),
             arguments: from_slice(&transaction.arguments).unwrap(),
@@ -198,15 +161,9 @@ impl From<transaction::CompletedTransaction> for Transaction {
             network_id: transaction.network_id as i64,
             hash: vec![],
             block_hash: vec![],
-            contract_address: [
-                &transaction.contract_address.0[..],
-                transaction.contract_address.1.as_bytes(),
-            ]
-            .concat(),
+            contract: transaction.contract,
             position: 0,
             sender: transaction.sender.to_vec(),
-            gas_limit: transaction.gas_limit as i64,
-            gas_used: transaction.gas_used as i64,
             nonce: transaction.nonce as i64,
             function: transaction.function,
             arguments: to_vec(&transaction.arguments).unwrap(),

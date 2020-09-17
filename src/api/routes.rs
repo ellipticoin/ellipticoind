@@ -13,10 +13,10 @@ impl API {
             .get(transactions::show);
         self.app.at("/transactions").post(transactions::create);
         self.app
-            .at("/memory/:contract_owner/:contract_name/:key")
+            .at("/memory/:contract/:key")
             .get(memory::show);
         self.app
-            .at("/storage/:contract_owner/:contract_name/:key")
+            .at("/storage/:contract/:key")
             .get(storage::show);
         self.app.at("/addresses/:address").get(addresses::show);
     }
