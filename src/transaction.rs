@@ -11,12 +11,12 @@ use serde_cbor::{to_vec, Value};
 pub struct Transaction {
     pub nonce: u32,
     pub sender: [u8; 32],
+    pub contract: String,
     pub function: String,
     pub arguments: Vec<serde_cbor::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<Vec<u8>>,
     pub network_id: u32,
-    pub contract: String,
 }
 
 impl Default for Transaction {
@@ -47,11 +47,7 @@ pub struct CompletedTransaction {
 }
 
 impl Transaction {
-    pub fn new(
-        contract: String,
-        function: &str,
-        arguments: Vec<Value>,
-    ) -> Self {
+    pub fn new(contract: String, function: &str, arguments: Vec<Value>) -> Self {
         let mut transaction = Self {
             contract,
             nonce: random(),

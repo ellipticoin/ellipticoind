@@ -7,10 +7,7 @@ use super::token;
 use crate::system_contracts::{
     ellipticoin::issuance::INCENTIVISED_POOLS, exchange, exchange::pool_token, token::mint,
 };
-use ellipticoin::{
-    constants::{ELC},
-    memory_accessors, pay, storage_accessors, Address,
-};
+use ellipticoin::{constants::ELC, memory_accessors, pay, storage_accessors, Address};
 use errors::Error;
 use hashing::sha256;
 use issuance::block_reward_at;
@@ -33,6 +30,7 @@ storage_accessors!(
     total_unlocked_ethereum() -> u64;
     unlocked_ethereum_balances(ethereum_address: Vec<u8>) -> bool;
 );
+
 memory_accessors!(
     issuance_rewards(address: Address) -> u64;
 );
@@ -252,7 +250,6 @@ mod tests {
             token::{constants::ETH, get_balance, BASE_FACTOR},
         },
     };
-    use ellipticoin::constants::SYSTEM_ADDRESS;
     use std::env;
 
     use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB};
@@ -262,11 +259,7 @@ mod tests {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         env::set_var("HOST", "localhost");
         let mut state = TestState::new();
-        let mut api = TestAPI::new(
-            &mut state,
-            *ALICE,
-            "Ellipticoin".to_string(),
-        );
+        let mut api = TestAPI::new(&mut state, *ALICE, "Ellipticoin".to_string());
         mint(&mut api, ELC.clone(), Address::Contract(ADDRESS.clone()), 1).unwrap();
         credit_issuance_rewards(&mut api, Address::PublicKey(*ALICE), 1);
         native::harvest(&mut api);
@@ -281,11 +274,7 @@ mod tests {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         env::set_var("HOST", "localhost");
         let mut state = TestState::new();
-        let mut api = TestAPI::new(
-            &mut state,
-            *ALICE,
-            "Ellipticoin".to_string(),
-        );
+        let mut api = TestAPI::new(&mut state, *ALICE, "Ellipticoin".to_string());
         credit(&mut api, Address::PublicKey(*ALICE), 5);
         credit(&mut api, Address::PublicKey(*BOB), 5);
         let alices_center = [0; 32];
