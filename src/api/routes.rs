@@ -12,12 +12,8 @@ impl API {
             .at("/transactions/:transaction_hash")
             .get(transactions::show);
         self.app.at("/transactions").post(transactions::create);
-        self.app
-            .at("/memory/:contract/:key")
-            .get(memory::show);
-        self.app
-            .at("/storage/:contract/:key")
-            .get(storage::show);
+        self.app.at("/memory/:contract/:key").get(memory::show);
+        self.app.at("/storage/:contract/:key").get(storage::show);
         self.app.at("/addresses/:address").get(addresses::show);
     }
 }

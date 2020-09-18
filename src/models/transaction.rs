@@ -70,12 +70,12 @@ pub struct Transaction {
 pub struct TransactionWithoutHash {
     nonce: u32,
     sender: Vec<u8>,
+    contract: String,
     function: String,
     position: u32,
     arguments: Vec<serde_cbor::Value>,
     signature: Option<Vec<u8>>,
     network_id: u64,
-    contract: String,
 }
 
 impl Transaction {
@@ -85,14 +85,15 @@ impl Transaction {
         vm_transaction: transaction::Transaction,
         position: i64,
     ) -> Self {
-            let mut api = NativeAPI {
-                transaction: vm_transaction.clone(),
-                contract: vm_transaction.clone().contract,
-                state,
-                caller: Address::PublicKey(vm_transaction.sender),
-                sender: vm_transaction.sender.clone(),
-            };
-        let mut completed_transaction: models::Transaction = system_contracts::run(&mut api, vm_transaction).into();
+        let mut api = NativeAPI {
+            transaction: vm_transaction.clone(),
+            contract: vm_transaction.clone().contract,
+            state,
+            caller: Address::PublicKey(vm_transaction.sender),
+            sender: vm_transaction.sender.clone(),
+        };
+        let mut completed_transaction: models::Transaction =
+            system_contracts::run(&mut api, vm_transaction).into();
         completed_transaction.block_hash = current_block.hash.clone();
         completed_transaction.position = position;
         completed_transaction.set_hash();

@@ -172,7 +172,7 @@ fn debit_reserves<API: ellipticoin::API>(api: &mut API, token: Token, amount: u6
 pub fn pool_token(token: Token) -> Token {
     Token {
         issuer: Address::Contract(CONTRACT_NAME.to_string()),
-        id: sha256(token.into()),
+        id: sha256(token.into()).to_vec().into(),
     }
 }
 
@@ -183,17 +183,17 @@ mod tests {
         test_api::{TestAPI, TestState},
         token,
     };
-    use ellipticoin::constants::{ELC, SYSTEM_ADDRESS};
+    use ellipticoin::constants::ELC;
     use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB};
     use std::env;
     lazy_static! {
         static ref APPLES: Token = Token {
             issuer: Address::PublicKey(*ALICE),
-            id: [0; 32]
+            id: vec![0].into()
         };
         static ref BANANAS: Token = Token {
             issuer: Address::PublicKey(*ALICE),
-            id: [1; 32]
+            id: vec![1].into()
         };
     }
 

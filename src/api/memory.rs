@@ -31,10 +31,7 @@ async fn get_memory(
         let mut memory = Memory {
             redis: get_redis_connection(),
         };
-        let value = memory.get(&db_key(
-            contract,
-            &key_bytes,
-        ));
+        let value = memory.get(&db_key(contract, &key_bytes));
         let mut res = Response::new(StatusCode::Ok);
         res.set_body(Body::from_bytes(value));
         Ok(res)
