@@ -31,10 +31,7 @@ async fn get_storage(
         let mut storage = Storage {
             rocksdb: get_rocksdb(),
         };
-        let value = storage.get(&db_key(
-            contract,
-            &key_bytes,
-        ));
+        let value = storage.get(&db_key(contract, &key_bytes));
         let mut res = Response::new(StatusCode::Ok);
         res.set_body(Body::from_bytes(value));
         Ok(res)
