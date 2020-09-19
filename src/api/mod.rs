@@ -6,27 +6,32 @@ pub use futures::stream::StreamExt;
 
 use std::net::SocketAddr;
 
-mod addresses;
 pub mod app;
 mod blocks;
+pub mod graphql;
 mod helpers;
 mod memory;
 mod middleware;
+mod mutations;
+mod query_root;
 mod routes;
 mod storage;
-mod transactions;
+mod types;
 pub mod views;
 pub struct API {
     pub app: tide::Server<State>,
 }
 
 pub enum Message {
-    Transaction(transaction::Transaction, oneshot::Sender<Transaction>),
+    Transaction(
+        transaction::TransactionRequest,
+        oneshot::Sender<Transaction>,
+    ),
     Block((models::Block, Vec<Transaction>)),
 }
 
 impl API {
-    pub fn new() -> (BroadcastChannel<Vec<u8>>, Receiver<Message>, Self) {
+    pub fn new() -> (BroadcastChannel<u32>, Receiver<Message>, Self) {
         let (sender, receiver) = channel(1);
         let new_block_broacaster = BroadcastChannel::new();
         let state = State::new(sender, new_block_broacaster.clone());
@@ -48,10 +53,10 @@ impl API {
 #[derive(Clone, Debug)]
 pub struct State {
     pub sender: Sender<Message>,
-    pub new_block_broacaster: BroadcastChannel<Vec<u8>>,
+    pub new_block_broacaster: BroadcastChannel<u32>,
 }
 impl State {
-    pub fn new(sender: Sender<Message>, new_block_broacaster: BroadcastChannel<Vec<u8>>) -> Self {
+    pub fn new(sender: Sender<Message>, new_block_broacaster: BroadcastChannel<u32>) -> Self {
         Self {
             sender,
             new_block_broacaster,

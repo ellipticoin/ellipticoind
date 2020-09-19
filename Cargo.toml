@@ -11,15 +11,19 @@ async-std = {version = "*", features = ["unstable", "attributes"]}
 broadcaster = "*"
 base64 = "*"
 clap = "3.0.0-beta.1"
-diesel = { version = "*", features = ["postgres", "r2d2"] }
+serde_cose = { path = "../../src/serde_cose"}
+diesel = { version = "1.4.5", features = ["postgres", "r2d2"] }
 diesel_migrations = "*"
 dotenv = "*"
-ed25519-dalek = "1.0.0-pre.4"
+ed25519-zebra = "2.2.0"
 ellipticoin = {path = "../rust-ellipticoin"}
-futures = "*"
+futures = "0.3.6"
 hex = "*"
+http-types = "2.5.0"
+graphql_client = "*"
 http-service = "*"
 indicatif = "*"
+juniper = { git = "https://github.com/graphql-rust/juniper"}
 lazy_static = "*"
 libsecp256k1 = "*"
 num-bigint = { version = "*", features = ["serde"] }
@@ -30,9 +34,10 @@ rocksdb = "*"
 serde = { version = "*", features = ["derive"] }
 serde_bytes = "*"
 serde_cbor = "*"
+serde_json = "*"
 serde_yaml = "*"
-sha2 = "*"
-surf = "*"
+sha2 = "0.9.1"
+surf = "2.0.0"
 tide = {version = "*", features = ["logger"]}
 time = "*"
 tiny-keccak = {version = "2.0.1", features = ["keccak"] }

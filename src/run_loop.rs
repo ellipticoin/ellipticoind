@@ -1,5 +1,5 @@
 use crate::{
-    api::Message, block_broadcaster::broadcast, config::public_key, constants::BLOCK_TIME,
+    api::Message, block_broadcaster::broadcast, config::verification_key, constants::BLOCK_TIME,
     helpers::current_miner, models, models::Block, state::State,
 };
 use async_std::{sync, task::sleep};
@@ -10,11 +10,11 @@ use broadcaster::BroadcastChannel;
 
 pub async fn run(
     mut state: State,
-    new_block_broadcaster: BroadcastChannel<Vec<u8>>,
+    new_block_broadcaster: BroadcastChannel<u32>,
     mut api_receiver: sync::Receiver<Message>,
 ) {
     'run: loop {
-        if current_miner().await.address.eq(&public_key()) {
+        if current_miner().await.address.eq(&verification_key()) {
             let block = Block::insert();
             println!("Won block #{}", &block.number);
             let sleep_fused = sleep(*BLOCK_TIME).fuse();
@@ -27,7 +27,7 @@ pub async fn run(
                     () = sleep_fused => {
                         let transactions = block.seal(&mut state, transaction_position + 1).await;
                         broadcast((block.clone(), transactions.clone())).await;
-                        let _ = new_block_broadcaster.send(&block.hash).await;
+                        let _ = new_block_broadcaster.send(&(block.number as u32)).await;
                         continue 'run;
                     },
                     (message) = next_message_fused => {
@@ -37,7 +37,7 @@ pub async fn run(
                             },
                             Message::Transaction(transaction, responder) => {
                                 let completed_transaction =
-                                    models::Transaction::run(&mut state, &block, transaction, transaction_position);
+                                    models::Transaction::run(&mut state, &block, transaction, transaction_position as i32);
                                 transaction_position += 1;
                                 responder.send(completed_transaction).unwrap();
                             },
@@ -49,7 +49,7 @@ pub async fn run(
         if let Message::Block((block, transactions)) = api_receiver.next().map(Option::unwrap).await
         {
             block.clone().apply(&mut state, transactions.clone()).await;
-            let _ = new_block_broadcaster.send(&block.hash).await;
+            let _ = new_block_broadcaster.send(&(block.number as u32)).await;
         }
     }
 }

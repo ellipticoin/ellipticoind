@@ -1,17 +1,17 @@
 extern crate clap;
 use crate::{pg, types};
-
 use clap::Clap;
 use diesel::{
     pg::PgConnection,
     r2d2::{ConnectionManager, Pool},
 };
 use dotenv::dotenv;
-use ed25519_dalek::{Keypair, SecretKey};
+use ed25519_zebra::{SigningKey, VerificationKey};
 use r2d2_redis::RedisConnectionManager;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Deserializer};
 use std::{
+    convert::TryFrom,
     env,
     net::{IpAddr, SocketAddr},
     sync::Arc,
@@ -123,15 +123,18 @@ pub fn socket() -> SocketAddr {
     (OPTS.bind_address.parse::<IpAddr>().unwrap(), OPTS.port).into()
 }
 
-pub fn keypair() -> Keypair {
-    Keypair::from_bytes(
-        &base64::decode(&env::var("PRIVATE_KEY").expect("PRIVATE_KEY not set")).unwrap(),
+pub fn signing_key() -> SigningKey {
+    SigningKey::try_from(
+        <[u8; 32]>::try_from(
+            &base64::decode(&env::var("PRIVATE_KEY").expect("PRIVATE_KEY not set")).unwrap()[..32],
+        )
+        .unwrap(),
     )
     .unwrap()
 }
 
-pub fn public_key() -> [u8; 32] {
-    keypair().public.to_bytes()
+pub fn verification_key() -> [u8; 32] {
+    VerificationKey::from(&signing_key()).into()
 }
 
 pub fn network_id() -> u32 {
@@ -140,10 +143,6 @@ pub fn network_id() -> u32 {
     } else {
         OPTS.network_id
     }
-}
-
-pub fn secret_key() -> SecretKey {
-    keypair().secret
 }
 
 pub fn random_bootnode() -> Bootnode {

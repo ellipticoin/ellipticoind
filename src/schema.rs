@@ -1,9 +1,6 @@
 table! {
-    blocks (hash) {
-        hash -> Bytea,
-        parent_hash -> Nullable<Bytea>,
-        winner -> Bytea,
-        number -> Int8,
+    blocks (number) {
+        number -> Int4,
         memory_changeset_hash -> Bytea,
         storage_changeset_hash -> Bytea,
         sealed -> Bool,
@@ -18,21 +15,21 @@ table! {
 }
 
 table! {
-    transactions (hash) {
+    transactions (id) {
+        id -> Int4,
         network_id -> Int8,
-        block_hash -> Bytea,
-        hash -> Bytea,
-        position -> Int8,
+        block_number -> Int4,
+        position -> Int4,
         contract -> Varchar,
         sender -> Bytea,
-        nonce -> Int8,
+        nonce -> Int4,
         function -> Varchar,
         arguments -> Bytea,
         return_value -> Bytea,
-        signature -> Bytea,
+        raw -> Bytea,
     }
 }
 
-joinable!(transactions -> blocks (block_hash));
+joinable!(transactions -> blocks (block_number));
 
 allow_tables_to_appear_in_same_query!(blocks, hash_onion, transactions,);
