@@ -1,27 +1,29 @@
 use crate::{
-    config::{get_pg_connection, public_key},
+    config::get_pg_connection,
     constants::TOKEN_CONTRACT,
     diesel::{BelongingToDsl, ExpressionMethods, QueryDsl, RunQueryDsl},
-    helpers::{bytes_to_value, sha256},
+    helpers::bytes_to_value,
     models::{self, HashOnion, Transaction},
     schema::{blocks, blocks::dsl, transactions},
     state::{State, MINERS},
     system_contracts::ellipticoin::Miner,
     transaction,
 };
-
-use crate::state::BLOCK_NUMBER;
-use diesel::dsl::insert_into;
+use diesel::{dsl::insert_into, sql_query};
 use serde::{Deserialize, Serialize};
-use serde_cbor::to_vec;
 
 #[derive(Queryable, Identifiable, Insertable, Clone, Debug, Serialize, Deserialize)]
-#[primary_key(hash)]
+#[primary_key(number)]
 pub struct Block {
-    pub hash: Vec<u8>,
-    pub parent_hash: Option<Vec<u8>>,
-    pub winner: Vec<u8>,
-    pub number: i64,
+    pub number: i32,
+    pub memory_changeset_hash: Vec<u8>,
+    pub storage_changeset_hash: Vec<u8>,
+    pub sealed: bool,
+}
+
+#[derive(Insertable, Clone, Default, Debug, Serialize, Deserialize)]
+#[table_name = "blocks"]
+pub struct NewBlock {
     pub memory_changeset_hash: Vec<u8>,
     pub storage_changeset_hash: Vec<u8>,
     pub sealed: bool,
@@ -30,69 +32,48 @@ pub struct Block {
 impl Default for Block {
     fn default() -> Self {
         Self {
-            hash: vec![],
-            parent_hash: Some(vec![]),
             number: 0,
-            winner: public_key().to_vec(),
             memory_changeset_hash: vec![],
             storage_changeset_hash: vec![],
             sealed: false,
-        }
-    }
-}
-
-#[derive(Serialize)]
-pub struct BlockWithoutHash {
-    pub parent_hash: Option<Vec<u8>>,
-    pub number: i64,
-    pub winner: Vec<u8>,
-    pub memory_changeset_hash: Vec<u8>,
-    pub storage_changeset_hash: Vec<u8>,
-}
-
-impl From<Block> for BlockWithoutHash {
-    fn from(block: Block) -> Self {
-        Self {
-            parent_hash: block.parent_hash.clone(),
-            number: block.number,
-            winner: block.winner.clone(),
-            memory_changeset_hash: block.memory_changeset_hash.clone(),
-            storage_changeset_hash: block.storage_changeset_hash.clone(),
         }
     }
 }
 
 impl Block {
-    pub fn new(number: i64) -> Self {
-        let mut block = Self {
-            hash: vec![],
-            number,
-            winner: public_key().to_vec(),
+    pub fn new() -> Self {
+        let block = Self {
+            number: 0,
             memory_changeset_hash: vec![],
             storage_changeset_hash: vec![],
-            parent_hash: Some(vec![]),
             sealed: false,
         };
-        block.set_hash();
         block
     }
 
-    pub async fn apply(mut self, vm_state: &mut State, transactions: Vec<models::Transaction>) {
-        let pg_db = get_pg_connection();
-        self.set_hash();
-        self.sealed = true;
-        BLOCK_NUMBER.increment();
-        insert_into(dsl::blocks)
+    pub async fn apply(self, vm_state: &mut State, transactions: Vec<models::Transaction>) {
+        // insert_into(dsl::blocks)
+        //     .values(&self)
+        //     .execute(&get_pg_connection()).unwrap();
+        let number = insert_into(dsl::blocks)
             .values(&self)
-            .execute(&pg_db)
+            .returning(blocks::dsl::number)
+            .get_result::<i32>(&get_pg_connection())
             .unwrap();
+        sql_query(format!(
+            "SELECT setval('blocks_number_seq', {}, true)",
+            number
+        ))
+        .execute(&get_pg_connection())
+        .unwrap();
+        // .load(&connection)
         let completed_transactions: Vec<Transaction> = transactions
             .iter()
             .map(|transaction| {
                 Transaction::run(
                     vm_state,
                     &self,
-                    transaction::Transaction::from(transaction),
+                    transaction::TransactionRequest::from(transaction),
                     transaction.position,
                 )
             })
@@ -107,13 +88,18 @@ impl Block {
     }
 
     pub fn insert() -> Block {
-        let pg_db = get_pg_connection();
-        let block = Self::new(BLOCK_NUMBER.increment() as i64);
-        insert_into(dsl::blocks)
-            .values(&block)
-            .execute(&pg_db)
+        let new_block: NewBlock = Default::default();
+        let number = insert_into(dsl::blocks)
+            .values(&new_block)
+            .returning(blocks::dsl::number)
+            .get_result::<i32>(&get_pg_connection())
             .unwrap();
-        block
+        Block {
+            number,
+            memory_changeset_hash: new_block.memory_changeset_hash,
+            storage_changeset_hash: new_block.storage_changeset_hash,
+            sealed: new_block.sealed,
+        }
     }
 
     pub async fn is_valid(&self) -> bool {
@@ -123,20 +109,24 @@ impl Block {
     pub async fn seal(&self, vm_state: &mut State, transaction_position: i64) -> Vec<Transaction> {
         let pg_db = get_pg_connection();
         let skin = HashOnion::peel(&pg_db);
-        let seal_transaction = transaction::Transaction::new(
+        let seal_transaction = transaction::TransactionRequest::new(
             TOKEN_CONTRACT.clone(),
             "seal",
             vec![bytes_to_value(skin.clone())],
         );
-        let completed_transaction =
-            Transaction::run(vm_state, &self, seal_transaction, transaction_position);
+        let completed_transaction = Transaction::run(
+            vm_state,
+            &self,
+            seal_transaction,
+            transaction_position as i32,
+        );
         *MINERS.lock().await =
             serde_cbor::from_slice::<Result<Vec<Miner>, wasm_rpc::error::Error>>(
                 &completed_transaction.return_value,
             )
             .unwrap()
             .unwrap();
-        diesel::update(dsl::blocks.filter(dsl::hash.eq(self.hash.clone())))
+        diesel::update(dsl::blocks.filter(dsl::number.eq(self.number.clone())))
             .set(dsl::sealed.eq(true))
             .execute(&pg_db)
             .unwrap();
@@ -144,9 +134,5 @@ impl Block {
             .order(transactions::dsl::position.asc())
             .load::<Transaction>(&pg_db)
             .unwrap()
-    }
-
-    pub fn set_hash(&mut self) {
-        self.hash = sha256(to_vec(&BlockWithoutHash::from(self.clone())).unwrap()).to_vec();
     }
 }

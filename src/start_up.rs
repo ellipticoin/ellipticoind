@@ -1,15 +1,16 @@
 use crate::{
+    client::{get_block, post_transaction},
     config::{
         ethereum_balances_path, get_pg_connection, get_redis_connection, get_rocksdb,
         random_bootnode, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
     },
     constants::TOKEN_CONTRACT,
-    helpers::{bytes_to_value, get_block, post_transaction},
+    helpers::bytes_to_value,
     models,
     models::{Block, HashOnion},
     state::{db_key, Memory, State, Storage},
     system_contracts,
-    transaction::Transaction,
+    transaction::TransactionRequest,
 };
 use diesel_migrations::revert_latest_migration;
 use serde::{Deserialize, Serialize};
@@ -27,7 +28,7 @@ pub struct VMState {
 pub async fn start_miner(vm_state: &mut State) {
     let pg_db = get_pg_connection();
     let skin = HashOnion::peel(&pg_db);
-    let start_mining_transaction = Transaction::new(
+    let start_mining_transaction = TransactionRequest::new(
         TOKEN_CONTRACT.clone(),
         "start_mining",
         vec![
@@ -39,20 +40,21 @@ pub async fn start_miner(vm_state: &mut State) {
     if *GENESIS_NODE {
         let block = Block::insert();
         models::Transaction::run(vm_state, &block, start_mining_transaction, 0);
+
         block.seal(vm_state, 1).await;
+        println!("Created genisis block");
     } else {
-        post_transaction(&random_bootnode(), start_mining_transaction.clone()).await;
+        post_transaction(start_mining_transaction).await;
     }
 }
 
 pub async fn catch_up(vm_state: &mut State) {
-    for block_number in 0.. {
-        if let Some(block) = get_block(&random_bootnode(), block_number).await {
+    for block_number in 1.. {
+        if let Ok((block, transactions)) = get_block(block_number).await {
             if !block.sealed {
                 break;
             }
 
-            let (block, transactions) = block.into();
             block.apply(vm_state, transactions).await;
         } else {
             break;
@@ -66,7 +68,7 @@ pub async fn reset_state() {
     reset_redis().await;
     reset_pg().await;
     reset_rocksdb().await;
-    import_ethereum_balances().await;
+    // import_ethereum_balances().await;
     load_genesis_state().await;
     HashOnion::generate(&pg_db);
 }

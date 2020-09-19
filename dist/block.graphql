@@ -1,0 +1,19 @@
+query block($blockNumber: U32!) {
+  block(blockNumber: $blockNumber) {
+    number
+    sealed
+    transactions {
+      id
+      networkId
+      blockNumber
+      position
+      contract
+      sender
+      nonce
+      function
+      arguments
+      returnValue
+      raw
+    }
+  }
+}

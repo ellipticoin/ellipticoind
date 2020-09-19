@@ -17,14 +17,6 @@ use std::{
 lazy_static! {
     pub static ref MINERS: async_std::sync::Arc<Mutex<Vec<Miner>>> =
         async_std::sync::Arc::new(Mutex::new(vec![]));
-    pub static ref BLOCK_NUMBER: async_std::sync::Arc<AtomicUsize> =
-        async_std::sync::Arc::new(AtomicUsize::new(0));
-}
-impl BLOCK_NUMBER {
-    pub fn increment(&self) -> usize {
-        let b = Arc::clone(&self);
-        b.fetch_add(1, Ordering::SeqCst)
-    }
 }
 
 pub type Changeset = HashMap<Vec<u8>, Vec<u8>>;

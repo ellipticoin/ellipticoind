@@ -80,6 +80,7 @@ export_native! {
         };
         charge!(api, input_token.clone(), api.caller(), input_amount)?;
         credit_reserves(api, input_token.clone(), input_amount);
+        debit_base_token_reserves(api, input_token.clone(), base_token_amount);
         let token_amount = if output_token == BASE_TOKEN.clone() {
             base_token_amount
         } else {
@@ -173,6 +174,14 @@ pub fn pool_token(token: Token) -> Token {
     Token {
         issuer: Address::Contract(CONTRACT_NAME.to_string()),
         id: sha256(token.into()).to_vec().into(),
+    }
+}
+pub fn price<API: ellipticoin::API>(api: &mut API, token: Token) -> u64 {
+    let base_token_reserves = get_base_token_reserves(api, token.clone());
+    if base_token_reserves == 0 {
+        0
+    } else {
+        base_token_reserves * BASE_FACTOR / get_reserves(api, token)
     }
 }
 
@@ -417,6 +426,52 @@ mod tests {
                 ellipticoin::Address::PublicKey(*ALICE)
             ),
             199_700_002
+        );
+    }
+
+    #[test]
+    fn test_remove_liqidity_after_trade() {
+        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+        let mut state = TestState::new();
+        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
+        token::set_balance(
+            &mut api,
+            APPLES.clone(),
+            ellipticoin::Address::PublicKey(*ALICE),
+            101 * BASE_FACTOR,
+        );
+        token::set_balance(
+            &mut api,
+            BASE_TOKEN.clone().into(),
+            ellipticoin::Address::PublicKey(*ALICE),
+            100 * BASE_FACTOR,
+        );
+        native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
+        api.caller = Address::PublicKey(ALICE.clone());
+        native::swap(
+            &mut api,
+            APPLES.clone(),
+            BASE_TOKEN.clone(),
+            1 * BASE_FACTOR,
+        )
+        .unwrap();
+        api.caller = Address::PublicKey(ALICE.clone());
+        native::remove_liqidity(&mut api, APPLES.clone(), 100 * BASE_FACTOR).unwrap();
+        assert_eq!(
+            token::get_balance(
+                &mut api,
+                APPLES.clone().into(),
+                ellipticoin::Address::PublicKey(*ALICE)
+            ),
+            101000000
+        );
+        assert_eq!(
+            token::get_balance(
+                &mut api,
+                BASE_TOKEN.clone().into(),
+                ellipticoin::Address::PublicKey(*ALICE)
+            ),
+            100000000
         );
     }
 }

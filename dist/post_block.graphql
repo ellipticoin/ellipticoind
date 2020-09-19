@@ -1,0 +1,3 @@
+mutation PostBlock($block: Bytes!) {
+  postBlock(block: $block)
+}

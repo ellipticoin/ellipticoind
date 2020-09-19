@@ -1,16 +1,13 @@
 CREATE TABLE "transactions" (
+  "id" SERIAL PRIMARY KEY,
   "network_id" BIGINT NOT NULL,
-  "block_hash" BYTEA CONSTRAINT "transactions_block_hash_fkey" REFERENCES "blocks" ("hash") NOT NULL,
-  "hash" BYTEA NOT NULL,
-  "position" BIGINT NOT NULL,
+  "block_number" INTEGER REFERENCES "blocks" NOT NULL,
+  "position" INTEGER NOT NULL,
   "contract" VARCHAR NOT NULL,
   "sender" BYTEA NOT NULL,
-  "nonce" BIGINT NOT NULL,
+  "nonce" INTEGER NOT NULL,
   "function" VARCHAR NOT NULL,
   "arguments" BYTEA NOT NULL,
   "return_value" BYTEA NOT NULL,
-  "signature" BYTEA NOT NULL,
-  PRIMARY KEY ("hash")
+  "raw" BYTEA NOT NULL
 );
-
-CREATE INDEX "transactions_block_hash_index" ON "transactions" ("block_hash");

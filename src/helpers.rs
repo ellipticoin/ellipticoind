@@ -1,11 +1,4 @@
-use crate::{
-    api::views,
-    config::{Bootnode, HOST},
-    state::MINERS,
-    system_contracts::ellipticoin::Miner,
-    transaction::Transaction,
-};
-use rand::Rng;
+use crate::{config::HOST, state::MINERS, system_contracts::ellipticoin::Miner};
 use serde_cbor::Value;
 use sha2::{Digest, Sha256};
 
@@ -33,31 +26,6 @@ pub fn generate_hash_onion(layers: usize, center: [u8; 32]) -> Vec<[u8; 32]> {
         onion.push(sha256(onion.last().unwrap().to_vec()));
     }
     onion
-}
-
-pub fn random() -> u32 {
-    let mut rng = rand::thread_rng();
-    rng.gen_range(0, u32::max_value() as u32)
-}
-
-pub async fn post_transaction(bootnode: &Bootnode, transaction: Transaction) {
-    let uri = format!("http://{}/transactions", bootnode.host);
-    surf::post(uri)
-        .body_bytes(serde_cbor::to_vec(&transaction).unwrap())
-        .await
-        .unwrap();
-}
-
-pub async fn get_block(bootnode: &Bootnode, block_number: u32) -> Option<views::Block> {
-    let url = format!("http://{}/blocks/{}", bootnode.host, block_number);
-    let mut res = surf::get(url).await.unwrap();
-    if res.status() == 200 {
-        serde_cbor::from_slice::<views::Block>(&res.body_bytes().await.unwrap())
-            .unwrap()
-            .into()
-    } else {
-        None
-    }
 }
 
 pub async fn current_miner() -> Miner {

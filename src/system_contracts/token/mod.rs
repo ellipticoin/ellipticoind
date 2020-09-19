@@ -28,7 +28,7 @@ export_native! {
     pub fn mint<API: ellipticoin::API>(
         api: &mut API,
         token_id: Bytes,
-        address: Address,
+        address: Bytes,
         amount: u64,
     ) -> Result<(), Box<Error>> {
         super::mint(
@@ -37,7 +37,7 @@ export_native! {
                 issuer: api.caller(),
                 id: token_id,
             },
-            address,
+            address.into(),
             amount,
         )
     }
@@ -111,6 +111,7 @@ pub fn debit<API: ellipticoin::API>(
     if amount <= balance {
         Ok(set_balance(api, token.clone(), address, balance - amount))
     } else {
+        panic!("💥");
         Err(Box::new(errors::INSUFFICIENT_FUNDS.clone()))
     }
 }

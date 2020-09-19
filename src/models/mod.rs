@@ -1,6 +1,6 @@
-mod block;
-mod hash_onion;
-mod transaction;
+pub mod block;
+pub mod hash_onion;
+pub mod transaction;
 
 pub use block::*;
 pub use hash_onion::*;
