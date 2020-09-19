@@ -1,7 +1,4 @@
-use crate::{
-    error::CONTRACT_NOT_FOUND,
-    transaction::{CompletedTransaction, Transaction},
-};
+use crate::{error::CONTRACT_NOT_FOUND, transaction::TransactionRequest};
 
 #[macro_use]
 pub mod macros;
@@ -15,13 +12,8 @@ pub mod token;
 
 pub fn run<API: ::ellipticoin::API>(
     api: &mut API,
-    transaction: Transaction,
-) -> CompletedTransaction {
-    let return_value = run2(api, transaction.clone());
-    transaction.complete(return_value)
-}
-
-pub fn run2<API: ::ellipticoin::API>(api: &mut API, transaction: Transaction) -> serde_cbor::Value {
+    transaction: TransactionRequest,
+) -> serde_cbor::Value {
     let f = match &transaction.contract[..] {
         "Bridge" => bridge::native::call,
         "Ellipticoin" => ellipticoin::native::call,

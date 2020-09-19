@@ -1,0 +1,36 @@
+schema {
+  mutation: Mutation
+}
+scalar Bytes
+scalar U32
+scalar U64
+
+type transaction {
+  id: U32!
+  networkId: U64!
+  blockNumber: U32!
+  position: U32!
+  contract: String!
+  sender: Bytes!
+  nonce: U32!
+  function: String!
+  arguments: Bytes!
+  returnValue: Bytes!
+  raw: Bytes!
+}
+
+type block {
+  number: U32!
+  id: Bool!
+  transactions: [transaction!]!
+  sealed: Boolean!
+}
+
+type Mutation {
+  postTransaction(transaction: Bytes!): transaction
+  postBlock(block: Bytes!): Boolean!
+}
+
+type Query {
+  block(blockNuber: U32): block
+}

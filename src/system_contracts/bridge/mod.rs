@@ -14,14 +14,14 @@ export_native! {
     pub fn mint<API: ellipticoin::API>(
         api: &mut API,
         token_id: Bytes,
-        address: Address,
+        address: Bytes,
         amount: u64,
     ) -> Result<(), Box<Error>> {
     if SIGNERS
         .iter()
         .any(|&signer| Address::PublicKey(signer) == api.caller())
     {
-        token::mint(api, token(token_id), address, amount)?;
+        token::mint(api, token(token_id), address.into(), amount)?;
     } else {
         return Err(Box::new(errors::INVALID_SIGNER.clone()));
     }
@@ -31,7 +31,7 @@ export_native! {
     pub fn release<API: ellipticoin::API>(
         api: &mut API,
         token_id: Bytes,
-        _address: [u8; 20],
+        _address: Bytes,
         amount: u64,
     ) -> Result<(), Box<Error>> {
         token::burn(api, token(token_id),api.caller(), amount)?;

@@ -1,18 +1,12 @@
 use crate::{
-    state::State,
-    system_contracts::{self},
-    transaction::Transaction,
+    state::{Memory, State, Storage},
+    transaction::TransactionRequest,
 };
 use ellipticoin::Address;
-use serde::de::DeserializeOwned;
-use serde_cbor::Value;
 
 pub struct NativeAPI<'a> {
     pub state: &'a mut State,
-    pub transaction: Transaction,
-    pub contract: String,
-    pub sender: [u8; 32],
-    pub caller: Address,
+    pub transaction: TransactionRequest,
 }
 
 impl<'a> ellipticoin::MemoryAPI for NativeAPI<'a> {
@@ -36,30 +30,49 @@ impl<'a> ellipticoin::StorageAPI for NativeAPI<'a> {
 }
 
 impl<'a> ellipticoin::API for NativeAPI<'a> {
-    fn sender(&self) -> [u8; 32] {
-        self.sender.clone()
-    }
     fn caller(&self) -> Address {
-        self.caller.clone()
+        Address::PublicKey(self.transaction.sender.clone())
     }
-    fn call<D: DeserializeOwned>(
-        &mut self,
-        contract: &str,
-        function_name: &str,
-        arguments: Vec<Value>,
-    ) -> Result<D, Box<ellipticoin::wasm_rpc::error::Error>> {
-        let mut api = NativeAPI {
-            state: &mut self.state,
-            contract: contract.to_string(),
-            caller: Address::Contract(self.contract.to_string()),
-            sender: self.sender,
-            transaction: self.transaction.clone(),
+}
+
+pub struct ReadOnlyAPI {
+    pub state: State,
+}
+impl ReadOnlyAPI {
+    pub fn new(
+        rocksdb: std::sync::Arc<rocksdb::DB>,
+        redis: crate::types::redis::Connection,
+    ) -> Self {
+        let memory = Memory { redis };
+        let storage = Storage {
+            rocksdb: rocksdb.clone(),
         };
-        let mut transaction = self.transaction.clone();
-        transaction.contract = contract.to_string();
-        transaction.arguments = arguments;
-        transaction.function = function_name.to_string();
-        let return_value: serde_cbor::Value = system_contracts::run2(&mut api, transaction).into();
-        Ok(serde_cbor::from_slice(&serde_cbor::to_vec(&return_value).unwrap()).unwrap())
+        let state = crate::state::State::new(memory, storage);
+        Self { state }
+    }
+}
+impl ellipticoin::MemoryAPI for ReadOnlyAPI {
+    fn get(&mut self, key: &[u8]) -> Vec<u8> {
+        self.state.get_memory(key)
+    }
+
+    fn set(&mut self, _key: &[u8], _value: &[u8]) {
+        panic!("tried to write in a read-only context")
+    }
+}
+
+impl ellipticoin::StorageAPI for ReadOnlyAPI {
+    fn get(&mut self, key: &[u8]) -> Vec<u8> {
+        self.state.get_storage(key)
+    }
+
+    fn set(&mut self, _key: &[u8], _value: &[u8]) {
+        panic!("tried to write in a read-only context")
+    }
+}
+
+impl ellipticoin::API for ReadOnlyAPI {
+    fn caller(&self) -> Address {
+        panic!("called `caller` in a read-only context")
     }
 }

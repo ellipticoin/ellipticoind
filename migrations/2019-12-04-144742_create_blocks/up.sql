@@ -1,12 +1,7 @@
 CREATE TABLE "blocks" (
-  "hash" BYTEA NOT NULL,
-  "parent_hash" BYTEA, --CONSTRAINT "blocks_parent_hash_fkey" REFERENCES "blocks" ("hash"),
-  "winner" BYTEA NOT NULL,
-  "number" BIGINT NOT NULL,
+  "number" SERIAL PRIMARY KEY,
   "memory_changeset_hash" BYTEA NOT NULL,
   "storage_changeset_hash" BYTEA NOT NULL,
-  "sealed" BOOL NOT NULL DEFAULT false,
-  PRIMARY KEY ("hash")
+  "sealed" BOOL NOT NULL DEFAULT false
 );
-
-CREATE UNIQUE INDEX "blocks_hash_index" ON "blocks" ("hash");
+ALTER SEQUENCE blocks_number_seq RESTART WITH 1

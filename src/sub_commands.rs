@@ -16,12 +16,11 @@ use crate::{
     system_contracts::api::NativeAPI,
 };
 use async_std::task::spawn;
-use ed25519_dalek::Keypair;
-use ellipticoin::Address;
+use ed25519_zebra::{SigningKey, VerificationKey};
 use r2d2_redis::redis::Commands;
-use rand::rngs::OsRng;
+use rand::thread_rng;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, convert::TryInto, fs::File, str};
+use std::{collections::HashMap, convert::TryFrom, fs::File, str};
 
 #[derive(Serialize, Deserialize)]
 pub struct Genesis {
@@ -30,19 +29,29 @@ pub struct Genesis {
 }
 
 pub fn generate_keypair() {
-    let mut os_rng = OsRng {};
-    let keypair: Keypair = Keypair::generate(&mut os_rng);
-    let public_key = base64::encode(&keypair.public.to_bytes());
-    let private_key = base64::encode(&keypair.to_bytes().to_vec());
-    println!("Public Key (Address): {}", public_key);
-    println!("Private Key: {}", private_key);
+    let signing_key = SigningKey::new(thread_rng());
+    let verification_key = VerificationKey::from(&signing_key);
+    println!(
+        "Verification Key (Address): {}",
+        base64::encode(&<[u8; 32]>::try_from(verification_key).unwrap())
+    );
+    println!(
+        "Full Private Key: {}",
+        base64::encode(
+            &[
+                <[u8; 32]>::try_from(signing_key).unwrap(),
+                <[u8; 32]>::try_from(verification_key).unwrap()
+            ]
+            .concat()
+        )
+    );
 }
 
 pub async fn dump_state(block_number: Option<u32>) {
     let pg_db = get_pg_connection();
     let blocks = if let Some(block_number) = block_number {
         blocks_dsl::blocks
-            .filter(blocks_dsl::number.le(block_number as i64))
+            .filter(blocks_dsl::number.le(block_number as i32))
             .order(blocks_dsl::number.asc())
             .load::<Block>(&pg_db)
             .unwrap()
@@ -74,10 +83,7 @@ pub async fn dump_state(block_number: Option<u32>) {
             transactions.iter().for_each(|transaction| {
                 let mut api = NativeAPI {
                     transaction: transaction.clone().into(),
-                    contract: transaction.contract.clone(),
                     state: &mut state,
-                    caller: Address::PublicKey(transaction.sender[0..32].try_into().unwrap()),
-                    sender: transaction.sender.clone()[..].try_into().unwrap(),
                 };
                 let res = crate::system_contracts::run(&mut api, transaction.into());
                 println!("{:?}", res);

@@ -12,6 +12,8 @@ extern crate diesel;
 extern crate diesel_migrations;
 #[macro_use]
 extern crate lazy_static;
+// #[macro_use]
+// extern crate juniper;
 
 pub mod config;
 pub mod sub_commands;
@@ -19,6 +21,7 @@ pub mod sub_commands;
 mod api;
 mod backend;
 mod block_broadcaster;
+pub mod client;
 mod constants;
 mod error;
 mod helpers;
