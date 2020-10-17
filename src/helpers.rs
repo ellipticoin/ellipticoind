@@ -1,6 +1,15 @@
-use crate::{config::HOST, state::MINERS, system_contracts::ellipticoin::Miner};
+use crate::{
+    client::post_transaction,
+    config::verification_key,
+    constants::{MINERS, TRANSACTION_QUEUE},
+    models::transaction::Transaction,
+    transaction::TransactionRequest,
+};
+use async_std::{future::Future, prelude::FutureExt as asyncStdFutureExt, task::sleep};
+use futures::future::FutureExt;
 use serde_cbor::Value;
 use sha2::{Digest, Sha256};
+use std::time::Duration;
 
 pub fn sha256(message: Vec<u8>) -> [u8; 32] {
     let mut hasher = Sha256::new();
@@ -19,6 +28,15 @@ pub fn bytes_to_value(bytes: Vec<u8>) -> Value {
         .into()
 }
 
+pub async fn run_transaction(transaction_request: TransactionRequest) -> Transaction {
+    if MINERS.current().await.address == verification_key() {
+        let receiver = TRANSACTION_QUEUE.push(transaction_request).await;
+        receiver.await.unwrap()
+    } else {
+        post_transaction(&MINERS.current().await.host, transaction_request).await
+    }
+}
+
 #[cfg(test)]
 pub fn generate_hash_onion(layers: usize, center: [u8; 32]) -> Vec<[u8; 32]> {
     let mut onion = vec![center];
@@ -28,17 +46,13 @@ pub fn generate_hash_onion(layers: usize, center: [u8; 32]) -> Vec<[u8; 32]> {
     onion
 }
 
-pub async fn current_miner() -> Miner {
-    MINERS.lock().await.clone().first().unwrap().clone()
-}
-
-pub async fn peers() -> Vec<String> {
-    MINERS
-        .lock()
-        .await
-        .clone()
-        .iter()
-        .map(|miner| miner.host.clone())
-        .filter(|host| host.to_string() != *HOST)
-        .collect()
+pub async fn run_for<F>(duration: Duration, f: F)
+where
+    F: Future<Output = ()>,
+{
+    sleep(duration)
+        .join(f)
+        .map(|_| ())
+        .race(sleep(duration))
+        .await;
 }

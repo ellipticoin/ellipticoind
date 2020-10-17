@@ -9,7 +9,7 @@ use crate::{
             dsl::transactions as transactions_table,
         },
     },
-    state::State,
+    state::STATE,
     system_contracts::{self, api::NativeAPI},
     transaction::TransactionRequest,
 };
@@ -25,6 +25,7 @@ use std::{convert::TryInto, str};
     Associations,
     PartialEq,
     Clone,
+    Default,
     Debug,
     Serialize,
     Deserialize,
@@ -72,15 +73,15 @@ pub struct TransactionWithoutHash {
 }
 
 impl Transaction {
-    pub fn run(
-        state: &mut State,
+    pub async fn run(
         current_block: &Block,
         vm_transaction: TransactionRequest,
         position: i32,
     ) -> Self {
+        let mut state = STATE.lock().await;
         let mut api = NativeAPI {
             transaction: vm_transaction.clone(),
-            state,
+            state: &mut state,
         };
         let return_value = system_contracts::run(&mut api, vm_transaction.clone());
         // println!("{:?}", return_value);

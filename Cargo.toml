@@ -38,7 +38,7 @@ serde_json = "*"
 serde_yaml = "*"
 sha2 = "0.9.1"
 surf = "2.0.0"
-tide = {version = "*", features = ["logger"]}
+tide = { git = "https://github.com/http-rs/tide", branch="listen_with", features = ["logger"]}
 time = "*"
 tiny-keccak = {version = "2.0.1", features = ["keccak"] }
 wasm-rpc = { version = "*"}

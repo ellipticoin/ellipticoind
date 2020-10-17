@@ -1,11 +1,15 @@
 use crate::{
-    config::get_pg_connection,
+    block_broadcaster::broadcast_block,
+    constants::{set_miners, MINERS},
+};
+pub use crate::{
+    config::{get_pg_connection, verification_key},
     constants::TOKEN_CONTRACT,
     diesel::{BelongingToDsl, ExpressionMethods, QueryDsl, RunQueryDsl},
     helpers::bytes_to_value,
     models::{self, HashOnion, Transaction},
     schema::{blocks, blocks::dsl, transactions},
-    state::{State, MINERS},
+    state::State,
     system_contracts::ellipticoin::Miner,
     transaction,
 };
@@ -51,40 +55,44 @@ impl Block {
         block
     }
 
-    pub async fn apply(self, vm_state: &mut State, transactions: Vec<models::Transaction>) {
-        // insert_into(dsl::blocks)
-        //     .values(&self)
-        //     .execute(&get_pg_connection()).unwrap();
-        let number = insert_into(dsl::blocks)
-            .values(&self)
-            .returning(blocks::dsl::number)
-            .get_result::<i32>(&get_pg_connection())
-            .unwrap();
+    pub async fn increment_block_number(number: i32) {
         sql_query(format!(
             "SELECT setval('blocks_number_seq', {}, true)",
             number
         ))
         .execute(&get_pg_connection())
         .unwrap();
-        // .load(&connection)
-        let completed_transactions: Vec<Transaction> = transactions
-            .iter()
-            .map(|transaction| {
+    }
+    pub async fn apply(self, transactions: Vec<models::Transaction>) -> Miner {
+        let number = insert_into(dsl::blocks)
+            .values(&self)
+            .returning(blocks::dsl::number)
+            .get_result::<i32>(&get_pg_connection())
+            .unwrap();
+        Block::increment_block_number(number as i32).await;
+        let mut completed_transactions: Vec<Transaction> = vec![];
+        for transaction in transactions {
+            completed_transactions.push(
                 Transaction::run(
-                    vm_state,
                     &self,
-                    transaction::TransactionRequest::from(transaction),
+                    transaction::TransactionRequest::from(transaction.clone()),
                     transaction.position,
                 )
-            })
-            .collect();
-        *MINERS.lock().await =
-            serde_cbor::from_slice::<Result<Vec<Miner>, wasm_rpc::error::Error>>(
-                &completed_transactions.last().unwrap().return_value,
-            )
-            .unwrap()
-            .unwrap();
+                .await,
+            );
+        }
+        let miners = serde_cbor::from_slice::<Result<Vec<Miner>, wasm_rpc::error::Error>>(
+            &completed_transactions.last().unwrap().return_value,
+        )
+        .unwrap()
+        .unwrap();
+        *MINERS.lock().await = Some(miners.clone());
+        // if should_set_current_miner {
+        //     set_current_miner(miners.first().unwrap().clone()).await
+        //     // CURRENT_MINER_CHANNEL.0.send(miners.first().unwrap().clone()).await;
+        // }
         println!("Applied block #{}", self.number);
+        miners.first().unwrap().clone()
     }
 
     pub fn insert() -> Block {
@@ -106,33 +114,31 @@ impl Block {
         true
     }
 
-    pub async fn seal(&self, vm_state: &mut State, transaction_position: i64) -> Vec<Transaction> {
+    pub async fn seal(self, transaction_position: i64) {
         let pg_db = get_pg_connection();
         let skin = HashOnion::peel(&pg_db);
-        let seal_transaction = transaction::TransactionRequest::new(
+        let seal_transaction_request = transaction::TransactionRequest::new(
             TOKEN_CONTRACT.clone(),
             "seal",
             vec![bytes_to_value(skin.clone())],
         );
-        let completed_transaction = Transaction::run(
-            vm_state,
-            &self,
-            seal_transaction,
-            transaction_position as i32,
-        );
-        *MINERS.lock().await =
-            serde_cbor::from_slice::<Result<Vec<Miner>, wasm_rpc::error::Error>>(
-                &completed_transaction.return_value,
-            )
-            .unwrap()
-            .unwrap();
+        let seal_transaction =
+            Transaction::run(&self, seal_transaction_request, transaction_position as i32);
+        let miners = serde_cbor::from_slice::<Result<Vec<Miner>, wasm_rpc::error::Error>>(
+            &seal_transaction.await.return_value,
+        )
+        .unwrap()
+        .unwrap();
+        // CURRENT_MINER_CHANNEL.0.send(miners.first().unwrap().clone()).await;
+        set_miners(miners.clone()).await;
         diesel::update(dsl::blocks.filter(dsl::number.eq(self.number.clone())))
             .set(dsl::sealed.eq(true))
             .execute(&pg_db)
             .unwrap();
-        Transaction::belonging_to(self)
+        let transactions = Transaction::belonging_to(&self)
             .order(transactions::dsl::position.asc())
             .load::<Transaction>(&pg_db)
-            .unwrap()
+            .unwrap();
+        broadcast_block((self, transactions), miners.clone()).await;
     }
 }

@@ -1,6 +1,6 @@
 use crate::config::{signing_key, verification_key};
 use serde::Serialize;
-use serde_cose::{HeaderParameter, Map, Sign1};
+use serde_cose::Sign1;
 
 pub async fn sign<S: Serialize>(payload: S) -> Sign1 {
     let mut sign1 = Sign1::new(payload, verification_key().to_vec());
