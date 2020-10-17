@@ -27,7 +27,7 @@ type block {
 }
 
 type Mutation {
-  postTransaction(transaction: Bytes!): transaction
+  postTransaction(transaction: Bytes!): transaction!
   postBlock(block: Bytes!): Boolean!
 }
 

@@ -35,7 +35,7 @@ memory_accessors!(
     issuance_rewards(address: Address) -> u64;
 );
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Miner {
     pub host: String,
     pub address: [u8; 32],

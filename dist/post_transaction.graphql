@@ -1,7 +1,15 @@
 mutation PostTransaction($transaction: Bytes!) {
   postTransaction(transaction: $transaction) {
     id
+    networkId
     blockNumber
+    position
+    contract
+    sender
+    nonce
+    function
+    arguments
     returnValue
+    raw
   }
 }

@@ -1,25 +1,29 @@
 extern crate juniper;
-use crate::{
-    api::{mutations::Mutations, query_root::QueryRoot, State},
-    helpers::current_miner,
-};
-use async_std::sync::Sender;
-use juniper::{EmptySubscription, Variables};
+use crate::api::{mutations::Mutations, query_root::QueryRoot};
+use juniper::{graphql_value, EmptySubscription, Variables};
 use serde_json::json;
 use std::{fmt, sync::Arc};
 use tide::{http::StatusCode, Body, Request, Response};
 
-impl juniper::Context for State {}
-
 pub struct Context {
     pub rocksdb: Arc<rocksdb::DB>,
     pub redis_pool: crate::types::redis::Pool,
-    pub sender: Sender<crate::api::Message>,
 }
 impl juniper::Context for Context {}
 
 #[derive(Debug)]
 pub struct Error(pub String);
+
+impl juniper::IntoFieldError for Error {
+    fn into_field_error(self) -> juniper::FieldError {
+        juniper::FieldError::new(
+            self.to_string(),
+            graphql_value!({
+                "type": "Error"
+            }),
+        )
+    }
+}
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -28,16 +32,10 @@ impl fmt::Display for Error {
 }
 
 pub type Schema = juniper::RootNode<'static, QueryRoot, Mutations, EmptySubscription<Context>>;
-pub async fn handle_graphql(mut request: Request<State>) -> tide::Result {
-    let current_miner = current_miner().await;
-    // if !current_miner.address.eq(&verification_key()) {
-    //     return proxy_post(&mut request, current_miner.host).await;
-    // }
-
+pub async fn handle_graphql(mut request: Request<()>) -> tide::Result {
     let ctx = Context {
         rocksdb: crate::config::ROCKSDB.clone(),
         redis_pool: crate::config::REDIS_POOL.clone(),
-        sender: request.state().sender.clone(),
     };
 
     let body_json = request

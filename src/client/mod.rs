@@ -1,8 +1,5 @@
 mod helpers;
-use crate::{
-    helpers::current_miner, models, models::transaction::Transaction,
-    transaction::TransactionRequest,
-};
+use crate::{models, models::transaction::Transaction, transaction::TransactionRequest};
 use graphql_client::*;
 use helpers::{base64_encode, sign};
 
@@ -28,11 +25,9 @@ pub async fn post_block(
         block: base64_encode(signed_block),
     });
 
-    let mut res = surf::post(peer)
+    let _ = surf::post(peer)
         .body(http_types::Body::from_json(&request_body).unwrap())
-        .await
-        .unwrap();
-    let response_body: Response<post_block::ResponseData> = res.body_json().await.unwrap();
+        .await;
 }
 #[derive(GraphQLQuery)]
 #[graphql(
@@ -43,17 +38,36 @@ pub async fn post_block(
 )]
 struct PostTransaction;
 
-pub async fn post_transaction(transaction_request: TransactionRequest) {
+pub async fn post_transaction(host: &str, transaction_request: TransactionRequest) -> Transaction {
     let signed_transaction = sign(transaction_request).await;
     let request_body = PostTransaction::build_query(post_transaction::Variables {
         transaction: base64_encode(signed_transaction),
     });
 
-    let mut res = surf::post(current_miner().await.host)
+    let mut res = surf::post(host)
         .body(http_types::Body::from_json(&request_body).unwrap())
         .await
         .unwrap();
-    let _response_body: Response<post_transaction::ResponseData> = res.body_json().await.unwrap();
+    let response_data: Response<post_transaction::ResponseData> = res.body_json().await.unwrap();
+    response_data.data.unwrap().post_transaction.into()
+}
+
+impl From<post_transaction::PostTransactionPostTransaction> for Transaction {
+    fn from(transaction: post_transaction::PostTransactionPostTransaction) -> Self {
+        Self {
+            id: transaction.id.parse().unwrap_or(0),
+            network_id: transaction.network_id.parse().unwrap_or(0),
+            block_number: transaction.block_number.parse().unwrap_or(0),
+            position: transaction.position.parse().unwrap_or(0),
+            contract: transaction.contract,
+            sender: base64::decode(transaction.sender).unwrap_or(vec![]),
+            nonce: transaction.nonce.parse().unwrap_or(0),
+            function: transaction.function,
+            arguments: base64::decode(transaction.arguments).unwrap_or(vec![]),
+            return_value: base64::decode(transaction.return_value).unwrap_or(vec![]),
+            raw: base64::decode(transaction.raw).unwrap_or(vec![]),
+        }
+    }
 }
 
 #[derive(GraphQLQuery)]

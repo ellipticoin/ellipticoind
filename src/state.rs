@@ -1,22 +1,23 @@
 use crate::{
+    config::{get_redis_connection, get_rocksdb},
     helpers::sha256,
-    system_contracts::{ellipticoin, ellipticoin::Miner},
+    system_contracts::ellipticoin,
     types,
 };
-use async_std::sync::Mutex;
+use async_std::sync::{Arc, Mutex};
 use serde_cbor::from_slice;
-use std::{
-    collections::HashMap,
-    ops::DerefMut,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
+use std::{collections::HashMap, ops::DerefMut};
 
 lazy_static! {
-    pub static ref MINERS: async_std::sync::Arc<Mutex<Vec<Miner>>> =
-        async_std::sync::Arc::new(Mutex::new(vec![]));
+    pub static ref STATE: async_std::sync::Arc<Mutex<State>> = {
+        let memory = Memory {
+            redis: get_redis_connection(),
+        };
+        let storage = Storage {
+            rocksdb: get_rocksdb(),
+        };
+        Arc::new(Mutex::new(State::new(memory, storage)))
+    };
 }
 
 pub type Changeset = HashMap<Vec<u8>, Vec<u8>>;

@@ -1,4 +1,4 @@
-#![recursion_limit = "200"]
+#![feature(const_fn)]
 extern crate hex;
 extern crate rand;
 extern crate rocksdb;
@@ -12,25 +12,23 @@ extern crate diesel;
 extern crate diesel_migrations;
 #[macro_use]
 extern crate lazy_static;
-// #[macro_use]
-// extern crate juniper;
-
-pub mod config;
-pub mod sub_commands;
 
 mod api;
-mod backend;
 mod block_broadcaster;
 pub mod client;
+pub mod config;
 mod constants;
 mod error;
 mod helpers;
-mod models;
+mod miner;
+pub mod models;
 mod pg;
 mod run_loop;
 mod schema;
+pub mod slasher;
 mod start_up;
 mod state;
+pub mod sub_commands;
 mod system_contracts;
-mod transaction;
+pub mod transaction;
 mod types;
