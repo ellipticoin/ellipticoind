@@ -6,8 +6,8 @@ use crate::{
     },
     constants::TOKEN_CONTRACT,
     diesel::{BelongingToDsl, ExpressionMethods, GroupedBy, QueryDsl, RunQueryDsl},
+    miner,
     models::{Block, Transaction},
-    run_loop,
     schema::{blocks::dsl as blocks_dsl, transactions::dsl as transactions_dsl},
     start_up,
     start_up::{load_genesis_state, reset_redis, reset_rocksdb},
@@ -17,10 +17,12 @@ use crate::{
 };
 use async_std::task::spawn;
 use ed25519_zebra::{SigningKey, VerificationKey};
+use futures::future;
 use r2d2_redis::redis::Commands;
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryFrom, fs::File, str};
+use tide::listener::ListenInfo;
 
 #[derive(Serialize, Deserialize)]
 pub struct Genesis {
@@ -122,21 +124,21 @@ pub async fn dump_state(block_number: Option<u32>) {
 }
 
 pub async fn main() {
-    let memory = Memory {
-        redis: get_redis_connection(),
-    };
-    let storage = Storage {
-        rocksdb: get_rocksdb(),
-    };
-    let mut state = State::new(memory, storage);
     start_up::reset_state().await;
     if !*GENESIS_NODE {
-        start_up::catch_up(&mut state).await;
+        start_up::catch_up().await;
     }
-    if *ENABLE_MINER {
-        start_up::start_miner(&mut state).await;
-    }
-    let (new_block_broadcaster, api_receiver, api_state) = api::API::new();
-    spawn(api_state.listen(socket()));
-    run_loop::run(state, new_block_broadcaster, api_receiver).await
+    let api = api::API::new();
+    spawn(
+        api.app
+            .listen_with(socket(), |info: ListenInfo| async move {
+                println!("started listening on {}!", info.connection());
+                if *ENABLE_MINER {
+                    start_up::start_miner().await;
+                }
+                Ok(())
+            }),
+    );
+    spawn(miner::run());
+    future::pending().await
 }

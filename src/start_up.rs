@@ -1,14 +1,14 @@
 use crate::{
-    client::{get_block, post_transaction},
+    client::get_block,
     config::{
         ethereum_balances_path, get_pg_connection, get_redis_connection, get_rocksdb,
-        random_bootnode, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
+        BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
     },
     constants::TOKEN_CONTRACT,
-    helpers::bytes_to_value,
+    helpers::{bytes_to_value, run_transaction},
     models,
     models::{Block, HashOnion},
-    state::{db_key, Memory, State, Storage},
+    state::{db_key, Memory, Storage},
     system_contracts,
     transaction::TransactionRequest,
 };
@@ -25,7 +25,7 @@ pub struct VMState {
     pub storage: HashMap<Vec<u8>, Vec<u8>>,
 }
 
-pub async fn start_miner(vm_state: &mut State) {
+pub async fn start_miner() {
     let pg_db = get_pg_connection();
     let skin = HashOnion::peel(&pg_db);
     let start_mining_transaction = TransactionRequest::new(
@@ -39,23 +39,23 @@ pub async fn start_miner(vm_state: &mut State) {
     );
     if *GENESIS_NODE {
         let block = Block::insert();
-        models::Transaction::run(vm_state, &block, start_mining_transaction, 0);
+        models::Transaction::run(&block, start_mining_transaction, 0).await;
 
-        block.seal(vm_state, 1).await;
-        println!("Created genisis block");
+        println!("Won block #1");
+        block.seal(1).await;
     } else {
-        post_transaction(start_mining_transaction).await;
+        run_transaction(start_mining_transaction).await;
     }
 }
 
-pub async fn catch_up(vm_state: &mut State) {
+pub async fn catch_up() {
     for block_number in 1.. {
         if let Ok((block, transactions)) = get_block(block_number).await {
             if !block.sealed {
                 break;
             }
 
-            block.apply(vm_state, transactions).await;
+            block.apply(transactions).await;
         } else {
             break;
         }
@@ -127,7 +127,7 @@ pub async fn reset_rocksdb() {
     println!("Reset RocksDB");
 }
 
-async fn import_ethereum_balances() {
+async fn _import_ethereum_balances() {
     let rocksdb = get_rocksdb();
     if rocksdb
         .prefix_iterator(db_key(
