@@ -78,6 +78,7 @@ impl Transaction {
         vm_transaction: TransactionRequest,
         position: i32,
     ) -> Self {
+        println!("running {}", vm_transaction.function);
         let mut state = STATE.lock().await;
         let mut api = NativeAPI {
             transaction: vm_transaction.clone(),

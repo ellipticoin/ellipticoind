@@ -48,7 +48,7 @@ impl QueryRoot {
 
     async fn block(_context: &Context, block_number: U32) -> Option<Block> {
         let con = get_pg_connection();
-        let b = blocks::dsl::blocks
+        blocks::dsl::blocks
             .filter(number.eq(block_number.0 as i32))
             .first::<models::Block>(&con)
             .optional()
@@ -60,9 +60,12 @@ impl QueryRoot {
                     .load::<models::Transaction>(&con))
                 .unwrap_or(vec![]);
                 Block::from((block, transactions))
-            });
-        // println!("is_some: {} {}", b.is_some(), block_number.0);
-        b
+            })
+    }
+
+    async fn current_block_number(_context: &Context) -> Option<U32> {
+        let block_number = models::Block::current_block_number();
+        Some(block_number.into())
     }
 
     async fn latest_block(_context: &Context) -> Block {

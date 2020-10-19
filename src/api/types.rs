@@ -170,6 +170,13 @@ impl From<U32> for String {
     }
 }
 
+impl From<u32> for U32 {
+    fn from(n: u32) -> Self {
+        U32(n)
+    }
+}
+
+
 #[derive(Clone, juniper::GraphQLInputObject)]
 pub struct TokenId {
     pub id: Bytes,
