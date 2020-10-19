@@ -119,6 +119,7 @@ pub fn debit<API: ellipticoin::API>(
 mod tests {
     use super::{native, *};
     use crate::system_contracts::test_api::{TestAPI, TestState};
+    use ellipticoin::Bytes;
     use std::env;
 
     use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB, CAROL};
@@ -206,7 +207,7 @@ mod tests {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
         let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
-        native::mint(&mut api, TOKEN.id.clone(), Address::PublicKey(*ALICE), 50).unwrap();
+        native::mint(&mut api, TOKEN.id.clone(), Bytes(ALICE.to_vec()), 50).unwrap();
         assert_eq!(
             get_balance(&mut api, TOKEN.clone(), Address::PublicKey(*ALICE)),
             50
