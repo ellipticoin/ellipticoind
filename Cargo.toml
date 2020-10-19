@@ -7,7 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-std = {version = "*", features = ["unstable", "attributes"]}
+async-std = {version = "1.6.5", features = ["unstable", "attributes"]}
 broadcaster = "*"
 base64 = "*"
 clap = "3.0.0-beta.1"
@@ -48,5 +48,5 @@ wasm-rpc-macros = {path = "../rust-wasm-rpc/wasm-rpc-macros"}
 ellipticoin-test-framework = "0.1.4"
 
 
-[profile.dev]
-panic = 'unwind'
+# [profile.dev]
+# panic = 'unwind'
