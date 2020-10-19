@@ -25,4 +25,8 @@ lazy_static! {
         code: 6,
         message: "Only a total of 1000000 ELC can be unlocked in Phase I".to_string(),
     };
+    pub static ref MINER_IS_NOT_WHITELISTED: Error = Error {
+        code: 6,
+        message: "Only a total of 1000000 ELC can be unlocked in Phase I".to_string(),
+    };
 }

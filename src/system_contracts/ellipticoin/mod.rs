@@ -8,6 +8,7 @@ use crate::system_contracts::{
     ellipticoin::issuance::INCENTIVISED_POOLS, exchange, exchange::pool_token, token::mint,
 };
 use ellipticoin::{constants::ELC, memory_accessors, pay, storage_accessors, Address};
+
 use errors::Error;
 use hashing::sha256;
 use issuance::block_reward_at;
@@ -15,6 +16,7 @@ use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_cbor::Value;
 use std::convert::TryInto;
+use std::collections::HashSet;
 use wasm_rpc_macros::export_native;
 
 const CONTRACT_NAME: &'static str = "Ellipticoin";
@@ -29,6 +31,7 @@ storage_accessors!(
     miners() -> Vec<Miner>;
     total_unlocked_ethereum() -> u64;
     unlocked_ethereum_balances(ethereum_address: Vec<u8>) -> bool;
+    miner_whitelist() -> HashSet<[u8; 32]>;
 );
 
 memory_accessors!(
@@ -86,6 +89,25 @@ export_native! {
         Ok(balance.into())
     }
 
+    pub fn whitelist_miner<API: ellipticoin::API>(
+        api: &mut API,
+        address: [u8; 32],
+    ) -> Result<Value, Box<Error>> {
+        let mut whitelist = get_miner_whitelist(api);
+        let caller_address = api.caller().as_public_key().unwrap();
+        if whitelist.is_empty() {
+            whitelist.insert(caller_address);
+        } else {
+            if !whitelist.contains(&caller_address) {
+                return Err(Box::new(errors::MINER_IS_NOT_WHITELISTED.clone()));
+            }
+        }
+
+        whitelist.insert(address);
+        set_miner_whitelist(api, whitelist);
+        return Ok(Value::Null)
+    }
+
     pub fn start_mining<API: ellipticoin::API>(
         api: &mut API,
         host: String,
@@ -93,8 +115,13 @@ export_native! {
         hash_onion_skin: [u8; 32],
     ) -> Result<Value, Box<Error>> {
         let mut miners = get_miners(api);
+        let whitelist = get_miner_whitelist(api);
+        let address = api.caller().as_public_key().unwrap();
+        if !whitelist.is_empty() && !whitelist.contains(&address) {
+            return Err(Box::new(errors::MINER_IS_NOT_WHITELISTED.clone()));
+        }
         miners.push(Miner {
-            address: api.caller().as_public_key().unwrap(),
+            address,
             host,
             burn_per_block,
             hash_onion_skin,
@@ -254,7 +281,7 @@ mod tests {
     };
     use std::env;
 
-    use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB};
+    use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB, CAROL};
 
     #[test]
     fn test_harvest() {
@@ -269,6 +296,29 @@ mod tests {
             get_balance(&mut api, ELC.clone(), Address::PublicKey(*ALICE)),
             1
         );
+    }
+
+    #[test]
+    fn test_whitelist_miner() {
+        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+        env::set_var("HOST", "localhost");
+        let mut state = TestState::new();
+        let mut api = TestAPI::new(&mut state, *ALICE, "Ellipticoin".to_string());
+
+        let alice_pub: [u8; 32] = Address::PublicKey(*ALICE).as_public_key().unwrap();
+        let bob_pub: [u8; 32] = Address::PublicKey(*BOB).as_public_key().unwrap();
+        let carol_pub: [u8; 32] = Address::PublicKey(*CAROL).as_public_key().unwrap();
+        native::whitelist_miner(&mut api, bob_pub).expect("whitelisting bob failed!");
+
+        let mut whitelist = get_miner_whitelist(&mut api);
+        assert!(whitelist.contains(&alice_pub), "Alice's address not present in whitelist!");
+        assert!(whitelist.contains(&bob_pub), "Bob's address not present in whitelist!");
+        assert!(!whitelist.contains(&carol_pub), "Carol's address present in whitelist when it shouldn't be!");
+
+        native::whitelist_miner(&mut api, carol_pub).expect("Whitelisting carol failed!");
+        whitelist = get_miner_whitelist(&mut api);
+
+        assert!(whitelist.contains(&carol_pub), "Carol's address not present in whitelist!");
     }
 
     #[test]
