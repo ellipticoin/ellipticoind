@@ -1,9 +1,7 @@
 use crate::{
-    system_contracts::{self},
     transaction::TransactionRequest,
 };
 use ellipticoin::Address;
-use serde::de::DeserializeOwned;
 use std::{collections::BTreeMap, convert::TryInto};
 pub struct TestState {
     pub memory: BTreeMap<Vec<u8>, Vec<u8>>,
