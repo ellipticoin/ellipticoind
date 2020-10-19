@@ -67,7 +67,7 @@ mod tests {
         native::mint(
             &mut api,
             BTC.to_vec().into(),
-            Address::PublicKey(*ALICE),
+            Bytes(ALICE.to_vec()),
             1 * BASE_FACTOR,
         )
         .unwrap();
@@ -89,7 +89,7 @@ mod tests {
         assert!(native::mint(
             &mut api,
             BTC.to_vec().into(),
-            Address::PublicKey(*ALICE),
+            Bytes(ALICE.to_vec()),
             1 * BASE_FACTOR
         )
         .is_err());
@@ -103,12 +103,12 @@ mod tests {
         native::mint(
             &mut api,
             BTC.to_vec().into(),
-            Address::PublicKey(*ALICE),
+            Bytes::from(ALICE.to_vec()),
             1 * BASE_FACTOR,
         )
         .unwrap();
         api.caller = Address::PublicKey(ALICE.clone());
-        native::release(&mut api, BTC.to_vec().into(), ETH_ADDRESS, 1 * BASE_FACTOR).unwrap();
+        native::release(&mut api, BTC.to_vec().into(), Bytes(ETH_ADDRESS.to_vec()), 1 * BASE_FACTOR).unwrap();
         assert_eq!(
             token::get_balance(
                 &mut api,

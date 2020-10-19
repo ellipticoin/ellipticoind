@@ -1,6 +1,6 @@
 use crate::{
     system_contracts::{self},
-    transaction::Transaction,
+    transaction::TransactionRequest,
 };
 use ellipticoin::Address;
 use serde::de::DeserializeOwned;
@@ -24,14 +24,14 @@ impl TestState {
 pub struct TestAPI<'a> {
     pub state: &'a mut TestState,
     pub contract: String,
-    pub transaction: Transaction,
+    pub transaction: TransactionRequest,
     pub sender: [u8; 32],
     pub caller: Address,
 }
 
 impl<'a> TestAPI<'a> {
     pub fn new(state: &'a mut TestState, sender: [u8; 32], contract: String) -> Self {
-        let transaction = Transaction {
+        let transaction = TransactionRequest {
             sender,
             ..Default::default()
         };
@@ -65,30 +65,7 @@ impl<'a> ellipticoin::StorageAPI for TestAPI<'a> {
 }
 
 impl<'a> ellipticoin::API for TestAPI<'a> {
-    fn sender(&self) -> [u8; 32] {
-        self.sender
-    }
     fn caller(&self) -> Address {
         self.caller.clone()
-    }
-    fn call<D: DeserializeOwned>(
-        &mut self,
-        contract: &str,
-        function_name: &str,
-        arguments: Vec<ellipticoin::wasm_rpc::serde_cbor::Value>,
-    ) -> Result<D, Box<ellipticoin::wasm_rpc::error::Error>> {
-        let mut transaction = self.transaction.clone();
-        transaction.contract = contract.to_string();
-        transaction.arguments = arguments;
-        transaction.function = function_name.to_string();
-        let mut api = TestAPI {
-            state: &mut self.state,
-            contract: contract.to_string(),
-            caller: Address::Contract(self.contract.clone()),
-            sender: self.sender,
-            transaction: transaction.clone(),
-        };
-        let return_value: serde_cbor::Value = system_contracts::run2(&mut api, transaction).into();
-        Ok(serde_cbor::from_slice(&serde_cbor::to_vec(&return_value).unwrap()).unwrap())
     }
 }
