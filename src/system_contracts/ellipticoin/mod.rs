@@ -322,6 +322,28 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn test_whitelist_miner_failure() {
+        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+        env::set_var("HOST", "localhost");
+        let mut state = TestState::new();
+        let mut api = TestAPI::new(&mut state, *ALICE, "Ellipticoin".to_string());
+
+        let alice_pub: [u8; 32] = Address::PublicKey(*ALICE).as_public_key().unwrap();
+        let bob_pub: [u8; 32] = Address::PublicKey(*BOB).as_public_key().unwrap();
+        let carol_pub: [u8; 32] = Address::PublicKey(*CAROL).as_public_key().unwrap();
+        native::whitelist_miner(&mut api, bob_pub).expect("whitelisting bob failed!");
+
+        let mut whitelist = get_miner_whitelist(&mut api);
+        assert!(whitelist.contains(&alice_pub), "Alice's address not present in whitelist!");
+        assert!(whitelist.contains(&bob_pub), "Bob's address not present in whitelist!");
+        assert!(!whitelist.contains(&carol_pub), "Carol's address present in whitelist when it shouldn't be!");
+
+        api.caller = Address::PublicKey(*CAROL);
+        native::whitelist_miner(&mut api, bob_pub).expect("This should fail");
+    }
+
+    #[test]
     fn test_commit_and_seal() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         env::set_var("HOST", "localhost");
