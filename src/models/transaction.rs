@@ -78,14 +78,12 @@ impl Transaction {
         vm_transaction: TransactionRequest,
         position: i32,
     ) -> Self {
-        println!("running {}", vm_transaction.function);
         let mut state = STATE.lock().await;
         let mut api = NativeAPI {
             transaction: vm_transaction.clone(),
             state: &mut state,
         };
         let return_value = system_contracts::run(&mut api, vm_transaction.clone());
-        // println!("{:?}", return_value);
         Transaction::insert(vm_transaction, current_block, position, return_value)
     }
 
