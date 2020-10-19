@@ -1,4 +1,3 @@
-#![feature(const_fn)]
 extern crate hex;
 extern crate rand;
 extern crate rocksdb;

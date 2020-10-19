@@ -1,6 +1,7 @@
 use crate::{
     block_broadcaster::broadcast_block,
     constants::{set_miners, MINERS},
+    diesel::OptionalExtension,
 };
 pub use crate::{
     config::{get_pg_connection, verification_key},
@@ -13,7 +14,10 @@ pub use crate::{
     system_contracts::ellipticoin::Miner,
     transaction,
 };
-use diesel::{dsl::insert_into, sql_query};
+use diesel::{
+    dsl::{insert_into, max},
+    sql_query,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Queryable, Identifiable, Insertable, Clone, Debug, Serialize, Deserialize)]
@@ -69,6 +73,7 @@ impl Block {
             .returning(blocks::dsl::number)
             .get_result::<i32>(&get_pg_connection())
             .unwrap();
+        println!("applying block {}", number);
         Block::increment_block_number(number as i32).await;
         let mut completed_transactions: Vec<Transaction> = vec![];
         for transaction in transactions {
@@ -87,6 +92,10 @@ impl Block {
         .unwrap()
         .unwrap();
         *MINERS.lock().await = Some(miners.clone());
+        println!(
+            "{}",
+            base64::encode(&miners.clone().first().unwrap().address)
+        );
         // if should_set_current_miner {
         //     set_current_miner(miners.first().unwrap().clone()).await
         //     // CURRENT_MINER_CHANNEL.0.send(miners.first().unwrap().clone()).await;
@@ -130,6 +139,10 @@ impl Block {
         .unwrap()
         .unwrap();
         // CURRENT_MINER_CHANNEL.0.send(miners.first().unwrap().clone()).await;
+        println!(
+            "{}",
+            base64::encode(&miners.clone().first().unwrap().address)
+        );
         set_miners(miners.clone()).await;
         diesel::update(dsl::blocks.filter(dsl::number.eq(self.number.clone())))
             .set(dsl::sealed.eq(true))
@@ -140,5 +153,15 @@ impl Block {
             .load::<Transaction>(&pg_db)
             .unwrap();
         broadcast_block((self, transactions), miners.clone()).await;
+    }
+
+    pub fn current_block_number() -> u32 {
+        let pg_db = get_pg_connection();
+        blocks::dsl::blocks
+            .select(max(blocks::dsl::number))
+            .first::<Option<i32>>(&pg_db)
+            .unwrap()
+            .map(|n: i32| n as u32)
+            .unwrap_or(0)
     }
 }
