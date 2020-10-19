@@ -19,15 +19,15 @@ use std::{
 
 #[derive(Clap, Debug)]
 pub struct Opts {
-    #[clap(short = "a", long = "bind-address", default_value = "0.0.0.0")]
+    #[clap(short = 'a', long = "bind-address", default_value = "0.0.0.0")]
     pub bind_address: String,
-    #[clap(short = "b", long = "bootnodes")]
+    #[clap(short = 'b', long = "bootnodes")]
     pub bootnodes: Option<String>,
-    #[clap(short = "d", long = "database-url")]
+    #[clap(short = 'd', long = "database-url")]
     pub database_url: Option<String>,
-    #[clap(short = "n", long = "network-id", default_value = "3750925312")]
+    #[clap(short = 'n', long = "network-id", default_value = "3750925312")]
     pub network_id: u32,
-    #[clap(short = "p", long = "port", default_value = "80")]
+    #[clap(short = 'p', long = "port", default_value = "80")]
     pub port: u16,
     #[clap(long = "rocksdb-path", default_value = "./db")]
     pub rocksdb_path: String,
