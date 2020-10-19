@@ -106,6 +106,7 @@ export_native! {
     pub fn seal<API: ellipticoin::API>(api: &mut API, value: [u8; 32]) -> Result<Vec<Miner>, Box<Error>> {
         let mut miners = get_miners(api);
         if api.caller() != ellipticoin::Address::PublicKey(miners.first().unwrap().address) {
+            println!("sender is not the winner");
             return Err(Box::new(errors::SENDER_IS_NOT_THE_WINNER.clone()));
         }
         if !miners
@@ -115,6 +116,7 @@ export_native! {
             .to_vec()
             .eq(&sha256(value.to_vec()))
         {
+            println!("invalid value submitted");
             return Err(Box::new(errors::INVALID_VALUE.clone()));
         }
         miners.first_mut().unwrap().hash_onion_skin = value.clone();
