@@ -1,0 +1,14 @@
+[package]
+name = "ellipticoin_macros"
+version = "0.1.0"
+authors = ["Mason Fischer <mason@kissr.co>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+quote = "*"
+syn = {version = "*", features = ["full"]} 
+proc-macro2 = "*"
+heck = "*"
