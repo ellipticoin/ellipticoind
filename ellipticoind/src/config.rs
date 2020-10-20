@@ -31,7 +31,7 @@ pub struct Opts {
     pub port: u16,
     #[clap(long = "rocksdb-path", default_value = "./db")]
     pub rocksdb_path: String,
-    #[clap(long = "genesis-path", default_value = "./dist/genesis.cbor")]
+    #[clap(long = "genesis-path", default_value = "./ellipticoind/dist/genesis.cbor")]
     pub genesis_state_path: String,
     #[clap(long = "save-state")]
     pub save_state: bool,
@@ -108,7 +108,7 @@ pub fn bootnodes() -> Vec<Bootnode> {
     let path = OPTS
         .bootnodes
         .clone()
-        .unwrap_or("dist/bootnodes.yaml".to_string());
+        .unwrap_or("./ellipticoind/dist/bootnodes.yaml".to_string());
     let string = std::fs::read_to_string(path).unwrap();
     serde_yaml::from_str(&string).unwrap()
 }
@@ -168,5 +168,5 @@ pub async fn websocket_socket() -> SocketAddr {
 }
 
 pub fn ethereum_balances_path() -> String {
-    env::var("ETHEREUM_BALANCES_PATH").unwrap_or("dist/ethereum-balances-10054080.bin".to_string())
+    env::var("ETHEREUM_BALANCES_PATH").unwrap_or("./ellipticoind/dist/ethereum-balances-10054080.bin".to_string())
 }

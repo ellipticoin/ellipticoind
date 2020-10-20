@@ -1,0 +1,27 @@
+[package]
+name = "ellipticoin"
+version = "0.0.5"
+authors = ["Mason Fischer <mason@kissr.co>"]
+description = "A library for building Elliptcoin smart contracts"
+license = "MIT"
+
+[lib]
+crate-type =["rlib"]
+
+[profile.release]
+opt-level = "z"
+debug = false
+rpath = false
+lto = true
+debug-assertions = false
+codegen-units = 1
+panic = 'abort'
+incremental = false
+
+[dependencies]
+lazy_static = "*"
+sha2 = "0.9.1"
+serde = { version = "*", features = ["derive"] }
+ellipticoin_macros = { path = "../ellipticoind_macros"}
+wasm-rpc = "0.2.15"
+wasm-rpc-macros = "0.2.15"
