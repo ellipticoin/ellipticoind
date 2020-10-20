@@ -8,41 +8,41 @@ edition = "2018"
 
 [dependencies]
 async-std = {version = "1.6.5", features = ["unstable", "attributes"]}
-broadcaster = "*"
-base64 = "*"
+broadcaster = "1.0.0"
+base64 = "0.13.0"
 clap = "3.0.0-beta.1"
-serde_cose = { path = "../../src/serde_cose"}
+serde_cose = "0.1.3"
 diesel = { version = "1.4.5", features = ["postgres", "r2d2"] }
-diesel_migrations = "*"
-dotenv = "*"
+diesel_migrations = "1.4.0"
+dotenv = "0.15.0"
 ed25519-zebra = "2.2.0"
 ellipticoin = {path = "../rust-ellipticoin"}
 futures = "0.3.6"
-hex = "*"
+hex = "0.4.2"
 http-types = "2.5.0"
-graphql_client = "*"
-http-service = "*"
-indicatif = "*"
-juniper = { git = "https://github.com/graphql-rust/juniper"}
-lazy_static = "*"
-libsecp256k1 = "*"
+graphql_client = "0.9.0"
+http-service = "0.5.0"
+indicatif = "0.15.0"
+juniper = { git = "https://github.com/graphql-rust/juniper" }
+lazy_static = "1.4.0"
+libsecp256k1 = "0.3.5"
 num-bigint = { version = "*", features = ["serde"] }
-num-traits = "*"
+num-traits = "0.2.12"
 r2d2_redis = { git = "https://github.com/sorccu/r2d2-redis" }
 rand = {version = "0.7.3", features = ["small_rng"]}
-rocksdb = "*"
-serde = { version = "*", features = ["derive"] }
-serde_bytes = "*"
-serde_cbor = "*"
-serde_json = "*"
-serde_yaml = "*"
+rocksdb = "0.15.0"
+serde = { version = "1.0.117", features = ["derive"] }
+serde_bytes = "0.11.5"
+serde_cbor = "0.11.1"
+serde_json = "1.0.59"
+serde_yaml = "0.8.13"
 sha2 = "0.9.1"
 surf = "2.0.0"
 tide = { git = "https://github.com/http-rs/tide", branch="listen_with", features = ["logger"]}
-time = "*"
+time = "0.2.22"
 tiny-keccak = {version = "2.0.1", features = ["keccak"] }
-wasm-rpc = { version = "*"}
-wasm-rpc-macros = {path = "../rust-wasm-rpc/wasm-rpc-macros"}
+wasm-rpc = "0.2.17"
+wasm-rpc-macros = "0.2.17"
 
 [dev-dependencies]
 ellipticoin-test-framework = "0.1.4"

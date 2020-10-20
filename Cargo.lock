@@ -998,7 +998,7 @@ dependencies = [
  "serde",
  "sha2 0.9.1",
  "wasm-rpc",
- "wasm-rpc-macros 0.2.16 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wasm-rpc-macros",
 ]
 
 [[package]]
@@ -1010,7 +1010,7 @@ dependencies = [
  "lazy_static",
  "serde",
  "wasm-rpc",
- "wasm-rpc-macros 0.2.16 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wasm-rpc-macros",
 ]
 
 [[package]]
@@ -1056,7 +1056,7 @@ dependencies = [
  "ellipticoin-test-framework",
  "futures",
  "graphql_client",
- "hex 0.3.2",
+ "hex 0.4.2",
  "http-service",
  "http-types 2.6.0",
  "indicatif",
@@ -1080,7 +1080,7 @@ dependencies = [
  "time 0.2.22",
  "tiny-keccak",
  "wasm-rpc",
- "wasm-rpc-macros 0.2.16",
+ "wasm-rpc-macros",
 ]
 
 [[package]]
@@ -1745,7 +1745,7 @@ dependencies = [
 [[package]]
 name = "juniper"
 version = "0.14.2"
-source = "git+https://github.com/graphql-rust/juniper#421b343398c0e2ef4037b3956fb192348325f5e2"
+source = "git+https://github.com/graphql-rust/juniper#3e4cf680e2cb07d4deca207ff1753bcab18e9a97"
 dependencies = [
  "async-trait",
  "bson",
@@ -1765,7 +1765,7 @@ dependencies = [
 [[package]]
 name = "juniper_codegen"
 version = "0.14.2"
-source = "git+https://github.com/graphql-rust/juniper#421b343398c0e2ef4037b3956fb192348325f5e2"
+source = "git+https://github.com/graphql-rust/juniper#3e4cf680e2cb07d4deca207ff1753bcab18e9a97"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -2746,9 +2746,10 @@ dependencies = [
 
 [[package]]
 name = "serde_cose"
-version = "0.1.1"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb5cecafc0bcdee8be352976c494ee245c807e3dca11aae7e53c43834cced1f8"
 dependencies = [
- "base64 0.13.0",
  "ed25519-zebra",
  "hex 0.4.2",
  "lazy_static",
@@ -3479,9 +3480,9 @@ checksum = "1d649a3145108d7d3fbcde896a468d1bd636791823c9921135218ad89be08307"
 
 [[package]]
 name = "wasm-rpc"
-version = "0.2.16"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4a7d4daf378fb5a4f693a091fc4ac9f384e6ec085111284884762ebbab6ec03"
+checksum = "6eadf0cefcbc6e6e51f59b852c51ac3db5e5ef58891c1280c12f853bf0dc25e4"
 dependencies = [
  "serde",
  "serde_bytes",
@@ -3490,18 +3491,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-rpc-macros"
-version = "0.2.16"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "wasm-rpc-macros"
-version = "0.2.16"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f05e5cfcbbbcbdb9e3b8de5f366f91637eb9d5e367ba17aa50e59b6cb330fdac"
+checksum = "fe48a8e8b91942ba0d48488be14c960933668241efc7b48c3fc0e9972da0789b"
 dependencies = [
  "proc-macro2",
  "quote",
