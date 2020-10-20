@@ -156,9 +156,16 @@ impl From<(models::Block, Vec<models::Transaction>)> for Block {
 
 #[derive(Clone, Debug)]
 pub struct U64(pub u64);
+
 impl From<U64> for String {
     fn from(n: U64) -> Self {
         n.0.to_string()
+    }
+}
+
+impl From<u64> for U64 {
+    fn from(n: u64) -> Self {
+      U64(n)
     }
 }
 
@@ -185,6 +192,12 @@ pub struct TokenId {
 
 #[derive(Clone, Debug)]
 pub struct Bytes(pub Vec<u8>);
+
+impl From<Bytes> for Vec<u8> {
+    fn from(bytes: Bytes) -> Self {
+        bytes.0
+    }
+}
 #[juniper::graphql_scalar(description = "Bytes")]
 impl<S> GraphQLScalar for Bytes
 where
