@@ -1,0 +1,17 @@
+[package]
+name = "ellipticoin-test-framework"
+version = "0.1.4"
+authors = ["Mason Fischer <mason@kissr.co>"]
+description = "A framework for testing Ellipticoin smart contracts"
+license = "MIT"
+
+[dependencies]
+ed25519-dalek = "1.0.0-pre.3"
+ellipticoin = "0.0.5"
+hex = "0.3.2"
+hex-literal = "0.3.0"
+lazy_static = "1.1.0"
+rand = "0.6.5"
+secp256k1 = {version = "0.17.2", features = ["rand"]}
+sha2 = "0.8.1"
+wasm-rpc = "0.2.16"
