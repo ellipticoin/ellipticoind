@@ -8,6 +8,7 @@ use crate::{
     system_contracts::{api::ReadOnlyAPI, exchange, token},
 };
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl};
+use crate::system_contracts::ellipticoin::get_issuance_rewards;
 
 pub struct QueryRoot;
 #[juniper::graphql_object(
@@ -66,6 +67,12 @@ impl QueryRoot {
     async fn current_block_number(_context: &Context) -> Option<U32> {
         let block_number = models::Block::current_block_number();
         Some(block_number.into())
+    }
+
+    async fn issuance_rewards(context: &Context, address: Bytes) -> Option<U64> {
+        let mut api = ReadOnlyAPI::new(context.rocksdb.clone(), context.redis_pool.get().unwrap());
+        let issuance_rewards = get_issuance_rewards(&mut api, <Vec<u8>>::from(address).into());
+        Some(issuance_rewards.into())
     }
 
     async fn latest_block(_context: &Context) -> Block {
