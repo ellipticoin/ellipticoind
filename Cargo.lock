@@ -1016,8 +1016,6 @@ dependencies = [
 [[package]]
 name = "ellipticoin-test-framework"
 version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c84a7b57b69ec140ef44b73d8b765c8c7094c579953510f39903c4a6b0b12545"
 dependencies = [
  "ed25519-dalek",
  "ellipticoin 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
