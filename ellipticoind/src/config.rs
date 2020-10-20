@@ -29,7 +29,7 @@ pub struct Opts {
     pub network_id: u32,
     #[clap(short = 'p', long = "port", default_value = "80")]
     pub port: u16,
-    #[clap(long = "rocksdb-path", default_value = "./db")]
+    #[clap(long = "rocksdb-path", default_value = "./ellipticoind/db")]
     pub rocksdb_path: String,
     #[clap(long = "genesis-path", default_value = "./ellipticoind/dist/genesis.cbor")]
     pub genesis_state_path: String,
