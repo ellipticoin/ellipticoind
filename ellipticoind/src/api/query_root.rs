@@ -47,6 +47,38 @@ impl QueryRoot {
             .collect()
     }
 
+    async fn liquidity_tokens(
+        context: &Context,
+        token_ids: Vec<TokenId>,
+        address: Bytes,
+    ) -> Vec<LiquidityToken> {
+        let mut api = ReadOnlyAPI::new(context.rocksdb.clone(), context.redis_pool.get().unwrap());
+        token_ids
+            .iter()
+            .cloned()
+            .map(|token| {
+                let issuer = token.clone().issuer;
+                let id = token.clone().id;
+                let token = ellipticoin::Token::from(token);
+                let liquidity_token = exchange::liquidity_token(token.clone());
+                let balance =
+                    token::get_balance(&mut api, liquidity_token.clone(), address.0.clone().into());
+                let share_of_pool =
+                    exchange::share_of_pool(&mut api, token.clone(), address.0.clone().into());
+                let price = exchange::get_price(&mut api, token).unwrap_or(0);
+
+                LiquidityToken {
+                    issuer,
+                    id,
+                    balance: U64(balance),
+                    price: U64(price),
+
+                    share_of_pool: U32(share_of_pool),
+                }
+            })
+            .collect()
+    }
+
     async fn block(_context: &Context, block_number: U32) -> Option<Block> {
         let con = get_pg_connection();
         blocks::dsl::blocks
@@ -75,9 +107,10 @@ impl QueryRoot {
         Some(issuance_rewards.into())
     }
 
-    async fn latest_block(_context: &Context) -> Block {
+    async fn current_block(_context: &Context) -> Block {
         let con = get_pg_connection();
         blocks::dsl::blocks
+            .filter(blocks::sealed.eq(true))
             .order_by(number.desc())
             .first::<models::Block>(&con)
             .map(|block| {
