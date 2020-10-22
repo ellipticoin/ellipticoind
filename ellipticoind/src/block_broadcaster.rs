@@ -5,21 +5,21 @@ use crate::{
     models::{block::Block, transaction::Transaction},
     system_contracts::ellipticoin::Miner,
 };
-use futures::future::{BoxFuture, FutureExt};
+use futures::future::{BoxFuture, FutureExt, join_all};
 
 pub fn broadcast_block(
     block: (Block, Vec<Transaction>),
     miners: Vec<Miner>,
 ) -> BoxFuture<'static, ()> {
     async move {
-        for miner in miners
+        join_all(
+            miners
             .iter()
             .cloned()
             .filter(|miner| miner.host.to_string() != *HOST)
-            .collect::<Vec<Miner>>()
-        {
-            post_block(miner.host, &block).await
-        }
+            .map(|miner| post_block(miner.host, &block))
+        ).await;
+
         BLOCK_BROADCASTER
             .send(&(block.0.number as u32))
             .await
