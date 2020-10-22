@@ -1,6 +1,6 @@
 use crate::{
     block_broadcaster::broadcast_block,
-    constants::{set_miners, MINERS},
+    constants::{set_miners, MINERS, WEB_SOCKET_BROADCASTER},
 };
 pub use crate::{
     config::{get_pg_connection, verification_key},
@@ -90,6 +90,7 @@ impl Block {
         .unwrap()
         .unwrap();
         *MINERS.lock().await = Some(miners.clone());
+        WEB_SOCKET_BROADCASTER.broadcast(number as u32, miners.first().unwrap().host.clone()).await;
         println!("Applied block #{}", self.number);
         miners.first().unwrap().clone()
     }
@@ -138,7 +139,8 @@ impl Block {
             .order(transactions::dsl::position.asc())
             .load::<Transaction>(&pg_db)
             .unwrap();
-        broadcast_block((self, transactions), miners.clone()).await;
+        broadcast_block((self.clone(), transactions), miners.clone()).await;
+        WEB_SOCKET_BROADCASTER.broadcast(self.number as u32, miners.first().unwrap().host.clone()).await;
     }
 
     pub fn current_block_number() -> u32 {

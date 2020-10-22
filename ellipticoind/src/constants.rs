@@ -17,7 +17,7 @@ lazy_static! {
     pub static ref CURRENT_MINER_CHANNEL: (Sender<Miner>, Receiver<Miner>) = channel(1);
     pub static ref MINERS: Arc<Mutex<Option<Vec<Miner>>>> = Arc::new(Mutex::new(None));
     pub static ref SYNCING: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
-    pub static ref BLOCK_BROADCASTER: BroadcastChannel<u32> = BroadcastChannel::new();
+    pub static ref WEB_SOCKET_BROADCASTER: BroadcastChannel<(u32, String)> = BroadcastChannel::new();
 }
 
 pub async fn set_miners(miners: Vec<Miner>) {
@@ -45,5 +45,18 @@ impl TRANSACTION_QUEUE {
         let (sender, receiver) = oneshot::channel();
         self.0.send((transaction_request, sender)).await;
         receiver
+    }
+}
+
+impl WEB_SOCKET_BROADCASTER {
+    pub async fn broadcast(
+        &self,
+        block_number: u32,
+        current_miner_host: String,
+    ) {
+        self
+            .send(&(block_number, current_miner_host))
+            .await
+            .unwrap();
     }
 }

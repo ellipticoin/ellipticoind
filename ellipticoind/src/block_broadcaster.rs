@@ -1,7 +1,6 @@
 use crate::{
     client::post_block,
-    config::HOST,
-    constants::BLOCK_BROADCASTER,
+    config::verification_key,
     models::{block::Block, transaction::Transaction},
     system_contracts::ellipticoin::Miner,
 };
@@ -16,15 +15,10 @@ pub fn broadcast_block(
             miners
                 .iter()
                 .cloned()
-                .filter(|miner| miner.host.to_string() != *HOST)
+                .filter(|miner| miner.address != verification_key())
                 .map(|miner| post_block(miner.host, &block)),
         )
         .await;
-
-        BLOCK_BROADCASTER
-            .send(&(block.0.number as u32))
-            .await
-            .unwrap();
     }
     .boxed()
 }

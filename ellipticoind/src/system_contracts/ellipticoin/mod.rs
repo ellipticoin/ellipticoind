@@ -5,7 +5,7 @@ mod issuance;
 
 use super::token;
 use crate::system_contracts::{
-    ellipticoin::issuance::INCENTIVISED_POOLS, exchange, exchange::pool_token, token::mint,
+    ellipticoin::issuance::INCENTIVISED_POOLS, exchange, exchange::liquidity_token, token::mint,
 };
 use ellipticoin::{constants::ELC, memory_accessors, pay, storage_accessors, Address};
 
@@ -174,7 +174,7 @@ fn issue_block_rewards<API: ellipticoin::API>(api: &mut API) -> Result<(), Box<E
             .map(|address| {
                 (
                     address.clone(),
-                    token::get_balance(api, pool_token(token.clone()), address),
+                    token::get_balance(api, liquidity_token(token.clone()), address),
                 )
             })
             .collect::<Vec<(Address, u64)>>()

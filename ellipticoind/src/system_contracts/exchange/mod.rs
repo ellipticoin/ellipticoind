@@ -42,11 +42,11 @@ export_native! {
         token: Token,
         amount: u64,
     ) -> Result<(), Box<Error>> {
-        let ratio = get_ratio(api, token.clone())?;
+        let price = get_price(api, token.clone())?;
         charge!(api, token.clone(), api.caller(), amount)?;
         credit_reserves(api, token.clone(), amount);
-        charge!(api, BASE_TOKEN.clone(), api.caller(), (amount * ratio)/BASE_FACTOR)?;
-        credit_base_token_reserves(api, token.clone(), (amount * ratio)/BASE_FACTOR);
+        charge!(api, BASE_TOKEN.clone(), api.caller(), (amount * price)/BASE_FACTOR)?;
+        credit_base_token_reserves(api, token.clone(), (amount * price)/BASE_FACTOR);
         mint(api, token, amount)?;
         Ok(())
     }
@@ -58,7 +58,7 @@ export_native! {
     ) -> Result<(), Box<Error>> {
         let reserves = get_reserves(api, token.clone());
         let base_token_reserves = get_base_token_reserves(api, token.clone());
-        let total_supply = token::get_total_supply(api, pool_token(token.clone()));
+        let total_supply = token::get_total_supply(api, liquidity_token(token.clone()));
         debit_base_token_reserves(api, token.clone(), (base_token_reserves * amount) / total_supply);
         pay!(api, token.clone(), api.caller(), (reserves * amount) / total_supply)?;
         debit_reserves(api, token.clone(), (reserves * amount) / total_supply);
@@ -95,7 +95,7 @@ export_native! {
 }
 
 fn mint<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) -> Result<(), Box<Error>> {
-    token::mint(api, pool_token(token.clone()), api.caller(), amount)?;
+    token::mint(api, liquidity_token(token.clone()), api.caller(), amount)?;
     let mut share_holders = get_share_holders(api, token.clone());
     share_holders.insert(api.caller());
     set_share_holders(api, token, share_holders);
@@ -103,8 +103,8 @@ fn mint<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) -> Resu
 }
 
 fn burn<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) -> Result<(), Box<Error>> {
-    token::burn(api, pool_token(token.clone()), api.caller(), amount)?;
-    if token::get_balance(api, pool_token(token.clone()), api.caller()) == 0 {
+    token::burn(api, liquidity_token(token.clone()), api.caller(), amount)?;
+    if token::get_balance(api, liquidity_token(token.clone()), api.caller()) == 0 {
         let mut share_holders = get_share_holders(api, token.clone());
         share_holders.remove(&api.caller());
         set_share_holders(api, token.clone(), share_holders);
@@ -137,7 +137,7 @@ fn apply_fee(amount: u64) -> u64 {
     amount - ((amount * FEE) / BASE_FACTOR)
 }
 
-fn get_ratio<API: ellipticoin::API>(api: &mut API, token: Token) -> Result<u64, Box<Error>> {
+pub fn get_price<API: ellipticoin::API>(api: &mut API, token: Token) -> Result<u64, Box<Error>> {
     let base_token_reserves = get_base_token_reserves(api, token.clone());
     if base_token_reserves == 0 {
         Err(Box::new(errors::POOL_NOT_FOUND.clone()))
@@ -170,19 +170,32 @@ fn debit_reserves<API: ellipticoin::API>(api: &mut API, token: Token, amount: u6
     set_reserves(api, token.clone(), reserves - amount);
 }
 
-pub fn pool_token(token: Token) -> Token {
+pub fn liquidity_token(token: Token) -> Token {
     Token {
         issuer: Address::Contract(CONTRACT_NAME.to_string()),
         id: sha256(token.into()).to_vec().into(),
     }
 }
+
 pub fn price<API: ellipticoin::API>(api: &mut API, token: Token) -> u64 {
+    if token == BASE_TOKEN.clone() {
+        return BASE_FACTOR;
+    }
     let base_token_reserves = get_base_token_reserves(api, token.clone());
     if base_token_reserves == 0 {
         0
     } else {
         base_token_reserves * BASE_FACTOR / get_reserves(api, token)
     }
+}
+
+pub fn share_of_pool<API: ellipticoin::API>(api: &mut API, token: Token, address: Address) -> u32 {
+    let balance = token::get_balance(api, liquidity_token(token.clone()), address);
+    let total_supply = token::get_total_supply(api, liquidity_token(token.clone()));
+    if balance == 0 {
+        return 0;
+    }
+    (balance * BASE_FACTOR / total_supply) as u32
 }
 
 #[cfg(test)]
@@ -229,7 +242,7 @@ mod tests {
         assert_eq!(
             token::get_balance(
                 &mut api,
-                pool_token(APPLES.clone()),
+                liquidity_token(APPLES.clone()),
                 Address::PublicKey(*ALICE)
             ),
             2 * BASE_FACTOR
