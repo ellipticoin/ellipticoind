@@ -5,8 +5,8 @@ use juniper::{ParseScalarResult, ParseScalarValue, Value};
 pub struct Token {
     pub id: Bytes,
     pub issuer: String,
-    pub balance: U64,
     pub price: U64,
+    pub balance: U64,
 }
 
 #[juniper::graphql_object]
@@ -18,12 +18,45 @@ impl Token {
     fn issuer(&self) -> String {
         self.issuer.clone()
     }
+
+    fn price(&self) -> U64 {
+        self.price.clone()
+    }
+
     fn balance(&self) -> U64 {
         self.balance.clone()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LiquidityToken {
+    pub id: Bytes,
+    pub issuer: String,
+    pub price: U64,
+    pub balance: U64,
+    pub share_of_pool: U32,
+}
+
+#[juniper::graphql_object]
+impl LiquidityToken {
+    fn id(&self) -> Bytes {
+        self.id.clone()
+    }
+
+    fn issuer(&self) -> String {
+        self.issuer.clone()
     }
 
     fn price(&self) -> U64 {
         self.price.clone()
+    }
+
+    fn balance(&self) -> U64 {
+        self.balance.clone()
+    }
+
+    fn share_of_pool(&self) -> U32 {
+        self.share_of_pool.clone()
     }
 }
 
@@ -187,6 +220,15 @@ impl From<u32> for U32 {
 pub struct TokenId {
     pub id: Bytes,
     pub issuer: String,
+}
+
+impl From<TokenId> for ellipticoin::Token {
+    fn from(token_id: TokenId) -> Self {
+        Self {
+            id: token_id.id.0.into(),
+            issuer: ellipticoin::Address::Contract(token_id.issuer),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
