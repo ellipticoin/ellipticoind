@@ -1,6 +1,6 @@
 use bytes::Bytes;
-use wasm_rpc::serde::{Deserialize, Serialize};
 use std::convert::TryInto;
+use wasm_rpc::serde::{Deserialize, Serialize};
 #[derive(Clone, Deserialize, Serialize, PartialEq, Debug)]
 pub struct Token {
     pub issuer: Address,

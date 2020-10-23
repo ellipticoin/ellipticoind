@@ -165,7 +165,7 @@ impl From<U64> for String {
 
 impl From<u64> for U64 {
     fn from(n: u64) -> Self {
-      U64(n)
+        U64(n)
     }
 }
 
@@ -182,7 +182,6 @@ impl From<u32> for U32 {
         U32(n)
     }
 }
-
 
 #[derive(Clone, juniper::GraphQLInputObject)]
 pub struct TokenId {

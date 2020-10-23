@@ -15,8 +15,8 @@ use issuance::block_reward_at;
 use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_cbor::Value;
-use std::convert::TryInto;
 use std::collections::HashSet;
+use std::convert::TryInto;
 use wasm_rpc_macros::export_native;
 
 const CONTRACT_NAME: &'static str = "Ellipticoin";
@@ -311,14 +311,26 @@ mod tests {
         native::whitelist_miner(&mut api, bob_pub).expect("whitelisting bob failed!");
 
         let mut whitelist = get_miner_whitelist(&mut api);
-        assert!(whitelist.contains(&alice_pub), "Alice's address not present in whitelist!");
-        assert!(whitelist.contains(&bob_pub), "Bob's address not present in whitelist!");
-        assert!(!whitelist.contains(&carol_pub), "Carol's address present in whitelist when it shouldn't be!");
+        assert!(
+            whitelist.contains(&alice_pub),
+            "Alice's address not present in whitelist!"
+        );
+        assert!(
+            whitelist.contains(&bob_pub),
+            "Bob's address not present in whitelist!"
+        );
+        assert!(
+            !whitelist.contains(&carol_pub),
+            "Carol's address present in whitelist when it shouldn't be!"
+        );
 
         native::whitelist_miner(&mut api, carol_pub).expect("Whitelisting carol failed!");
         whitelist = get_miner_whitelist(&mut api);
 
-        assert!(whitelist.contains(&carol_pub), "Carol's address not present in whitelist!");
+        assert!(
+            whitelist.contains(&carol_pub),
+            "Carol's address not present in whitelist!"
+        );
     }
 
     #[test]
@@ -335,9 +347,18 @@ mod tests {
         native::whitelist_miner(&mut api, bob_pub).expect("whitelisting bob failed!");
 
         let mut whitelist = get_miner_whitelist(&mut api);
-        assert!(whitelist.contains(&alice_pub), "Alice's address not present in whitelist!");
-        assert!(whitelist.contains(&bob_pub), "Bob's address not present in whitelist!");
-        assert!(!whitelist.contains(&carol_pub), "Carol's address present in whitelist when it shouldn't be!");
+        assert!(
+            whitelist.contains(&alice_pub),
+            "Alice's address not present in whitelist!"
+        );
+        assert!(
+            whitelist.contains(&bob_pub),
+            "Bob's address not present in whitelist!"
+        );
+        assert!(
+            !whitelist.contains(&carol_pub),
+            "Carol's address present in whitelist when it shouldn't be!"
+        );
 
         api.caller = Address::PublicKey(*CAROL);
         native::whitelist_miner(&mut api, bob_pub).expect("This should fail");
