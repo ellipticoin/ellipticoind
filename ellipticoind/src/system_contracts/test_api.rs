@@ -1,6 +1,4 @@
-use crate::{
-    transaction::TransactionRequest,
-};
+use crate::transaction::TransactionRequest;
 use ellipticoin::Address;
 use std::{collections::BTreeMap, convert::TryInto};
 pub struct TestState {

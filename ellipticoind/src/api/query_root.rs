@@ -1,3 +1,4 @@
+use crate::system_contracts::ellipticoin::get_issuance_rewards;
 use crate::{
     api::{graphql::Context, types::*},
     config::get_pg_connection,
@@ -8,7 +9,6 @@ use crate::{
     system_contracts::{api::ReadOnlyAPI, exchange, token},
 };
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl};
-use crate::system_contracts::ellipticoin::get_issuance_rewards;
 
 pub struct QueryRoot;
 #[juniper::graphql_object(

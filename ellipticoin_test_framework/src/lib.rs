@@ -8,9 +8,9 @@ extern crate rand;
 extern crate secp256k1;
 extern crate sha2;
 
-use sha2::{Sha256, Digest};
 use self::secp256k1::Message;
 use rand::{rngs::OsRng, Rng};
+use sha2::{Digest, Sha256};
 pub mod constants;
 
 pub fn sha256(value: Vec<u8>) -> Vec<u8> {
