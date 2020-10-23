@@ -108,7 +108,13 @@ mod tests {
         )
         .unwrap();
         api.caller = Address::PublicKey(ALICE.clone());
-        native::release(&mut api, BTC.to_vec().into(), Bytes(ETH_ADDRESS.to_vec()), 1 * BASE_FACTOR).unwrap();
+        native::release(
+            &mut api,
+            BTC.to_vec().into(),
+            Bytes(ETH_ADDRESS.to_vec()),
+            1 * BASE_FACTOR,
+        )
+        .unwrap();
         assert_eq!(
             token::get_balance(
                 &mut api,

@@ -81,20 +81,23 @@ fn accessors(item: TokenStream, ty: &str) -> TokenStream {
         )
         .collect();
     let get_fn = Ident::new(&format!("get_{}", ty), Span::call_site());
-    let base_namespace = Ident::new(&format!("{}Namespace", ty.to_camel_case()), Span::call_site());
+    let base_namespace = Ident::new(
+        &format!("{}Namespace", ty.to_camel_case()),
+        Span::call_site(),
+    );
     // println!("{}", namespace);
     let getters = attrs2
         .iter()
         .map(|(ident, inputs, ty)| {
             let getter_name = Ident::new(&format!("get_{}", &ident), Span::call_site());
             let namespace = Ident::new(&ident.to_string().to_camel_case(), Span::call_site());
-            let mut p: Punctuated<syn::Expr,syn::token::Comma> = Punctuated::new();
+            let mut p: Punctuated<syn::Expr, syn::token::Comma> = Punctuated::new();
             for input in inputs {
-                    if let syn::FnArg::Typed(syn::PatType { pat, .. }) = input {
+                if let syn::FnArg::Typed(syn::PatType { pat, .. }) = input {
                     p.push(parse_quote!(#pat.into()))
-} else {
-    panic!("oh no")
-}
+                } else {
+                    panic!("oh no")
+                }
             }
             let mut inputs3 = inputs.clone();
             let fn_arg: FnArg = parse_quote!(api: &mut API);
@@ -116,28 +119,28 @@ fn accessors(item: TokenStream, ty: &str) -> TokenStream {
     let set_fn = Ident::new(&format!("set_{}", ty), Span::call_site());
     let setters = attrs2
         .iter()
-        .map(|(ident,inputs, ty)| {
+        .map(|(ident, inputs, ty)| {
             let setter_name = Ident::new(&format!("set_{}", &ident), Span::call_site());
             let namespace = Ident::new(&ident.to_string().to_camel_case(), Span::call_site());
-            let mut p: Punctuated<syn::Expr,syn::token::Comma> = Punctuated::new();
+            let mut p: Punctuated<syn::Expr, syn::token::Comma> = Punctuated::new();
             for input in inputs {
-                    if let syn::FnArg::Typed(syn::PatType { pat, .. }) = input {
+                if let syn::FnArg::Typed(syn::PatType { pat, .. }) = input {
                     p.push(parse_quote!(#pat.into()))
-} else {
-    panic!("oh no")
-}
+                } else {
+                    panic!("oh no")
+                }
             }
             let fn_arg: FnArg = parse_quote!(api: &mut API);
             let mut inputs3 = inputs.clone();
             inputs3.insert(0, fn_arg);
             parse_quote!(
-            pub fn #setter_name<API: ellipticoin::API>(#inputs3, value: #ty) {
-         api.#set_fn(
-                CONTRACT_NAME,
-[[#base_namespace::#namespace as u8].to_vec(),
-                        #p
-].concat(), value);
-            })
+                        pub fn #setter_name<API: ellipticoin::API>(#inputs3, value: #ty) {
+                     api.#set_fn(
+                            CONTRACT_NAME,
+            [[#base_namespace::#namespace as u8].to_vec(),
+                                    #p
+            ].concat(), value);
+                        })
         })
         .collect::<Vec<syn::ItemFn>>();
     let mut namespace: ItemEnum = parse_quote!(
