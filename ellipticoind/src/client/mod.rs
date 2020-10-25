@@ -45,7 +45,7 @@ pub async fn post_transaction(host: &str, transaction_request: TransactionReques
         transaction: base64_encode(signed_transaction),
     });
 
-    let mut res = surf::post(host)
+    let mut res = surf::post(format!("http://{}", host))
         .body(http_types::Body::from_json(&request_body).unwrap())
         .await
         .unwrap();
@@ -84,7 +84,7 @@ pub async fn get_block(block_number: u32) -> Result<(models::block::Block, Vec<T
     let request_body = Block::build_query(block::Variables {
         block_number: block_number.to_string(),
     });
-    let mut res = surf::post(random_bootnode().host)
+    let mut res = surf::post(format!("http://{}", random_bootnode().host))
         .body(http_types::Body::from_json(&request_body).unwrap())
         .await
         .unwrap();
