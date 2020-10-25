@@ -1,6 +1,7 @@
 mod helpers;
 use crate::{models, models::transaction::Transaction, transaction::TransactionRequest};
 use graphql_client::*;
+use crate::config::random_bootnode;
 use helpers::{base64_encode, sign};
 
 type Bytes = String;
@@ -83,13 +84,12 @@ pub async fn get_block(block_number: u32) -> Result<(models::block::Block, Vec<T
     let request_body = Block::build_query(block::Variables {
         block_number: block_number.to_string(),
     });
-    let mut res = surf::post("localhost:8080")
+    let mut res = surf::post(random_bootnode().host)
         .body(http_types::Body::from_json(&request_body).unwrap())
         .await
         .unwrap();
     let response_body: Response<block::ResponseData> = res.body_json().await.unwrap();
     let block_response = response_body.data.and_then(|data| data.block).ok_or(())?;
-    // Err(())
     Ok(block_response.into())
 }
 impl From<Response<block::ResponseData>> for models::block::Block {
