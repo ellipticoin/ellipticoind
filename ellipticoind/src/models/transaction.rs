@@ -153,7 +153,7 @@ impl From<&Transaction> for TransactionRequest {
     }
 }
 
-pub fn highest_nonce(address: Vec<u8>) -> Option<u32> {
+pub fn next_nonce(address: Vec<u8>) -> u32 {
     let pg_db = get_pg_connection();
     transactions::dsl::transactions
         .order(nonce.desc())
@@ -162,5 +162,5 @@ pub fn highest_nonce(address: Vec<u8>) -> Option<u32> {
         .first(&pg_db)
         .optional()
         .unwrap()
-        .map(|n: i32| n as u32)
+        .unwrap_or(1) as u32 + 1
 }
