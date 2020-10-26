@@ -18,7 +18,7 @@ type U64 = String;
 struct PostBlock;
 
 pub async fn post_block(
-    peer: impl AsRef<str>,
+    host: String,
     block: &(models::block::Block, Vec<models::transaction::Transaction>),
 ) {
     let signed_block = sign(block).await;
@@ -26,7 +26,7 @@ pub async fn post_block(
         block: base64_encode(signed_block),
     });
 
-    let _ = surf::post(peer)
+    let _ = surf::post(format!("http://{}", host))
         .body(http_types::Body::from_json(&request_body).unwrap())
         .await;
 }
