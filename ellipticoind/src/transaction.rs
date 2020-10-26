@@ -1,7 +1,7 @@
 use crate::{
     config::{network_id, verification_key},
     constants::TOKEN_CONTRACT,
-    models::transaction::highest_nonce,
+    models::transaction::next_nonce,
 };
 use serde::{Deserialize, Serialize};
 use serde_cbor::{from_slice, Value};
@@ -34,9 +34,7 @@ impl TransactionRequest {
     pub fn new(contract: String, function: &str, arguments: Vec<Value>) -> Self {
         let transaction = Self {
             contract,
-            nonce: highest_nonce(verification_key().to_vec())
-                .map(|nonce| nonce + 1)
-                .unwrap_or(0),
+            nonce: next_nonce(verification_key().to_vec()),
             function: function.to_string(),
             arguments,
             ..Default::default()
