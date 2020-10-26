@@ -1,0 +1,54 @@
+version: "3.1"
+services:
+
+  postgres:
+    restart: always
+    image: postgres:latest
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data/
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+     - ./redisdata:/data
+
+  elipticoin-server:
+    build: 
+      context: ./elipticoin-server
+      args:
+        - PRIVATE_KEY=${PRIVATE_KEY}
+    ports:
+      - "81:80"
+      - "3030:3030"
+    restart: always
+    tty: true
+    stdin_open: true
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 16G
+    environment:
+      - RUST_BACKTRACE=${RUST_BACKTRACE}
+      - HOST=${HOST}
+    depends_on:
+      - postgres
+      - redis
+    links:
+      - "postgres"
+      - "redis"
+    # volumes:
+    #   - ./shared/:/shared/
+    command: bash -c "wait-for-it -s postgres:5432 -s redis:6379 --  /root/ellipticoind/target/release/ellipticoind --database-url postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB} --redis-url redis://redis:6379"    
+
+# volumes:
+#   pgdata:
+#   shared:

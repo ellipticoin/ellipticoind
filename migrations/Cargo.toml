@@ -1,0 +1,7 @@
+[workspace]
+
+members = [
+    "ellipticoind",
+    "ellipticoind_macros",
+    "ellipticoind_types",
+]
