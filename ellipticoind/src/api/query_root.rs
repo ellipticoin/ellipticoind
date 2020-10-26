@@ -4,7 +4,7 @@ use crate::{
     config::get_pg_connection,
     diesel::{BelongingToDsl, RunQueryDsl},
     models,
-    models::transaction::highest_nonce,
+    models::transaction::next_nonce,
     schema::{blocks, blocks::columns::number, transactions},
     system_contracts::{api::ReadOnlyAPI, exchange, token},
 };
@@ -134,7 +134,7 @@ impl QueryRoot {
             .map(Transaction::from)
     }
 
-    async fn nonce(_context: &Context, address: Bytes) -> Option<U32> {
-        highest_nonce(address.0).map(|nonce| U32(nonce as u32))
+    async fn next_nonce(_context: &Context, address: Bytes) -> U32 {
+        U32(next_nonce(address.0))
     }
 }
