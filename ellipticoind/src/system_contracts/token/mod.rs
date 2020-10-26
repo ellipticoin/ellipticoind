@@ -111,6 +111,7 @@ pub fn debit<API: ellipticoin::API>(
     if amount <= balance {
         Ok(set_balance(api, token.clone(), address, balance - amount))
     } else {
+        println!("INSUFFICIENT_FUNDS {}", base64::encode::<Vec<u8>>(address.into()));
         Err(Box::new(errors::INSUFFICIENT_FUNDS.clone()))
     }
 }

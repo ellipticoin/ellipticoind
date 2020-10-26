@@ -15,6 +15,7 @@ use crate::{
     system_contracts,
     system_contracts::api::NativeAPI,
 };
+use crate::models::verification_key;
 use async_std::task::spawn;
 use ed25519_zebra::{SigningKey, VerificationKey};
 use futures::future;
@@ -133,6 +134,7 @@ pub async fn main() {
         api.app
             .listen_with(socket(), |info: ListenInfo| async move {
                 println!("started listening on {}!", info.connection());
+                println!("Address: {}", base64::encode(verification_key()));
                 if *ENABLE_MINER {
                     start_up::start_miner().await;
                 }
