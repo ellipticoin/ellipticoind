@@ -71,3 +71,27 @@ $ git lfs pull
 ```
 $ HOST="<your-external-ip>" ./target/release/ellipticoind
 ```
+
+![Ellipticoin Logo](README/ellipticoin.png)
+
+---
+
+### How to run Ellipticoin Miner for Docker:
+1. cmd: **mv .env.sample .env**
+2. Edit **.env**:
+
+
+> RUST_BACKTRACE=1 \
+HOST=IP:PORT or ExternalURL:PORT \
+POSTGRES_DB=ellipticoind \
+POSTGRES_USER=root \
+POSTGRES_PASSWORD=\<password you make up> \
+PRIVATE_KEY=\<you will input in upcoming steps> 
+    
+| note: set RUST_BACKTRACE=0 to suppress backtrace
+
+3. cmd: **docker-compose build**
+4. Copy & Paste **Private Key** that is written in the **build output** to **PRIVATE_KEY=** in **.env** . Save **public key** to somewhere safe.
+5. cmd: **docker-compose build --no-cache**
+6. cmd: **docker-compose up**
+---
