@@ -1,6 +1,81 @@
 use crate::models;
 use juniper::{ParseScalarResult, ParseScalarValue, Value};
 
+#[derive(juniper::GraphQLEnum, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum GraphQLPostBlockResultStatus {
+    NotConsidered,
+    Rejected,
+    Witnessed
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct GraphQLPostBlockResult {
+    pub status: GraphQLPostBlockResultStatus,
+    pub proof: Option<Vec<Bytes>>,
+}
+
+#[juniper::graphql_object]
+impl GraphQLPostBlockResult {
+    fn status(&self) -> GraphQLPostBlockResultStatus {
+        self.status.clone()
+    }
+
+    fn proof(&self) -> Option<Vec<Bytes>> {
+        match &self.proof {
+            None => None,
+            Some(x) => Some(x.clone())
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum PostBlockResult {
+    NotConsidered(),
+    Rejected(Vec<Bytes>),
+    Witnessed(Bytes)
+}
+
+impl From<PostBlockResult> for GraphQLPostBlockResult {
+    fn from(res: PostBlockResult) -> Self {
+        return match res {
+            PostBlockResult::NotConsidered() => {
+                Self {
+                    status: GraphQLPostBlockResultStatus::NotConsidered,
+                    proof: None
+                }
+            },
+            PostBlockResult::Rejected(x) => {
+                Self {
+                    status: GraphQLPostBlockResultStatus::Rejected,
+                    proof: Some(x.clone())
+                }
+            },
+            PostBlockResult::Witnessed(x) => {
+                Self {
+                    status: GraphQLPostBlockResultStatus::Witnessed,
+                    proof: Some(vec![x.clone(); 1])
+                }
+            }
+        }
+    }
+}
+
+impl From<GraphQLPostBlockResult> for PostBlockResult {
+    fn from(res: GraphQLPostBlockResult) -> Self {
+        return match res.status {
+            GraphQLPostBlockResultStatus::NotConsidered => {
+                PostBlockResult::NotConsidered()
+            },
+            GraphQLPostBlockResultStatus::Rejected => {
+                PostBlockResult::Rejected(res.proof.unwrap().clone())
+            },
+            GraphQLPostBlockResultStatus::Witnessed => {
+                PostBlockResult::Witnessed(res.proof.unwrap().get(0).unwrap().clone())
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Token {
     pub id: Bytes,
@@ -190,7 +265,7 @@ pub struct TokenId {
     pub issuer: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct Bytes(pub Vec<u8>);
 
 impl From<Bytes> for Vec<u8> {

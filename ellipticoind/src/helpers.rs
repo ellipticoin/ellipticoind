@@ -1,6 +1,6 @@
 use crate::{
     client::post_transaction,
-    config::verification_key,
+    config::my_public_key,
     constants::{MINERS, TRANSACTION_QUEUE},
     models::transaction::Transaction,
     transaction::TransactionRequest,
@@ -29,7 +29,7 @@ pub fn bytes_to_value(bytes: Vec<u8>) -> Value {
 }
 
 pub async fn run_transaction(transaction_request: TransactionRequest) -> Transaction {
-    if MINERS.current().await.address == verification_key() {
+    if MINERS.current().await.address == my_public_key() {
         let receiver = TRANSACTION_QUEUE.push(transaction_request).await;
         receiver.await.unwrap()
     } else {

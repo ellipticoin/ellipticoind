@@ -4,13 +4,19 @@ use crate::{
         ethereum_balances_path, get_pg_connection, get_redis_connection, get_rocksdb,
         BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
     },
-    constants::TOKEN_CONTRACT,
+    constants::{
+        MINERS,
+        NEXT_BLOCK,
+        TOKEN_CONTRACT,
+    },
     helpers::{bytes_to_value, run_transaction},
     models,
     models::{Block, HashOnion},
     state::{db_key, Memory, Storage},
     system_contracts,
+    system_contracts::ellipticoin::Miner,
     transaction::TransactionRequest,
+    consensus::ExpectedBlock,
 };
 use diesel_migrations::revert_latest_migration;
 use serde::{Deserialize, Serialize};
@@ -32,7 +38,7 @@ pub async fn start_miner() {
         TOKEN_CONTRACT.clone(),
         "start_mining",
         vec![
-            ((*HOST).clone().to_string().clone()).into(),
+            HOST.to_string().into(),
             (*BURN_PER_BLOCK).into(),
             bytes_to_value(skin),
         ],
@@ -49,17 +55,24 @@ pub async fn start_miner() {
 }
 
 pub async fn catch_up() {
+    let mut next_block: u32 = 0;
+    let mut miner: Miner = MINERS.current().await;
     for block_number in 1.. {
         if let Ok((block, transactions)) = get_block(block_number).await {
             if !block.sealed {
+                next_block = block_number;
                 break;
             }
 
-            block.apply(transactions).await;
+            miner = block.apply(transactions).await;
         } else {
+            next_block = block_number;
             break;
         }
     }
+
+    *NEXT_BLOCK.write().await = Some(ExpectedBlock::new(next_block as i32, miner));
+
     println!("Syncing complete");
 }
 

@@ -1,16 +1,17 @@
 use crate::{
-    config::{network_id, verification_key},
+    config::{network_id, my_public_key},
     constants::TOKEN_CONTRACT,
     models::transaction::highest_nonce,
 };
 use serde::{Deserialize, Serialize};
 use serde_cbor::{from_slice, Value};
 use std::convert::TryInto;
+use ellipticoin::PublicKey;
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct TransactionRequest {
     pub nonce: u32,
-    pub sender: [u8; 32],
+    pub sender: PublicKey,
     pub contract: String,
     pub function: String,
     pub arguments: Vec<serde_cbor::Value>,
@@ -22,7 +23,7 @@ impl Default for TransactionRequest {
         Self {
             network_id: network_id(),
             contract: TOKEN_CONTRACT.clone(),
-            sender: verification_key(),
+            sender: my_public_key(),
             nonce: 0,
             function: "".to_string(),
             arguments: vec![],
@@ -34,7 +35,7 @@ impl TransactionRequest {
     pub fn new(contract: String, function: &str, arguments: Vec<Value>) -> Self {
         let transaction = Self {
             contract,
-            nonce: highest_nonce(verification_key().to_vec())
+            nonce: highest_nonce(my_public_key().to_vec())
                 .map(|nonce| nonce + 1)
                 .unwrap_or(0),
             function: function.to_string(),

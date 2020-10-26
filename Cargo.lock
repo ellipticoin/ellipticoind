@@ -996,6 +996,7 @@ dependencies = [
  "ellipticoin_macros",
  "lazy_static",
  "serde",
+ "serde_cose",
  "sha2 0.9.1",
  "wasm-rpc",
  "wasm-rpc-macros",
@@ -2744,9 +2745,9 @@ dependencies = [
 
 [[package]]
 name = "serde_cose"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb5cecafc0bcdee8be352976c494ee245c807e3dca11aae7e53c43834cced1f8"
+checksum = "cb093f9b4c4079594d97791eba327966efdc559196c5c6647db5f6f963a61d35"
 dependencies = [
  "ed25519-zebra",
  "hex 0.4.2",

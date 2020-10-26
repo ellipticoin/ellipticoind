@@ -23,6 +23,7 @@ use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryFrom, fs::File, str};
 use tide::listener::ListenInfo;
+use ellipticoin::{PublicKey, PrivateKey};
 
 #[derive(Serialize, Deserialize)]
 pub struct Genesis {
@@ -35,14 +36,14 @@ pub fn generate_keypair() {
     let verification_key = VerificationKey::from(&signing_key);
     println!(
         "Verification Key (Address): {}",
-        base64::encode(&<[u8; 32]>::try_from(verification_key).unwrap())
+        base64::encode(&<PublicKey>::try_from(verification_key).unwrap())
     );
     println!(
         "Full Private Key: {}",
         base64::encode(
             &[
-                <[u8; 32]>::try_from(signing_key).unwrap(),
-                <[u8; 32]>::try_from(verification_key).unwrap()
+                <PrivateKey>::try_from(signing_key).unwrap(),
+                <PublicKey>::try_from(verification_key).unwrap()
             ]
             .concat()
         )
@@ -125,6 +126,9 @@ pub async fn dump_state(block_number: Option<u32>) {
 
 pub async fn main() {
     start_up::reset_state().await;
+
+    spawn(miner::run());
+
     if !*GENESIS_NODE {
         start_up::catch_up().await;
     }
@@ -139,6 +143,5 @@ pub async fn main() {
                 Ok(())
             }),
     );
-    spawn(miner::run());
     future::pending().await
 }

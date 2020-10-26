@@ -1,10 +1,10 @@
-use crate::config::{signing_key, verification_key};
+use crate::config::{my_signing_key, my_public_key};
 use serde::Serialize;
 use serde_cose::Sign1;
 
 pub async fn sign<S: Serialize>(payload: S) -> Sign1 {
-    let mut sign1 = Sign1::new(payload, verification_key().to_vec());
-    sign1.sign(signing_key());
+    let mut sign1 = Sign1::new(payload, my_public_key().to_vec());
+    sign1.sign(my_signing_key());
     sign1
 }
 

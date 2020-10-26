@@ -1,30 +1,80 @@
 use crate::{
-    config::verification_key,
-    constants::{BLOCK_TIME, CURRENT_MINER_CHANNEL, TRANSACTION_QUEUE},
+    config::my_public_key,
+    constants::{BLOCK_TIME, BLOCK_SLASH_DELAY, BLOCK_CHANNEL, MINERS, NEXT_BLOCK, TRANSACTION_QUEUE},
     helpers::run_for,
     models::{Block, Transaction},
     slasher::slash_winner,
+    system_contracts::ellipticoin::Miner,
 };
 use async_std::{future::timeout, task::sleep};
-use futures::future::FutureExt;
+use futures::future::{
+    FutureExt,
+    select_all
+};
 use std::time::Duration;
+use std::process;
+use serde_cose::Sign1;
+use crate::config::my_signing_key;
 
 pub async fn run() {
-    loop {
-        if let Ok(current_miner) = timeout(
-            *BLOCK_TIME + Duration::from_secs(2),
-            CURRENT_MINER_CHANNEL.1.recv().map(Result::unwrap),
-        )
-        .await
-        {
-            if current_miner.address == verification_key() {
-                mine_block().await
-            } else {
-                sleep(*BLOCK_TIME).await;
-            }
-        } else {
-            slash_winner().await
+    // TODO: Swap out for a channel in separate function
+    for attempt in 1i32..7i32 {
+        if let Some(_) = *NEXT_BLOCK.read().await {
+            break;
         }
+        sleep(Duration::from_secs(1)).await;
+        if attempt > 5 {
+            eprintln!("Error starting. Sync did not start!");
+            process::exit(1);
+        }
+    }
+
+    loop {
+        let number: i32;
+        let miner: Miner;
+        {
+            let next = NEXT_BLOCK.read().await.clone().unwrap();
+            number = next.number;
+            miner = next.miner.clone();
+        }
+
+        let (received_block, _, _) = select_all(vec![wait_for_block().boxed(), wait_for_block_timeout().boxed()]).await;
+
+        if received_block || !try_vote_no(number, miner.clone(), MINERS.count().await, MINERS.second().await).await {
+            continue;
+        }
+
+        // TODO: Wait for everybody to burn this guy or vote for it.
+    }
+}
+
+async fn wait_for_block() -> bool {
+    BLOCK_CHANNEL.1.recv().map(Result::unwrap);
+
+    true
+}
+
+async fn wait_for_block_timeout() -> bool {
+    let _ = timeout(
+        *BLOCK_TIME + *BLOCK_SLASH_DELAY,
+        sleep(Duration::from_secs(999999999))
+    ).await;
+
+    false
+}
+
+async fn try_vote_no(block_number: i32, miner: Miner, miner_count: usize, next_miner: Miner) -> bool {
+    let mut next_block = NEXT_BLOCK.write().await.clone().unwrap();
+
+    if block_number != next_block.number || miner != next_block.miner {
+        false
+    } else {
+        let signed_burn_tx: Sign1 = get_signed_burn_tx(&miner);
+        next_block.burn_current_miner(&signed_burn_tx, miner_count, &next_miner);
+
+        // TODO: Send burn notice to all other miners
+
+        true
     }
 }
 
@@ -43,4 +93,11 @@ async fn mine_block() {
     })
     .await;
     block.seal(transaction_position + 1).await;
+}
+
+fn get_signed_burn_tx(miner: &Miner) -> Sign1 {
+    // TODO: actually get burn tx.
+    let mut burn_tx = Sign1::new("derp", my_public_key().to_vec());
+    burn_tx.sign(my_signing_key());
+    burn_tx
 }

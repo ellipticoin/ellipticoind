@@ -16,6 +16,7 @@ use std::{
     net::{IpAddr, SocketAddr},
     sync::Arc,
 };
+use ellipticoin::{PublicKey, PrivateKey};
 
 #[derive(Clap, Debug)]
 pub struct Opts {
@@ -123,9 +124,9 @@ pub fn socket() -> SocketAddr {
     (OPTS.bind_address.parse::<IpAddr>().unwrap(), OPTS.port).into()
 }
 
-pub fn signing_key() -> SigningKey {
+pub fn my_signing_key() -> SigningKey {
     SigningKey::try_from(
-        <[u8; 32]>::try_from(
+        <PrivateKey>::try_from(
             &base64::decode(&env::var("PRIVATE_KEY").expect("PRIVATE_KEY not set")).unwrap()[..32],
         )
         .unwrap(),
@@ -133,8 +134,8 @@ pub fn signing_key() -> SigningKey {
     .unwrap()
 }
 
-pub fn verification_key() -> [u8; 32] {
-    VerificationKey::from(&signing_key()).into()
+pub fn my_public_key() -> PublicKey {
+    VerificationKey::from(&my_signing_key()).into()
 }
 
 pub fn network_id() -> u32 {

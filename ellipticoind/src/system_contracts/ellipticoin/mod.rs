@@ -7,7 +7,7 @@ use super::token;
 use crate::system_contracts::{
     ellipticoin::issuance::INCENTIVISED_POOLS, exchange, exchange::pool_token, token::mint,
 };
-use ellipticoin::{constants::ELC, memory_accessors, pay, storage_accessors, Address};
+use ellipticoin::{constants::ELC, memory_accessors, pay, storage_accessors, Address, PublicKey};
 
 use errors::Error;
 use hashing::sha256;
@@ -38,10 +38,10 @@ memory_accessors!(
     issuance_rewards(address: Address) -> u64;
 );
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Miner {
     pub host: String,
-    pub address: [u8; 32],
+    pub address: PublicKey,
     pub burn_per_block: u64,
     pub hash_onion_skin: [u8; 32],
 }

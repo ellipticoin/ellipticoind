@@ -1,6 +1,10 @@
 use bytes::Bytes;
 use wasm_rpc::serde::{Deserialize, Serialize};
+use serde_cose::Sign1;
 use std::convert::TryInto;
+use std::collections::HashMap;
+
+
 #[derive(Clone, Deserialize, Serialize, PartialEq, Debug)]
 pub struct Token {
     pub issuer: Address,
@@ -13,9 +17,15 @@ impl Into<Vec<u8>> for Token {
     }
 }
 
+pub type PublicKey = [u8; 32];
+pub type PrivateKey = [u8; 32];
+pub type WitnessedMinerBlock = Sign1;
+pub type BurnTransaction = Sign1;
+pub type BurnProofs = HashMap<PublicKey, BurnTransaction>;
+
 #[derive(Clone, Hash, Deserialize, Serialize, PartialEq, Eq, Debug)]
 pub enum Address {
-    PublicKey([u8; 32]),
+    PublicKey(PublicKey),
     Contract(String),
 }
 
@@ -45,7 +55,7 @@ impl Address {
         }
     }
 
-    pub fn as_public_key(&mut self) -> Option<[u8; 32]> {
+    pub fn as_public_key(&mut self) -> Option<PublicKey> {
         match self {
             Address::PublicKey(address) => Some(*address),
             _ => None,

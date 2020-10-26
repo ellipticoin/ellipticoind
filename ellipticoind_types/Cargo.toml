@@ -22,6 +22,7 @@ incremental = false
 lazy_static = "*"
 sha2 = "0.9.1"
 serde = { version = "*", features = ["derive"] }
+serde_cose = "0.1.4"
 ellipticoin_macros = { path = "../ellipticoind_macros"}
 wasm-rpc = "0.2.15"
 wasm-rpc-macros = "0.2.15"

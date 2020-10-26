@@ -18,6 +18,7 @@ pub mod client;
 pub mod config;
 mod constants;
 mod error;
+mod consensus;
 mod helpers;
 mod miner;
 pub mod models;

@@ -3,7 +3,7 @@ use crate::{
     constants::{set_miners, MINERS},
 };
 pub use crate::{
-    config::{get_pg_connection, verification_key},
+    config::{get_pg_connection, my_public_key},
     constants::TOKEN_CONTRACT,
     diesel::{BelongingToDsl, ExpressionMethods, QueryDsl, RunQueryDsl},
     helpers::bytes_to_value,
