@@ -26,7 +26,7 @@ pub async fn post_block(
         block: base64_encode(signed_block),
     });
 
-    let _ = surf::post(peer)
+    let _ = surf::post(format!("http://{}", peer))
         .body(http_types::Body::from_json(&request_body).unwrap())
         .await;
 }
