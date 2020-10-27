@@ -5,7 +5,7 @@ use juniper::{ParseScalarResult, ParseScalarValue, Value};
 pub enum GraphQLPostBlockResultStatus {
     NotConsidered,
     Rejected,
-    Witnessed
+    Witnessed,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
@@ -26,50 +26,42 @@ impl GraphQLPostBlockResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum PostBlockResult {
+pub enum BlockResult {
     NotConsidered(),
     Rejected(Vec<Bytes>),
-    Witnessed(Bytes)
+    Witnessed(Bytes),
 }
 
-impl From<PostBlockResult> for GraphQLPostBlockResult {
-    fn from(res: PostBlockResult) -> Self {
+impl From<BlockResult> for GraphQLPostBlockResult {
+    fn from(res: BlockResult) -> Self {
         return match res {
-            PostBlockResult::NotConsidered() => {
-                Self {
-                    status: GraphQLPostBlockResultStatus::NotConsidered,
-                    proof: None
-                }
+            BlockResult::NotConsidered() => Self {
+                status: GraphQLPostBlockResultStatus::NotConsidered,
+                proof: None,
             },
-            PostBlockResult::Rejected(x) => {
-                Self {
-                    status: GraphQLPostBlockResultStatus::Rejected,
-                    proof: Some(x.clone())
-                }
+            BlockResult::Rejected(x) => Self {
+                status: GraphQLPostBlockResultStatus::Rejected,
+                proof: Some(x.clone()),
             },
-            PostBlockResult::Witnessed(x) => {
-                Self {
-                    status: GraphQLPostBlockResultStatus::Witnessed,
-                    proof: Some(vec![x.clone(); 1])
-                }
-            }
-        }
+            BlockResult::Witnessed(x) => Self {
+                status: GraphQLPostBlockResultStatus::Witnessed,
+                proof: Some(vec![x.clone(); 1]),
+            },
+        };
     }
 }
 
-impl From<GraphQLPostBlockResult> for PostBlockResult {
+impl From<GraphQLPostBlockResult> for BlockResult {
     fn from(res: GraphQLPostBlockResult) -> Self {
         return match res.status {
-            GraphQLPostBlockResultStatus::NotConsidered => {
-                PostBlockResult::NotConsidered()
-            },
+            GraphQLPostBlockResultStatus::NotConsidered => BlockResult::NotConsidered(),
             GraphQLPostBlockResultStatus::Rejected => {
-                PostBlockResult::Rejected(res.proof.unwrap().clone())
-            },
-            GraphQLPostBlockResultStatus::Witnessed => {
-                PostBlockResult::Witnessed(res.proof.unwrap().get(0).unwrap().clone())
+                BlockResult::Rejected(res.proof.unwrap().clone())
             }
-        }
+            GraphQLPostBlockResultStatus::Witnessed => {
+                BlockResult::Witnessed(res.proof.unwrap().get(0).unwrap().clone())
+            }
+        };
     }
 }
 
@@ -237,7 +229,7 @@ impl From<U64> for String {
 
 impl From<u64> for U64 {
     fn from(n: u64) -> Self {
-      U64(n)
+        U64(n)
     }
 }
 
@@ -254,7 +246,6 @@ impl From<u32> for U32 {
         U32(n)
     }
 }
-
 
 #[derive(Clone, juniper::GraphQLInputObject)]
 pub struct TokenId {

@@ -4,11 +4,8 @@ use crate::{
         ethereum_balances_path, get_pg_connection, get_redis_connection, get_rocksdb,
         BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
     },
-    constants::{
-        MINERS,
-        NEXT_BLOCK,
-        TOKEN_CONTRACT,
-    },
+    consensus::ExpectedBlock,
+    constants::{MINERS, NEXT_BLOCK, TOKEN_CONTRACT},
     helpers::{bytes_to_value, run_transaction},
     models,
     models::{Block, HashOnion},
@@ -16,7 +13,6 @@ use crate::{
     system_contracts,
     system_contracts::ellipticoin::Miner,
     transaction::TransactionRequest,
-    consensus::ExpectedBlock,
 };
 use diesel_migrations::revert_latest_migration;
 use serde::{Deserialize, Serialize};

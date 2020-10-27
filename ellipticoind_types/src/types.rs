@@ -1,9 +1,8 @@
 use bytes::Bytes;
-use wasm_rpc::serde::{Deserialize, Serialize};
 use serde_cose::Sign1;
-use std::convert::TryInto;
 use std::collections::HashMap;
-
+use std::convert::TryInto;
+use wasm_rpc::serde::{Deserialize, Serialize};
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Debug)]
 pub struct Token {

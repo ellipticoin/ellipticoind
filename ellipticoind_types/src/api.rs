@@ -1,10 +1,10 @@
 use crate::types::Address;
 use helpers::db_key;
+pub use wasm_rpc::{pointer, serde_cbor};
 use wasm_rpc::{
     serde::{de::DeserializeOwned, Serialize},
     serde_cbor::{from_slice, to_vec},
 };
-pub use wasm_rpc::{pointer, serde_cbor};
 pub use wasm_rpc_macros::{export, export_native};
 
 pub trait MemoryAPI {

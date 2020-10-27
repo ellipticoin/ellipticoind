@@ -2,8 +2,8 @@ extern crate ellipticoin_macros;
 #[macro_use]
 extern crate lazy_static;
 extern crate core;
-extern crate sha2;
 pub extern crate serde_cose;
+extern crate sha2;
 pub extern crate wasm_rpc;
 extern crate wasm_rpc_macros;
 

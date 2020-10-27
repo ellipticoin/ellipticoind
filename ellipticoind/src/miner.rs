@@ -1,20 +1,19 @@
+use crate::config::my_signing_key;
 use crate::{
     config::my_public_key,
-    constants::{BLOCK_TIME, BLOCK_SLASH_DELAY, BLOCK_CHANNEL, MINERS, NEXT_BLOCK, TRANSACTION_QUEUE},
+    constants::{
+        BLOCK_CHANNEL, BLOCK_SLASH_DELAY, BLOCK_TIME, MINERS, NEXT_BLOCK, TRANSACTION_QUEUE,
+    },
     helpers::run_for,
     models::{Block, Transaction},
     slasher::slash_winner,
     system_contracts::ellipticoin::Miner,
 };
 use async_std::{future::timeout, task::sleep};
-use futures::future::{
-    FutureExt,
-    select_all
-};
-use std::time::Duration;
-use std::process;
+use futures::future::{select_all, FutureExt};
 use serde_cose::Sign1;
-use crate::config::my_signing_key;
+use std::process;
+use std::time::Duration;
 
 pub async fn run() {
     // TODO: Swap out for a channel in separate function
@@ -38,9 +37,21 @@ pub async fn run() {
             miner = next.miner.clone();
         }
 
-        let (received_block, _, _) = select_all(vec![wait_for_block().boxed(), wait_for_block_timeout().boxed()]).await;
+        let (received_block, _, _) = select_all(vec![
+            wait_for_block().boxed(),
+            wait_for_block_timeout().boxed(),
+        ])
+        .await;
 
-        if received_block || !try_vote_no(number, miner.clone(), MINERS.count().await, MINERS.second().await).await {
+        if received_block
+            || !try_vote_no(
+                number,
+                miner.clone(),
+                MINERS.count().await,
+                MINERS.second().await,
+            )
+            .await
+        {
             continue;
         }
 
@@ -57,13 +68,19 @@ async fn wait_for_block() -> bool {
 async fn wait_for_block_timeout() -> bool {
     let _ = timeout(
         *BLOCK_TIME + *BLOCK_SLASH_DELAY,
-        sleep(Duration::from_secs(999999999))
-    ).await;
+        sleep(Duration::from_secs(999999999)),
+    )
+    .await;
 
     false
 }
 
-async fn try_vote_no(block_number: i32, miner: Miner, miner_count: usize, next_miner: Miner) -> bool {
+async fn try_vote_no(
+    block_number: i32,
+    miner: Miner,
+    miner_count: usize,
+    next_miner: Miner,
+) -> bool {
     let mut next_block = NEXT_BLOCK.write().await.clone().unwrap();
 
     if block_number != next_block.number || miner != next_block.miner {

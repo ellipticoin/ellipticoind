@@ -7,6 +7,7 @@ use diesel::{
 };
 use dotenv::dotenv;
 use ed25519_zebra::{SigningKey, VerificationKey};
+use ellipticoin::{PrivateKey, PublicKey};
 use r2d2_redis::RedisConnectionManager;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Deserializer};
@@ -16,7 +17,6 @@ use std::{
     net::{IpAddr, SocketAddr},
     sync::Arc,
 };
-use ellipticoin::{PublicKey, PrivateKey};
 
 #[derive(Clap, Debug)]
 pub struct Opts {
@@ -32,7 +32,10 @@ pub struct Opts {
     pub port: u16,
     #[clap(long = "rocksdb-path", default_value = "./ellipticoind/db")]
     pub rocksdb_path: String,
-    #[clap(long = "genesis-path", default_value = "./ellipticoind/dist/genesis.cbor")]
+    #[clap(
+        long = "genesis-path",
+        default_value = "./ellipticoind/dist/genesis.cbor"
+    )]
     pub genesis_state_path: String,
     #[clap(long = "save-state")]
     pub save_state: bool,
@@ -169,5 +172,6 @@ pub async fn websocket_socket() -> SocketAddr {
 }
 
 pub fn ethereum_balances_path() -> String {
-    env::var("ETHEREUM_BALANCES_PATH").unwrap_or("./ellipticoind/dist/ethereum-balances-10054080.bin".to_string())
+    env::var("ETHEREUM_BALANCES_PATH")
+        .unwrap_or("./ellipticoind/dist/ethereum-balances-10054080.bin".to_string())
 }

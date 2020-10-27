@@ -1,4 +1,4 @@
-use crate::config::{my_signing_key, my_public_key};
+use crate::config::{my_public_key, my_signing_key};
 use serde::Serialize;
 use serde_cose::Sign1;
 

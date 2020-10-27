@@ -1,20 +1,16 @@
+use crate::config::{my_public_key, my_signing_key};
 use crate::system_contracts::ellipticoin::Miner;
-use std::collections::HashMap;
+use ellipticoin::{Address, BurnProofs, BurnTransaction, PublicKey, WitnessedMinerBlock};
 use serde_cose::Sign1;
-use ellipticoin::{BurnProofs, BurnTransaction, PublicKey, WitnessedMinerBlock, Address};
-use crate::config::{
-    my_public_key,
-    my_signing_key
-};
+use std::collections::HashMap;
 
 use crate::constants::MINERS;
 use std::convert::TryFrom;
 
-
 #[derive(Clone, Debug)]
 pub enum MinerBlockDecision {
     Burned(BurnProofs),
-    Accepted(WitnessedMinerBlock)
+    Accepted(WitnessedMinerBlock),
 }
 
 #[derive(Clone, Debug)]
@@ -45,7 +41,11 @@ impl ExpectedBlock {
 
     pub fn is_miner_burned_by(&self, burned: &Miner, by: &Miner) -> bool {
         self.burned_miners.contains_key(&burned.address)
-            && self.burned_miners.get(&burned.address).unwrap().contains_key(&by.address)
+            && self
+                .burned_miners
+                .get(&burned.address)
+                .unwrap()
+                .contains_key(&by.address)
     }
 
     pub async fn is_miner_burned_by_me(&self, miner: &Miner) -> bool {
@@ -68,16 +68,24 @@ impl ExpectedBlock {
     pub fn witness_miner_block(&mut self, block: &[u8]) -> WitnessedMinerBlock {
         let mut to_sign = Sign1::new(&block, my_public_key().to_vec());
         to_sign.sign(my_signing_key());
-        self.decisions.insert(self.miner.address.clone(), MinerBlockDecision::Accepted(to_sign.clone()));
+        self.decisions.insert(
+            self.miner.address.clone(),
+            MinerBlockDecision::Accepted(to_sign.clone()),
+        );
         to_sign.clone()
     }
 
-    pub fn burn_current_miner(&mut self, signed_burn_tx: &BurnTransaction, miner_count: usize, next_miner: &Miner) -> bool {
+    pub fn burn_current_miner(
+        &mut self,
+        signed_burn_tx: &BurnTransaction,
+        miner_count: usize,
+        next_miner: &Miner,
+    ) -> bool {
         let count: usize;
         let burner_address: PublicKey = match Address::from(signed_burn_tx.kid()) {
             Address::PublicKey(pub_key) => pub_key,
             // TODO: Handle errors
-            _ => return false
+            _ => return false,
         };
 
         match self.burned_miners.get_mut::<PublicKey>(&self.miner.address) {

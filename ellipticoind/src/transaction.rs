@@ -1,12 +1,12 @@
 use crate::{
-    config::{network_id, my_public_key},
+    config::{my_public_key, network_id},
     constants::TOKEN_CONTRACT,
     models::transaction::highest_nonce,
 };
+use ellipticoin::PublicKey;
 use serde::{Deserialize, Serialize};
 use serde_cbor::{from_slice, Value};
 use std::convert::TryInto;
-use ellipticoin::PublicKey;
 
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
 pub struct TransactionRequest {

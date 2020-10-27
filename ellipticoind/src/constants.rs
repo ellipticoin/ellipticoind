@@ -1,11 +1,12 @@
+use crate::config::my_public_key;
 use crate::{
-    models::Transaction, system_contracts::ellipticoin::Miner, transaction::TransactionRequest, consensus::ExpectedBlock,
+    consensus::ExpectedBlock, models::Transaction, system_contracts::ellipticoin::Miner,
+    transaction::TransactionRequest,
 };
-use async_std::sync::{channel, Mutex, RwLock, Receiver, Sender};
+use async_std::sync::{channel, Mutex, Receiver, RwLock, Sender};
 use broadcaster::BroadcastChannel;
 use futures::channel::oneshot;
 use std::{sync::Arc, time::Duration};
-use crate::config::my_public_key;
 
 lazy_static! {
     pub static ref BLOCK_TIME: Duration = Duration::from_secs(3);
@@ -55,9 +56,14 @@ impl MINERS {
     }
 
     pub async fn from_pub_key(&self, key: [u8; 32]) -> Miner {
-        self.lock().await.as_ref().unwrap().iter()
+        self.lock()
+            .await
+            .as_ref()
+            .unwrap()
+            .iter()
             .filter(|m| m.address == key)
-            .collect::<Vec<&Miner>>()[0].clone()
+            .collect::<Vec<&Miner>>()[0]
+            .clone()
     }
 }
 

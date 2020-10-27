@@ -17,13 +17,13 @@ use crate::{
 };
 use async_std::task::spawn;
 use ed25519_zebra::{SigningKey, VerificationKey};
+use ellipticoin::{PrivateKey, PublicKey};
 use futures::future;
 use r2d2_redis::redis::Commands;
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryFrom, fs::File, str};
 use tide::listener::ListenInfo;
-use ellipticoin::{PublicKey, PrivateKey};
 
 #[derive(Serialize, Deserialize)]
 pub struct Genesis {
