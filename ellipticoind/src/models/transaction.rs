@@ -162,5 +162,6 @@ pub fn next_nonce(address: Vec<u8>) -> u32 {
         .first(&pg_db)
         .optional()
         .unwrap()
-        .unwrap_or(1) as u32 + 1
+        .unwrap_or(1) as u32
+        + 1
 }

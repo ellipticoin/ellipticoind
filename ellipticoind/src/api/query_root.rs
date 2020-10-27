@@ -29,6 +29,13 @@ impl QueryRoot {
                     },
                     address.0.clone().into(),
                 );
+                let total_supply = token::get_total_supply(
+                    &mut api,
+                    ellipticoin::Token {
+                        issuer: issuer.as_str().into(),
+                        id: id.0.clone().into(),
+                    },
+                );
                 let price = exchange::price(
                     &mut api,
                     ellipticoin::Token {
@@ -42,6 +49,7 @@ impl QueryRoot {
                     id: id.clone().into(),
                     balance: U64(balance),
                     price: U64(price),
+                    total_supply: U64(total_supply),
                 }
             })
             .collect()
