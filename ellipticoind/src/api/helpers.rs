@@ -16,9 +16,7 @@ pub fn validate_signature<D: DeserializeOwned>(cose_bytes: &[u8]) -> Result<(D, 
     serde_key.verify(&sign1)
         .map_err(|_| Error("invalid signature".to_string()))?;
 
-    let d = serde_cbor::from_slice(&sign1.payload).map_err(|_| Error("invalid CBOR payload".to_string()));
-    match d {
-        Ok(x) => Ok((x, signer_pub_key)),
-        Err(x) => Err(x)
-    }
+    serde_cbor::from_slice(&sign1.payload)
+        .map(|result| (result, signer_pub_key))
+        .map_err(|_| Error("invalid CBOR payload".to_string()))
 }

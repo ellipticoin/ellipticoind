@@ -105,9 +105,9 @@ async fn get_decided_block_result(block: &models::block::Block, req_miner_addres
     let req_miner_decision: Option<&MinerBlockDecision> = next_block.decisions.get(req_miner_address);
 
 
-    return if next_block_miner.address != req_miner_address.clone() || next_block_number != block.number {
+    if next_block_miner.address != req_miner_address.clone() || next_block_number != block.number {
         if block.number < next_block_number {
-            // TODO: Send witness / rejection
+            // TODO: Send witness / rejection from storage
             Some(Witnessed(Bytes("derp".as_bytes().to_vec())))
         } else if block.number > next_block_number {
             Some(NotConsidered())
@@ -116,12 +116,11 @@ async fn get_decided_block_result(block: &models::block::Block, req_miner_addres
         }
     } else {
         match get_res_from_decision(current_miner_decision) {
-            NotConsidered() => match burned_by_me {
-                true => {
-                    let bytes = bytes_from_signed_txs(burn_proof.unwrap().values());
-                    Some(Rejected(bytes))
-                },
-                false => Some(NotConsidered())
+            NotConsidered() => if burned_by_me {
+                let bytes = bytes_from_signed_txs(burn_proof.unwrap().values());
+                Some(Rejected(bytes))
+            } else {
+                Some(NotConsidered())
             }
             x => Some(x)
         }

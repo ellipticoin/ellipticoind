@@ -21,10 +21,7 @@ impl GraphQLPostBlockResult {
     }
 
     fn proof(&self) -> Option<Vec<Bytes>> {
-        match &self.proof {
-            None => None,
-            Some(x) => Some(x.clone())
-        }
+        self.proof.as_ref().cloned()
     }
 }
 
