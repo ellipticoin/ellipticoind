@@ -22,7 +22,6 @@ mod helpers;
 mod miner;
 pub mod models;
 mod pg;
-mod run_loop;
 mod schema;
 pub mod slasher;
 mod start_up;

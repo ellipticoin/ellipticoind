@@ -88,8 +88,7 @@ pub async fn dump_state(block_number: Option<u32>) {
                     transaction: transaction.clone().into(),
                     state: &mut state,
                 };
-                let res = crate::system_contracts::run(&mut api, transaction.into());
-                println!("{:?}", res);
+                crate::system_contracts::run(&mut api, transaction.into());
             });
             println!("Applied block #{}", block.number);
         });
