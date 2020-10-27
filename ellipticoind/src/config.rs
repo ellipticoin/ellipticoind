@@ -44,6 +44,8 @@ pub struct Opts {
     pub subcmd: Option<SubCommand>,
     #[clap(long = "websocket-port", default_value = "81")]
     pub websocket_port: u16,
+    #[clap(short = 'i', long = "insecure")]
+    pub insecure: bool
 }
 
 #[derive(Clap, Debug)]
@@ -168,6 +170,14 @@ pub async fn websocket_socket() -> SocketAddr {
     let mut websocket_socket = socket().clone();
     websocket_socket.set_port(OPTS.websocket_port);
     websocket_socket
+}
+
+pub fn host_uri(host: &str) -> String {
+    if OPTS.insecure {
+        format!("http://{}", host)
+    } else {
+        format!("https://{}", host)
+    }
 }
 
 pub fn ethereum_balances_path() -> String {
