@@ -1,3 +1,4 @@
+use crate::models::verification_key;
 use crate::{
     api,
     config::{
@@ -15,7 +16,6 @@ use crate::{
     system_contracts,
     system_contracts::api::NativeAPI,
 };
-use crate::models::verification_key;
 use async_std::task::spawn;
 use ed25519_zebra::{SigningKey, VerificationKey};
 use futures::future;
