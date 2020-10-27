@@ -33,8 +33,8 @@ lazy_static! {
         code: 8,
         message: "Invalid block number block".to_string()
     };
-    pub static ref CANNOT_BURN_YOURSELF: Error = Error {
+    pub static ref INVALID_MINER_TO_BURN: Error = Error {
         code: 9,
-        message: "Careful, you could burn yourself with that".to_string()
+        message: "Burned miner must be the first in the list and not the caller".to_string()
     };
 }

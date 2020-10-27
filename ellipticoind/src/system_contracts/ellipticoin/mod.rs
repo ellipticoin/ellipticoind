@@ -133,6 +133,7 @@ export_native! {
 
     pub fn burn_winning_miner<API: ellipticoin::API>(
         api: &mut API,
+        miner_to_burn: PublicKey,
         block_number: u32
     ) -> Result<bool, Box<Error>> {
         if block_number != get_block_number(api) {
@@ -141,8 +142,8 @@ export_native! {
 
         let mut miners = get_miners(api);
         let caller_pub_key: PublicKey = api.caller().as_public_key().unwrap();
-        if caller_pub_key == miners.get(0).unwrap().address {
-           return Err(Box::new(errors::CANNOT_BURN_YOURSELF.clone()))
+        if miner_to_burn == caller_pub_key || miner_to_burn != miners.get(0).unwrap().address {
+            return Err(Box::new(errors::INVALID_MINER_TO_BURN.clone()));
         }
 
         let mut burn_votes: HashSet<PublicKey> = get_burn_votes(api);
@@ -431,10 +432,10 @@ mod tests {
         assert!(burn_votes.len() == 0, "Burn votes should start as empty");
 
         api.caller = Address::PublicKey(*ALICE);
-        match native::burn_winning_miner(&mut api, block_number) {
+        match native::burn_winning_miner(&mut api, *ALICE, block_number) {
             Ok(res) => assert!(false, "Alice should not be able to burn herself!"),
             Err(err) => assert!(
-                err.code == errors::CANNOT_BURN_YOURSELF.code,
+                err.code == errors::INVALID_MINER_TO_BURN.code,
                 format!(
                     "Alice attempt to burn herself returned unexpected error code: {}!",
                     err.code
@@ -448,15 +449,21 @@ mod tests {
         );
 
         api.caller = Address::PublicKey(*BOB);
-        match native::burn_winning_miner(&mut api, block_number + 1) {
+        match native::burn_winning_miner(&mut api, *ALICE, block_number + 1) {
             Ok(res) => assert!(false, "Should have returned block number error!"),
             Err(err) => assert!(err.code == errors::INVALID_BLOCK_NUMBER.code,
                 format!("Expected invalid block number. Got error code {}!", err.code)
             ),
         }
 
-        api.caller = Address::PublicKey(*BOB);
-        match native::burn_winning_miner(&mut api, block_number) {
+        match native::burn_winning_miner(&mut api, *CAROL, block_number) {
+            Ok(res) => assert!(false, "Should have returned invalid miner to burn error!"),
+            Err(err) => assert!(err.code == errors::INVALID_MINER_TO_BURN.code,
+                                format!("Expected invalid miner to burn error. Got error code {}!", err.code)
+            ),
+        }
+
+        match native::burn_winning_miner(&mut api, *ALICE, block_number) {
             Ok(res) => assert!(
                 !res,
                 "Bob's vote should not have burned Alice without Carol's vote!"
@@ -480,7 +487,7 @@ mod tests {
         );
 
         api.caller = Address::PublicKey(*CAROL);
-        match native::burn_winning_miner(&mut api, block_number) {
+        match native::burn_winning_miner(&mut api, *ALICE, block_number) {
             Ok(res) => assert!(res, "Carol's vote should have burned Alice!"),
             Err(err) => assert!(
                 false,
@@ -530,7 +537,7 @@ mod tests {
         let block_number = get_block_number(&mut api);
 
         api.caller = Address::PublicKey(*BOB);
-        match native::burn_winning_miner(&mut api, block_number) {
+        match native::burn_winning_miner(&mut api, *ALICE, block_number) {
             Ok(res) => assert!(
                 !res,
                 "Bob's vote should not have burned Alice without Carol's vote!"
