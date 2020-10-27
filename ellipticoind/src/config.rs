@@ -45,7 +45,7 @@ pub struct Opts {
     #[clap(long = "websocket-port", default_value = "81")]
     pub websocket_port: u16,
     #[clap(short = 'i', long = "insecure")]
-    pub insecure: bool
+    pub insecure: bool,
 }
 
 #[derive(Clap, Debug)]

@@ -90,7 +90,9 @@ impl Block {
         .unwrap()
         .unwrap();
         *MINERS.lock().await = Some(miners.clone());
-        WEB_SOCKET_BROADCASTER.broadcast(number as u32, miners.first().unwrap().host.clone()).await;
+        WEB_SOCKET_BROADCASTER
+            .broadcast(number as u32, miners.first().unwrap().host.clone())
+            .await;
         println!("Applied block #{}", self.number);
         miners.first().unwrap().clone()
     }
@@ -140,7 +142,9 @@ impl Block {
             .load::<Transaction>(&pg_db)
             .unwrap();
         broadcast_block((self.clone(), transactions), miners.clone()).await;
-        WEB_SOCKET_BROADCASTER.broadcast(self.number as u32, miners.first().unwrap().host.clone()).await;
+        WEB_SOCKET_BROADCASTER
+            .broadcast(self.number as u32, miners.first().unwrap().host.clone())
+            .await;
     }
 
     pub fn current_block_number() -> u32 {

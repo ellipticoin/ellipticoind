@@ -7,6 +7,7 @@ pub struct Token {
     pub issuer: String,
     pub price: U64,
     pub balance: U64,
+    pub total_supply: U64,
 }
 
 #[juniper::graphql_object]
@@ -25,6 +26,10 @@ impl Token {
 
     fn balance(&self) -> U64 {
         self.balance.clone()
+    }
+
+    fn total_supply(&self) -> U64 {
+        self.total_supply.clone()
     }
 }
 
