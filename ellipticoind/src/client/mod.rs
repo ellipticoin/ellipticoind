@@ -3,6 +3,7 @@ use crate::{models, models::transaction::Transaction, transaction::TransactionRe
 use graphql_client::*;
 use crate::config::random_bootnode;
 use helpers::{base64_encode, sign};
+use crate::config::host_uri;
 
 type Bytes = String;
 type U32 = String;
@@ -26,7 +27,7 @@ pub async fn post_block(
         block: base64_encode(signed_block),
     });
 
-    let _ = surf::post(format!("http://{}", host))
+    let _ = surf::post(host_uri(&host))
         .body(http_types::Body::from_json(&request_body).unwrap())
         .await;
 }
@@ -45,7 +46,7 @@ pub async fn post_transaction(host: &str, transaction_request: TransactionReques
         transaction: base64_encode(signed_transaction),
     });
 
-    let mut res = surf::post(format!("http://{}", host))
+    let mut res = surf::post(host_uri(&host))
         .body(http_types::Body::from_json(&request_body).unwrap())
         .await
         .unwrap();
@@ -84,7 +85,7 @@ pub async fn get_block(block_number: u32) -> Result<(models::block::Block, Vec<T
     let request_body = Block::build_query(block::Variables {
         block_number: block_number.to_string(),
     });
-    let mut res = surf::post(format!("http://{}", random_bootnode().host))
+    let mut res = surf::post(host_uri(&random_bootnode().host))
         .body(http_types::Body::from_json(&request_body).unwrap())
         .await
         .unwrap();
