@@ -14,7 +14,7 @@ pub enum MinerBlockDecision {
 
 #[derive(Clone, Debug)]
 pub struct ExpectedBlock {
-    pub number: i32,
+    pub number: u32,
     pub miner: Miner,
     pub decisions: HashMap<PublicKey, MinerBlockDecision>,
     pub burned_miners: HashMap<PublicKey, BurnProofs>,
@@ -22,7 +22,7 @@ pub struct ExpectedBlock {
 
 // Note: None of the functions below are threadsafe. Lock to read / write.
 impl ExpectedBlock {
-    pub fn new(number: i32, miner: Miner) -> Self {
+    pub fn new(number: u32, miner: Miner) -> Self {
         Self {
             number,
             miner,

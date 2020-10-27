@@ -34,9 +34,10 @@ pub async fn process_received_block(
     loop {
         let next_block_read: ExpectedBlock = (*NEXT_BLOCK.read().await).clone().unwrap();
         let next_block_miner: Miner = next_block_read.miner.clone();
-        let next_block_number: i32 = next_block_read.number.clone();
+        let next_block_number: u32 = next_block_read.number.clone();
 
-        match get_decided_block_result(block.number, &signer_address, next_block_read).await {
+        match get_decided_block_result(block.number as u32, &signer_address, next_block_read).await
+        {
             Some(NotConsidered()) => return NotConsidered(),
             Some(Witnessed(x)) => return Witnessed(x),
             Some(Rejected(x)) => return Rejected(x),
@@ -78,12 +79,12 @@ pub async fn process_received_block(
 }
 
 pub async fn get_decided_block_result(
-    block_number: i32,
+    block_number: u32,
     block_miner_address: &PublicKey,
     next_block: ExpectedBlock,
 ) -> Option<BlockResult> {
     let next_block_miner: Miner = next_block.miner.clone();
-    let next_block_number: i32 = next_block.number.clone();
+    let next_block_number: u32 = next_block.number.clone();
     let burned_by_me: bool = next_block.is_miner_burned_by_me(&next_block_miner).await;
     let burn_proof: Option<BurnProofs> = next_block.current_burn_proof();
     let current_miner_decision: Option<&MinerBlockDecision> =

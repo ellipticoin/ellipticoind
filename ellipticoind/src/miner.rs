@@ -1,8 +1,11 @@
 use crate::config::my_signing_key;
+use crate::helpers::bytes_to_value;
+use crate::transaction::TransactionRequest;
 use crate::{
     config::my_public_key,
     constants::{
-        BLOCK_CHANNEL, BLOCK_SLASH_DELAY, BLOCK_TIME, MINERS, NEXT_BLOCK, TRANSACTION_QUEUE,
+        BLOCK_CHANNEL, BLOCK_SLASH_DELAY, BLOCK_TIME, MINERS, NEXT_BLOCK, TOKEN_CONTRACT,
+        TRANSACTION_QUEUE,
     },
     helpers::run_for,
     models::{Block, Transaction},
@@ -17,7 +20,7 @@ use std::time::Duration;
 
 pub async fn run() {
     loop {
-        let number: i32;
+        let number: u32;
         let miner: Miner;
         {
             let next = NEXT_BLOCK.read().await.clone().unwrap();
@@ -48,7 +51,7 @@ pub async fn run() {
 }
 
 async fn wait_for_block() -> bool {
-    let mined_block_number: i32 = BLOCK_CHANNEL.1.recv().map(Result::unwrap).await;
+    let mined_block_number: u32 = BLOCK_CHANNEL.1.recv().map(Result::unwrap).await;
     println!("Miner received block {}", mined_block_number);
 
     true
@@ -65,7 +68,7 @@ async fn wait_for_block_timeout() -> bool {
 }
 
 async fn try_vote_no(
-    block_number: i32,
+    block_number: u32,
     miner: Miner,
     miner_count: usize,
     next_miner: Miner,
@@ -75,7 +78,7 @@ async fn try_vote_no(
     if block_number != next_block.number || miner != next_block.miner {
         false
     } else {
-        let signed_burn_tx: Sign1 = get_signed_burn_tx(miner.address);
+        let signed_burn_tx: Sign1 = get_signed_burn_tx(miner.address, block_number);
         next_block.burn_current_miner(&signed_burn_tx, miner_count, &next_miner);
 
         // TODO: Send burn notice to all other miners
@@ -101,17 +104,13 @@ async fn mine_block() {
     block.seal(transaction_position + 1).await;
 }
 
-fn get_signed_burn_tx(miner_address: PublicKey) -> Sign1 {
-    // let start_mining_transaction = TransactionRequest::new(
-    //     TOKEN_CONTRACT.clone(),
-    //     "start_mining",
-    //     vec![
-    //         HOST.to_string().into(),
-    //         (*BURN_PER_BLOCK).into(),
-    //         bytes_to_value(skin),
-    //     ],
-    // );
-    let mut burn_tx = Sign1::new("derp", my_public_key().to_vec());
+fn get_signed_burn_tx(miner_address: PublicKey, block_number: u32) -> Sign1 {
+    let burn_miner_tx = TransactionRequest::new(
+        TOKEN_CONTRACT.clone(),
+        "burn_winning_miner",
+        vec![bytes_to_value(miner_address.to_vec()), block_number.into()],
+    );
+    let mut burn_tx = Sign1::new(burn_miner_tx, my_public_key().to_vec());
     burn_tx.sign(my_signing_key());
     burn_tx
 }

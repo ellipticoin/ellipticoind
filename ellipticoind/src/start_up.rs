@@ -67,7 +67,7 @@ pub async fn catch_up() {
         }
     }
 
-    *NEXT_BLOCK.write().await = Some(ExpectedBlock::new(next_block as i32, miner));
+    *NEXT_BLOCK.write().await = Some(ExpectedBlock::new(next_block, miner));
 
     println!("Syncing complete");
 }
