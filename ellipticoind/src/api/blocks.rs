@@ -1,6 +1,6 @@
 use crate::api::helpers::{bytes_from_signed_data, bytes_from_signed_iterable};
 use crate::api::types::BlockResult::{NotConsidered, Rejected, Witnessed};
-use crate::api::types::{Bytes, BlockResult};
+use crate::api::types::{BlockResult, Bytes};
 use crate::consensus::MinerBlockDecision::{Accepted, Burned};
 use crate::consensus::{ExpectedBlock, MinerBlockDecision};
 use crate::constants::{BLOCK_BROADCASTER, BLOCK_CHANNEL, NEXT_BLOCK};
@@ -71,9 +71,8 @@ pub async fn process_received_block(
     // TODO: Save witness here
 
     let miner = block.apply(txs).await;
-    BLOCK_CHANNEL.0.send(miner.clone()).await;
-
     next_block.increment(miner);
+    BLOCK_CHANNEL.0.send(next_block.number).await;
 
     Witnessed(bytes_from_signed_data(&witnessed_block))
 }

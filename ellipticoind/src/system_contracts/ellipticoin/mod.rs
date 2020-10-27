@@ -36,6 +36,7 @@ storage_accessors!(
 
 memory_accessors!(
     issuance_rewards(address: Address) -> u64;
+    burn_votes() -> HashSet<PublicKey>;
 );
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Hash)]
@@ -63,7 +64,7 @@ export_native! {
     pub fn unlock_ether<API: ellipticoin::API>(
         api: &mut API,
         unlock_signature: [u8; 32],
-        ellipticoin_address: [u8; 32],
+        ellipticoin_address: PublicKey,
     ) -> Result<Value, Box<Error>> {
         let encoded_ellipticoin_adress =
             base64::encode_config(&ellipticoin_address, base64::URL_SAFE_NO_PAD);
@@ -130,6 +131,37 @@ export_native! {
         Ok(Value::Null)
     }
 
+    pub fn burn_winning_miner<API: ellipticoin::API>(
+        api: &mut API,
+        block_number: u32
+    ) -> Result<bool, Box<Error>> {
+        if block_number != get_block_number(api) {
+            return Err(Box::new(errors::INVALID_BLOCK_NUMBER.clone()))
+        }
+
+        let mut miners = get_miners(api);
+        let caller_pub_key: PublicKey = api.caller().as_public_key().unwrap();
+        if caller_pub_key == miners.get(0).unwrap().address {
+           return Err(Box::new(errors::CANNOT_BURN_YOURSELF.clone()))
+        }
+
+        let mut burn_votes: HashSet<PublicKey> = get_burn_votes(api);
+        burn_votes.insert(caller_pub_key);
+
+        if burn_votes.len() + 1 < miners.len() {
+            set_burn_votes(api, burn_votes);
+            return Ok(false);
+        }
+
+        burn_votes.clear();
+        miners.remove(0);
+
+        set_miners(api, miners);
+        set_burn_votes(api, burn_votes);
+
+        Ok(true)
+    }
+
     pub fn seal<API: ellipticoin::API>(api: &mut API, value: [u8; 32]) -> Result<Vec<Miner>, Box<Error>> {
         let mut miners = get_miners(api);
         if api.caller() != ellipticoin::Address::PublicKey(miners.first().unwrap().address) {
@@ -152,6 +184,9 @@ export_native! {
         issue_block_rewards(api)?;
         increment_block_number(api);
 
+        let mut burn_votes = get_burn_votes(api);
+        burn_votes.clear();
+        set_burn_votes(api, burn_votes);
         Ok(miners)
     }
 
@@ -281,6 +316,7 @@ mod tests {
     };
     use std::env;
 
+    use crate::system_contracts::token::burn;
     use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB, CAROL};
 
     #[test]
@@ -362,6 +398,161 @@ mod tests {
 
         api.caller = Address::PublicKey(*CAROL);
         native::whitelist_miner(&mut api, bob_pub).expect("This should fail");
+    }
+
+    #[test]
+    fn test_burning_miners() {
+        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+        env::set_var("HOST", "localhost");
+        let mut state = TestState::new();
+        let mut api = TestAPI::new(&mut state, *ALICE, "Ellipticoin".to_string());
+
+        credit(&mut api, Address::PublicKey(*ALICE), 5);
+        credit(&mut api, Address::PublicKey(*BOB), 5);
+        credit(&mut api, Address::PublicKey(*CAROL), 5);
+
+        let alices_center = [0; 32];
+        let bobs_center = [1; 32];
+        let carols_center = [2; 32];
+
+        let mut alices_onion = generate_hash_onion(3, alices_center.clone());
+        let mut bobs_onion = generate_hash_onion(3, bobs_center.clone());
+        let mut carols_onion = generate_hash_onion(3, carols_center.clone());
+
+        api.caller = Address::PublicKey(*ALICE);
+        native::start_mining(&mut api, HOST.to_string(), 1, *alices_onion.last().unwrap()).unwrap();
+        api.caller = Address::PublicKey(*BOB);
+        native::start_mining(&mut api, HOST.to_string(), 1, *bobs_onion.last().unwrap()).unwrap();
+        api.caller = Address::PublicKey(*CAROL);
+        native::start_mining(&mut api, HOST.to_string(), 1, *carols_onion.last().unwrap()).unwrap();
+
+        let block_number = get_block_number(&mut api);
+        let burn_votes = get_burn_votes(&mut api);
+        assert!(burn_votes.len() == 0, "Burn votes should start as empty");
+
+        api.caller = Address::PublicKey(*ALICE);
+        match native::burn_winning_miner(&mut api, block_number) {
+            Ok(res) => assert!(false, "Alice should not be able to burn herself!"),
+            Err(err) => assert!(
+                err.code == errors::CANNOT_BURN_YOURSELF.code,
+                format!(
+                    "Alice attempt to burn herself returned unexpected error code: {}!",
+                    err.code
+                )
+            ),
+        }
+        let burn_votes = get_burn_votes(&mut api);
+        assert!(
+            burn_votes.len() == 0,
+            "Burn votes should be empty after Alice fails to burn herself."
+        );
+
+        api.caller = Address::PublicKey(*BOB);
+        match native::burn_winning_miner(&mut api, block_number + 1) {
+            Ok(res) => assert!(false, "Should have returned block number error!"),
+            Err(err) => assert!(err.code == errors::INVALID_BLOCK_NUMBER.code,
+                format!("Expected invalid block number. Got error code {}!", err.code)
+            ),
+        }
+
+        api.caller = Address::PublicKey(*BOB);
+        match native::burn_winning_miner(&mut api, block_number) {
+            Ok(res) => assert!(
+                !res,
+                "Bob's vote should not have burned Alice without Carol's vote!"
+            ),
+            Err(err) => assert!(
+                false,
+                format!("Bob's vote to burn Alice failed with error {}!", err.code)
+            ),
+        }
+
+        let burn_votes = get_burn_votes(&mut api);
+        assert!(
+            burn_votes.len() == 1 && burn_votes.contains(&*BOB),
+            "Bob's vote is not stored in burn votes!"
+        );
+
+        let miners = get_miners(&mut api);
+        assert!(
+            miners.iter().filter(|m| m.address == *ALICE).count() == 1,
+            "Alice should not be burned!"
+        );
+
+        api.caller = Address::PublicKey(*CAROL);
+        match native::burn_winning_miner(&mut api, block_number) {
+            Ok(res) => assert!(res, "Carol's vote should have burned Alice!"),
+            Err(err) => assert!(
+                false,
+                format!("Carol's vote to burn Alice failed with error {}!", err.code)
+            ),
+        }
+
+        let burn_votes = get_burn_votes(&mut api);
+        assert!(
+            burn_votes.len() == 0,
+            "Alice being burned should have reset the votes!"
+        );
+
+        let miners = get_miners(&mut api);
+        assert!(
+            miners.iter().filter(|m| m.address == *ALICE).count() == 0,
+            "Alice was not burned!"
+        );
+    }
+
+    #[test]
+    fn test_sealing_clears_burn_votes() {
+        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+        env::set_var("HOST", "localhost");
+        let mut state = TestState::new();
+        let mut api = TestAPI::new(&mut state, *ALICE, "Ellipticoin".to_string());
+
+        credit(&mut api, Address::PublicKey(*ALICE), 5);
+        credit(&mut api, Address::PublicKey(*BOB), 5);
+        credit(&mut api, Address::PublicKey(*CAROL), 5);
+
+        let alices_center = [0; 32];
+        let bobs_center = [1; 32];
+        let carols_center = [2; 32];
+
+        let mut alices_onion = generate_hash_onion(3, alices_center.clone());
+        let mut bobs_onion = generate_hash_onion(3, bobs_center.clone());
+        let mut carols_onion = generate_hash_onion(3, carols_center.clone());
+
+        api.caller = Address::PublicKey(*ALICE);
+        native::start_mining(&mut api, HOST.to_string(), 1, *alices_onion.last().unwrap()).unwrap();
+        api.caller = Address::PublicKey(*BOB);
+        native::start_mining(&mut api, HOST.to_string(), 1, *bobs_onion.last().unwrap()).unwrap();
+        api.caller = Address::PublicKey(*CAROL);
+        native::start_mining(&mut api, HOST.to_string(), 1, *carols_onion.last().unwrap()).unwrap();
+
+        let block_number = get_block_number(&mut api);
+
+        api.caller = Address::PublicKey(*BOB);
+        match native::burn_winning_miner(&mut api, block_number) {
+            Ok(res) => assert!(
+                !res,
+                "Bob's vote should not have burned Alice without Carol's vote!"
+            ),
+            Err(err) => assert!(
+                false,
+                format!("Bob's vote to burn Alice failed with error {}!", err.code)
+            ),
+        }
+
+        let burn_votes = get_burn_votes(&mut api);
+        assert!(
+            burn_votes.len() == 1 && burn_votes.contains(&*BOB),
+            "Bob's vote is not stored in burn votes!"
+        );
+
+        api.caller = Address::PublicKey(*ALICE);
+        alices_onion.pop();
+        assert!(native::seal(&mut api, *alices_onion.last().unwrap()).is_ok());
+
+        let burn_votes = get_burn_votes(&mut api);
+        assert!(burn_votes.len() == 0, "Burn votes were not reset!");
     }
 
     #[test]

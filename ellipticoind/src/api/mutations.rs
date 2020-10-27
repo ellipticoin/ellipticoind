@@ -1,21 +1,16 @@
 use crate::api::blocks::process_received_block;
 use crate::api::types::GraphQLPostBlockResult;
-use crate::api::types::BlockResult::{NotConsidered, Rejected, Witnessed};
-use crate::consensus::MinerBlockDecision::{Accepted, Burned};
-use crate::consensus::{ExpectedBlock, MinerBlockDecision};
 use crate::{
     api::{
         graphql::{Context, Error},
         helpers::validate_signature,
-        types::{Bytes, BlockResult, Transaction},
+        types::{BlockResult, Bytes, Transaction},
     },
-    constants::{BLOCK_CHANNEL, MINERS, NEXT_BLOCK},
+    constants::MINERS,
     helpers::run_transaction,
     models,
-    system_contracts::ellipticoin::Miner,
 };
-use ellipticoin::{BurnProofs, PublicKey, WitnessedMinerBlock};
-use serde_cose::Sign1;
+use ellipticoin::PublicKey;
 
 pub struct Mutations;
 

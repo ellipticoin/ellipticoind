@@ -18,23 +18,14 @@ lazy_static! {
         Receiver<(TransactionRequest, oneshot::Sender<Transaction>)>
     ) = channel(*TRANSACTION_QUEUE_SIZE);
     // TODO: Change the type of block channel
-    pub static ref BLOCK_CHANNEL: (Sender<Miner>, Receiver<Miner>) = channel(1);
+    pub static ref BLOCK_CHANNEL: (Sender<i32>, Receiver<i32>) = channel(0);
     pub static ref NEXT_BLOCK: Arc<RwLock<Option<ExpectedBlock>>> = Arc::new(RwLock::new(None));
     pub static ref MINERS: Arc<Mutex<Option<Vec<Miner>>>> = Arc::new(Mutex::new(None));
-    pub static ref SYNCING: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
     pub static ref BLOCK_BROADCASTER: BroadcastChannel<u32> = BroadcastChannel::new();
 }
 
 pub async fn set_miners(miners: Vec<Miner>) {
     *MINERS.lock().await = Some(miners.clone());
-    BLOCK_CHANNEL
-        .0
-        .send(miners.first().clone().unwrap().clone())
-        .await;
-}
-
-pub async fn get_my_miner() -> Miner {
-    MINERS.me().await
 }
 
 impl MINERS {

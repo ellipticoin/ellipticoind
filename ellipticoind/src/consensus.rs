@@ -5,7 +5,6 @@ use serde_cose::Sign1;
 use std::collections::HashMap;
 
 use crate::constants::MINERS;
-use std::convert::TryFrom;
 
 #[derive(Clone, Debug)]
 pub enum MinerBlockDecision {

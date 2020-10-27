@@ -127,11 +127,12 @@ pub async fn dump_state(block_number: Option<u32>) {
 pub async fn main() {
     start_up::reset_state().await;
 
-    spawn(miner::run());
-
     if !*GENESIS_NODE {
         start_up::catch_up().await;
     }
+
+    spawn(miner::run());
+
     let api = api::API::new();
     spawn(
         api.app

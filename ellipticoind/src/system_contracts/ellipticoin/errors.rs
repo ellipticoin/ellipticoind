@@ -26,7 +26,15 @@ lazy_static! {
         message: "Only a total of 1000000 ELC can be unlocked in Phase I".to_string(),
     };
     pub static ref MINER_IS_NOT_WHITELISTED: Error = Error {
-        code: 6,
-        message: "Only a total of 1000000 ELC can be unlocked in Phase I".to_string(),
+        code: 7,
+        message: "Miner is not whitelisted".to_string(),
+    };
+    pub static ref INVALID_BLOCK_NUMBER: Error = Error {
+        code: 8,
+        message: "Invalid block number block".to_string()
+    };
+    pub static ref CANNOT_BURN_YOURSELF: Error = Error {
+        code: 9,
+        message: "Careful, you could burn yourself with that".to_string()
     };
 }

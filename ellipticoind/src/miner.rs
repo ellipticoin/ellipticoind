@@ -10,24 +10,12 @@ use crate::{
     system_contracts::ellipticoin::Miner,
 };
 use async_std::{future::timeout, task::sleep};
+use ellipticoin::PublicKey;
 use futures::future::{select_all, FutureExt};
 use serde_cose::Sign1;
-use std::process;
 use std::time::Duration;
 
 pub async fn run() {
-    // TODO: Swap out for a channel in separate function
-    for attempt in 1i32..7i32 {
-        if let Some(_) = *NEXT_BLOCK.read().await {
-            break;
-        }
-        sleep(Duration::from_secs(1)).await;
-        if attempt > 5 {
-            eprintln!("Error starting. Sync did not start!");
-            process::exit(1);
-        }
-    }
-
     loop {
         let number: i32;
         let miner: Miner;
@@ -60,7 +48,8 @@ pub async fn run() {
 }
 
 async fn wait_for_block() -> bool {
-    BLOCK_CHANNEL.1.recv().map(Result::unwrap);
+    let mined_block_number: i32 = BLOCK_CHANNEL.1.recv().map(Result::unwrap).await;
+    println!("Miner received block {}", mined_block_number);
 
     true
 }
@@ -86,7 +75,7 @@ async fn try_vote_no(
     if block_number != next_block.number || miner != next_block.miner {
         false
     } else {
-        let signed_burn_tx: Sign1 = get_signed_burn_tx(&miner);
+        let signed_burn_tx: Sign1 = get_signed_burn_tx(miner.address);
         next_block.burn_current_miner(&signed_burn_tx, miner_count, &next_miner);
 
         // TODO: Send burn notice to all other miners
@@ -112,7 +101,7 @@ async fn mine_block() {
     block.seal(transaction_position + 1).await;
 }
 
-fn get_signed_burn_tx(miner: &Miner) -> Sign1 {
+fn get_signed_burn_tx(miner_address: PublicKey) -> Sign1 {
     // TODO: actually get burn tx.
     let mut burn_tx = Sign1::new("derp", my_public_key().to_vec());
     burn_tx.sign(my_signing_key());
