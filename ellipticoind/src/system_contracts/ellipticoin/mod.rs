@@ -451,15 +451,23 @@ mod tests {
         api.caller = Address::PublicKey(*BOB);
         match native::burn_winning_miner(&mut api, *ALICE, block_number + 1) {
             Ok(res) => assert!(false, "Should have returned block number error!"),
-            Err(err) => assert!(err.code == errors::INVALID_BLOCK_NUMBER.code,
-                format!("Expected invalid block number. Got error code {}!", err.code)
+            Err(err) => assert!(
+                err.code == errors::INVALID_BLOCK_NUMBER.code,
+                format!(
+                    "Expected invalid block number. Got error code {}!",
+                    err.code
+                )
             ),
         }
 
         match native::burn_winning_miner(&mut api, *CAROL, block_number) {
             Ok(res) => assert!(false, "Should have returned invalid miner to burn error!"),
-            Err(err) => assert!(err.code == errors::INVALID_MINER_TO_BURN.code,
-                                format!("Expected invalid miner to burn error. Got error code {}!", err.code)
+            Err(err) => assert!(
+                err.code == errors::INVALID_MINER_TO_BURN.code,
+                format!(
+                    "Expected invalid miner to burn error. Got error code {}!",
+                    err.code
+                )
             ),
         }
 

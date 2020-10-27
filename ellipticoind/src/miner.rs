@@ -102,7 +102,15 @@ async fn mine_block() {
 }
 
 fn get_signed_burn_tx(miner_address: PublicKey) -> Sign1 {
-    // TODO: actually get burn tx.
+    // let start_mining_transaction = TransactionRequest::new(
+    //     TOKEN_CONTRACT.clone(),
+    //     "start_mining",
+    //     vec![
+    //         HOST.to_string().into(),
+    //         (*BURN_PER_BLOCK).into(),
+    //         bytes_to_value(skin),
+    //     ],
+    // );
     let mut burn_tx = Sign1::new("derp", my_public_key().to_vec());
     burn_tx.sign(my_signing_key());
     burn_tx
