@@ -9,31 +9,31 @@ Building from source and running a miner:
 1. Install rust
 
 ```
-$ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-$ source $HOME/.cargo/env
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
 ```
 
 2. Clone the repo
 
 ```
-$ git clone https://github.com/ellipticoin/ellipticoind.git
-$ cd ellipticoind
+git clone https://github.com/ellipticoin/ellipticoind.git
+cd ellipticoind
 ```
 
 
 3. Install the required dependencies
 
 ```
-$ sudo apt-get update && sudo apt-get install certbot nginx build-essential libpq-dev pkg-config libssl-dev postgresql postgresql-contrib redis-server llvm clang redis git-lfs
+sudo apt-get update && sudo apt-get install certbot nginx build-essential libpq-dev pkg-config libssl-dev postgresql postgresql-contrib redis-server llvm clang redis git-lfs
 ```
 4. Build  ellipticoind
 ```
-$ cd ellipticoind
-$ C_INCLUDE_PATH=/usr/lib/gcc/x86_64-linux-gnu/7/include cargo build --release
+cd ellipticoind
+C_INCLUDE_PATH=/usr/lib/gcc/x86_64-linux-gnu/7/include cargo build --release
 ```
 5. Generate a key pair:
 ```
-$ ./target/release/ellipticoind generate-keypair
+./target/release/ellipticoind generate-keypair
 Public Key (Address): cwZitLN90FXTaOovm0ygsGNJ+nDJgFXg0Angzz7Lsbw=
 Private Key: gNCgX1Jfs3gXHDEvd7ano6bflJR0oNscgBI1O4JEN2N06SFQL1isJysk3/ix35gkwG7MztBrGv2iO/q2Th7SnQ==
 ```
@@ -41,7 +41,7 @@ Private Key: gNCgX1Jfs3gXHDEvd7ano6bflJR0oNscgBI1O4JEN2N06SFQL1isJysk3/ix35gkwG7
 6. Copy the sample `.env` file and add your private key
 
 ```
-$ cp .env.sample .env
+cp .env.sample .env
 ```
 
 ```
@@ -55,38 +55,45 @@ BURN_PER_BLOCK=100
 7. Create the postgres user and database
 
 ```
-$ cd /
-$ su postgres -c"createuser root"
-$ su postgres -c"createdb ellipticoind"
-$ cd /root/ellipticoind 
+cd /
+su postgres -c"createuser root"
+su postgres -c"createdb ellipticoind"
+cd /root/ellipticoind 
 ```
 
 8. Pull down the Ethereum Balances file from GitHub
 ```
-$ git lfs install
-$ git lfs pull
+git lfs install
+git lfs pull
 ```
-9. Run [certbot](https://certbot.eff.org/)
+9 Install snapd, [certbot](https://certbot.eff.org/), and nginx
 ```
-$ certbot --nginx -d yourhost.yourdomain.com
+sudo apt install nginx
+sudo apt install snapd
+sudo snap install core; sudo snap refresh core
+sudo snap install --classic certbot
+sudo ln -s /snap/bin/certbot /usr/bin/certbot
 ```
-10. Comment out the following lines of  `/etc/nginx/sites-enabled/default`
+10. Run certbot
 ```
-#server {
-#    if ($host = fritz.ellipticoin.org) {
-#        return 301 https://$host$request_uri;
-#    } # managed by Certbot
+certbot --nginx -d yourhost.yourdomain.com
+```
+11. Update your nginx config
+```
+cat > /etc/nginx/sites-enabled/default
+```
+11.b. Paste the following text and then press `ctrl + D`:
+```
+upstream upstream {
+  server 127.0.0.1:80;
+}
 
+server {
 
-#       listen 80 ;
-#       listen [::]:80 ;
-#    server_name fritz.ellipticoin.org;
-#    return 404; # managed by Certbot
+        root /var/www/html;
 
-
-#}
-```
-11. Find the `location` directive under the "SSL configuration" section of `/etc/nginx/sites-enabled/default` and add the following: 
+        index index.html index.htm index.nginx-debian.html;
+        server_name chicago.bitcoin.dance; # managed by Certbot
 
         location / {
                 proxy_pass http://upstream;
@@ -96,10 +103,18 @@ $ certbot --nginx -d yourhost.yourdomain.com
                 proxy_set_header Connection '';
                 proxy_http_version 1.1;
                 chunked_transfer_encoding off;
-                # First attempt to serve request as file, then
-                # as directory, then fall back to displaying a 404.
                 try_files $uri $uri/ =404;
         }
+
+    listen [::]:443 ssl ipv6only=on; # managed by Certbot
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/chicago.bitcoin.dance/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/chicago.bitcoin.dance/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+}
+```
 
 12. Run  ellipticoind (replace yourhost.yourdomain.com with your domain)
 
