@@ -1,17 +1,17 @@
 use crate::api::blocks::process_received_block;
-use crate::api::types::GraphQLPostBlockResult;
+use crate::api::types::block::*;
+use crate::api::types::misc::*;
+use crate::api::types::transaction::*;
 use crate::{
     api::{
         graphql::{Context, Error},
         helpers::validate_signature,
-        types::{BlockResult, Bytes, Transaction},
     },
     constants::MINERS,
     helpers::run_transaction,
     models,
 };
 use ellipticoin::PublicKey;
-use crate::api::types::*;
 
 pub struct Mutations;
 

@@ -1,5 +1,5 @@
 use crate::api::graphql::Error;
-use crate::api::types::Bytes;
+use crate::api::types::misc::Bytes;
 use ed25519_zebra::VerificationKey;
 use ellipticoin::PublicKey;
 use serde::de::DeserializeOwned;

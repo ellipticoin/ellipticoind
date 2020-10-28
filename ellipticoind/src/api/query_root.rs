@@ -1,3 +1,4 @@
+use crate::api::types::{block::*, misc::*, token::*, transaction::*};
 use crate::system_contracts::ellipticoin::get_issuance_rewards;
 use crate::{
     api::{graphql::Context, types::*},
@@ -15,7 +16,11 @@ pub struct QueryRoot;
     Context = Context,
 )]
 impl QueryRoot {
-    async fn tokens(context: &Context, token_ids: Vec<TokenId>, address: Bytes) -> Vec<Token> {
+    async fn tokens(
+        context: &Context,
+        token_ids: Vec<TokenId>,
+        address: misc::Bytes,
+    ) -> Vec<Token> {
         let mut api = ReadOnlyAPI::new(context.rocksdb.clone(), context.redis_pool.get().unwrap());
         token_ids
             .iter()

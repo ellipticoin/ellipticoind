@@ -14,12 +14,8 @@ use crate::{
 };
 use async_std::{
     future::timeout,
+    sync::{channel, Receiver, Sender},
     task::sleep,
-    sync::{
-        channel,
-        Sender,
-        Receiver,
-    },
 };
 use ellipticoin::PublicKey;
 use futures::future::{select_all, FutureExt};
@@ -57,26 +53,23 @@ pub async fn run() {
         }
         cancel_sender.send(true).await;
         next_miner_index += 1;
-
-
-
     }
 }
 
 async fn wait_for_block(cancel_channel: Receiver<bool>) -> bool {
     loop {
-       match BLOCK_CHANNEL.1.try_recv() {
-           Ok(mined_block_number) => {
-               println!("Miner received block {}", mined_block_number);
-               return true
-           }
-           Err(x) => {
-               if cancel_channel.try_recv().is_ok() {
-                   return false
-               }
-               sleep(Duration::from_millis(10)).await;
-           }
-       }
+        match BLOCK_CHANNEL.1.try_recv() {
+            Ok(mined_block_number) => {
+                println!("Miner received block {}", mined_block_number);
+                return true;
+            }
+            Err(x) => {
+                if cancel_channel.try_recv().is_ok() {
+                    return false;
+                }
+                sleep(Duration::from_millis(10)).await;
+            }
+        }
     }
     true
 }

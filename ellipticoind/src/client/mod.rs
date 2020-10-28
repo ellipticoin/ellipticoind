@@ -1,8 +1,8 @@
 mod helpers;
 use crate::{models, models::transaction::Transaction, transaction::TransactionRequest};
+use ellipticoin::{BurnProofs, BurnTransaction, PublicKey};
 use graphql_client::*;
 use helpers::{base64_encode, sign};
-use ellipticoin::{BurnProofs, BurnTransaction, PublicKey};
 // use crate::client::post_burn_proof;
 
 type Bytes = String;

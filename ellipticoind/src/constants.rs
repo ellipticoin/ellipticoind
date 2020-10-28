@@ -36,7 +36,7 @@ impl MINERS {
     pub async fn miner_at_index(&self, num: usize) -> Option<Miner> {
         match self.lock().await.as_ref().unwrap().get(num) {
             None => None,
-            Some(miner) => Some(miner.clone())
+            Some(miner) => Some(miner.clone()),
         }
     }
 

@@ -1,6 +1,7 @@
 use crate::api::helpers::{bytes_from_signed_data, bytes_from_signed_iterable};
-use crate::api::types::BlockResult::{NotConsidered, Rejected, Witnessed};
-use crate::api::types::{BlockResult, Bytes};
+use crate::api::types::block::BlockResult;
+use crate::api::types::block::BlockResult::{NotConsidered, Rejected, Witnessed};
+use crate::api::types::misc::Bytes;
 use crate::consensus::MinerBlockDecision::{Accepted, Burned};
 use crate::consensus::{ExpectedBlock, MinerBlockDecision};
 use crate::constants::{BLOCK_BROADCASTER, BLOCK_CHANNEL, NEXT_BLOCK};
