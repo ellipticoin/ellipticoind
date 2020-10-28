@@ -5,7 +5,7 @@ use crate::{
         get_pg_connection, get_redis_connection, get_rocksdb, socket, SubCommand, ENABLE_MINER,
         GENESIS_NODE, OPTS,
     },
-    constants::TOKEN_CONTRACT,
+    constants::{NEW_BLOCK_CHANNEL, STATE, TOKEN_CONTRACT},
     diesel::{BelongingToDsl, ExpressionMethods, GroupedBy, QueryDsl, RunQueryDsl},
     miner,
     models::{Block, Transaction},
@@ -128,6 +128,8 @@ pub async fn main() {
     if !*GENESIS_NODE {
         start_up::catch_up().await;
     }
+    let state = { STATE.lock().await.clone() };
+    NEW_BLOCK_CHANNEL.0.send(state.clone()).await;
     let api = api::API::new();
     spawn(
         api.app

@@ -67,7 +67,7 @@ export_native! {
         Ok(())
     }
 
-    pub fn swap<API: ellipticoin::API>(
+    pub fn exchange<API: ellipticoin::API>(
         api: &mut API,
         input_token: Token,
         output_token: Token,
@@ -257,7 +257,7 @@ mod tests {
     }
 
     #[test]
-    fn test_swap() {
+    fn test_exchange() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
         let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
@@ -288,7 +288,7 @@ mod tests {
             ellipticoin::Address::PublicKey(*BOB),
             100 * BASE_FACTOR,
         );
-        native::swap(&mut api, APPLES.clone(), BANANAS.clone(), 100 * BASE_FACTOR).unwrap();
+        native::exchange(&mut api, APPLES.clone(), BANANAS.clone(), 100 * BASE_FACTOR).unwrap();
         assert_eq!(
             token::get_balance(
                 &mut api,
@@ -300,7 +300,7 @@ mod tests {
     }
 
     #[test]
-    fn test_swap_base_token() {
+    fn test_exchange_base_token() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
         let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
@@ -318,13 +318,18 @@ mod tests {
         );
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
         api.caller = Address::PublicKey(BOB.clone());
+        credit_base_token_reserves(
+            &mut api,
+            BASE_TOKEN.clone(),
+            100 * BASE_FACTOR,
+        );
         token::set_balance(
             &mut api,
             BASE_TOKEN.clone().into(),
             ellipticoin::Address::PublicKey(*BOB),
             100 * BASE_FACTOR,
         );
-        native::swap(
+        native::exchange(
             &mut api,
             BASE_TOKEN.clone(),
             APPLES.clone(),
@@ -342,7 +347,7 @@ mod tests {
     }
 
     #[test]
-    fn test_swap_for_base_token() {
+    fn test_exchange_for_base_token() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
         let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
@@ -366,7 +371,7 @@ mod tests {
             ellipticoin::Address::PublicKey(*BOB),
             100 * BASE_FACTOR,
         );
-        native::swap(
+        native::exchange(
             &mut api,
             APPLES.clone(),
             BASE_TOKEN.clone(),
@@ -421,7 +426,7 @@ mod tests {
             ellipticoin::Address::PublicKey(*BOB),
             100 * BASE_FACTOR,
         );
-        native::swap(&mut api, BANANAS.clone(), APPLES.clone(), 100 * BASE_FACTOR).unwrap();
+        native::exchange(&mut api, BANANAS.clone(), APPLES.clone(), 100 * BASE_FACTOR).unwrap();
         api.caller = Address::PublicKey(ALICE.clone());
         native::remove_liqidity(&mut api, APPLES.clone(), 100 * BASE_FACTOR).unwrap();
         assert_eq!(
@@ -461,7 +466,7 @@ mod tests {
         );
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
         api.caller = Address::PublicKey(ALICE.clone());
-        native::swap(
+        native::exchange(
             &mut api,
             APPLES.clone(),
             BASE_TOKEN.clone(),

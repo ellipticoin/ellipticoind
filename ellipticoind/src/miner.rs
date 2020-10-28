@@ -1,35 +1,55 @@
+use crate::constants::STATE;
+use crate::system_contracts::ellipticoin::State;
 use crate::{
     config::verification_key,
-    constants::{BLOCK_TIME, CURRENT_MINER_CHANNEL, TRANSACTION_QUEUE},
+    constants::{BLOCK_TIME, NEW_BLOCK_CHANNEL, TRANSACTION_QUEUE},
     helpers::run_for,
     models::{Block, Transaction},
-    slasher::slash_winner,
 };
+use async_std::future::TimeoutError;
 use async_std::{future::timeout, task::sleep};
 use futures::future::FutureExt;
 use std::time::Duration;
 
 pub async fn run() {
     loop {
-        if let Ok(current_miner) = timeout(
+        match timeout(
             *BLOCK_TIME + Duration::from_secs(2),
-            CURRENT_MINER_CHANNEL.1.recv().map(Result::unwrap),
+            NEW_BLOCK_CHANNEL.1.recv().map(Result::unwrap),
         )
         .await
         {
-            if current_miner.address == verification_key() {
-                mine_block().await
-            } else {
-                sleep(*BLOCK_TIME).await;
-            }
-        } else {
-            slash_winner().await
+            Ok(state) => mine_if_winner(state).await,
+            Err(TimeoutError { .. }) => wait_for_peer().await,
         }
     }
 }
 
-async fn mine_block() {
-    let block = Block::insert();
+async fn wait_for_peer() {
+    let current_miner = STATE.current_miner().await;
+    println!(
+        "Waiting for peer: {} ({})",
+        current_miner.host,
+        base64::encode(&current_miner.address)
+    );
+    let state = NEW_BLOCK_CHANNEL.1.recv().map(Result::unwrap).await;
+    mine_if_winner(state).await
+}
+
+async fn mine_if_winner(state: State) {
+    if state
+        .miners
+        .first()
+        .map(|miner| miner.address == verification_key())
+        .unwrap_or(false)
+    {
+        mine_block(state.block_number).await
+    } else {
+        sleep(*BLOCK_TIME).await;
+    }
+}
+async fn mine_block(block_number: u32) {
+    let block = Block::insert(block_number);
     println!("Won block #{}", &block.number);
     let mut transaction_position = 0;
     run_for(*BLOCK_TIME, async {
