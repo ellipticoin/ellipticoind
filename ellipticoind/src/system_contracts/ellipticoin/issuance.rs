@@ -41,6 +41,6 @@ mod tests {
             0
         );
         assert_eq!(total_issuance, 20400000 * BASE_FACTOR);
-        assert_eq!(total_time.as_secs() / SECONDS_IN_A_YEAR, 8);
+        assert_eq!(total_time.as_secs() / SECONDS_IN_A_YEAR, 6);
     }
 }

@@ -1,10 +1,11 @@
+use crate::diesel::RunQueryDsl;
 use crate::{
     client::get_block,
     config::{
         ethereum_balances_path, get_pg_connection, get_redis_connection, get_rocksdb,
-        BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
+        verification_key, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
     },
-    constants::TOKEN_CONTRACT,
+    constants::{STATE, TOKEN_CONTRACT},
     helpers::{bytes_to_value, run_transaction},
     models,
     models::{Block, HashOnion},
@@ -12,7 +13,7 @@ use crate::{
     system_contracts,
     transaction::TransactionRequest,
 };
-use diesel_migrations::revert_latest_migration;
+use diesel::sql_query;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -26,6 +27,9 @@ pub struct VMState {
 }
 
 pub async fn start_miner() {
+    if STATE.is_mining().await {
+        return;
+    }
     let pg_db = get_pg_connection();
     let skin = HashOnion::peel(&pg_db);
     let start_mining_transaction = TransactionRequest::new(
@@ -38,10 +42,9 @@ pub async fn start_miner() {
         ],
     );
     if *GENESIS_NODE {
-        let block = Block::insert();
+        let block = Block::insert(0);
         models::Transaction::run(&block, start_mining_transaction, 0).await;
-
-        println!("Won block #1");
+        println!("Won block #0");
         block.seal(1).await;
     } else {
         run_transaction(start_mining_transaction).await;
@@ -49,17 +52,26 @@ pub async fn start_miner() {
 }
 
 pub async fn catch_up() {
-    for block_number in 1.. {
+    let pg_db = get_pg_connection();
+    let mut won_blocks = 0;
+    for block_number in 0.. {
         if let Ok((block, transactions)) = get_block(block_number).await {
             if !block.sealed {
                 break;
             }
 
-            block.apply(transactions).await;
+            let state = block.apply(transactions).await;
+            if state.miners.first().unwrap().address == verification_key() {
+                won_blocks += 1;
+            }
         } else {
             break;
         }
     }
+    if won_blocks > 0 {
+        HashOnion::skip(&pg_db, won_blocks);
+    }
+
     println!("Syncing complete");
 }
 
@@ -71,6 +83,7 @@ pub async fn reset_state() {
     // import_ethereum_balances().await;
     load_genesis_state().await;
     HashOnion::generate(&pg_db);
+    HashOnion::skip_to_current(&pg_db).await;
 }
 
 pub async fn load_genesis_state() {
@@ -101,10 +114,11 @@ pub async fn reset_redis() {
 async fn reset_pg() {
     let pg_db = get_pg_connection();
     diesel_migrations::embed_migrations!();
-    for _ in 0..4 {
-        let _ = revert_latest_migration(&pg_db);
-    }
     embedded_migrations::run(&pg_db).unwrap();
+    sql_query("TRUNCATE blocks CASCADE")
+        .execute(&pg_db)
+        .unwrap();
+    sql_query("TRUNCATE hash_onion").execute(&pg_db).unwrap();
 }
 
 pub async fn reset_rocksdb() {

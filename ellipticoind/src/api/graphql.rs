@@ -63,8 +63,8 @@ pub async fn handle_graphql(mut request: Request<()>) -> tide::Result {
         &ctx,
     )
     .await
-    .unwrap();
-    // .map_err(|e| http::Error::from_str(StatusCode::BadRequest, e.to_string()))?;
+    .map_err(|e| http::Error::from_str(StatusCode::BadRequest, e.to_string()))?;
+    // .unwrap();
 
     Ok(Response::builder(StatusCode::Ok)
         .body(Body::from_json(&json!({

@@ -23,7 +23,6 @@ mod miner;
 pub mod models;
 mod pg;
 mod schema;
-pub mod slasher;
 mod start_up;
 mod state;
 pub mod sub_commands;

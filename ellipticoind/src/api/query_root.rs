@@ -71,9 +71,11 @@ impl QueryRoot {
                 let liquidity_token = exchange::liquidity_token(token.clone());
                 let balance =
                     token::get_balance(&mut api, liquidity_token.clone(), address.0.clone().into());
+                let price = exchange::get_price(&mut api, token.clone()).unwrap_or(0);
                 let share_of_pool =
-                    exchange::share_of_pool(&mut api, token.clone(), address.0.clone().into());
-                let price = exchange::get_price(&mut api, token).unwrap_or(0);
+                    exchange::share_of_pool(&mut api, token, address.0.clone().into());
+                let total_supply =
+                    token::get_total_supply(&mut api, liquidity_token.clone());
 
                 LiquidityToken {
                     issuer,
@@ -82,6 +84,7 @@ impl QueryRoot {
                     price: U64(price),
 
                     share_of_pool: U32(share_of_pool),
+                    total_supply: U64(total_supply),
                 }
             })
             .collect()
