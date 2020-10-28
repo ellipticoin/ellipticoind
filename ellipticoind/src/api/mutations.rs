@@ -11,6 +11,7 @@ use crate::{
     models,
 };
 use ellipticoin::PublicKey;
+use crate::api::types::*;
 
 pub struct Mutations;
 

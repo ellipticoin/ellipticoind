@@ -2,6 +2,8 @@ mod helpers;
 use crate::{models, models::transaction::Transaction, transaction::TransactionRequest};
 use graphql_client::*;
 use helpers::{base64_encode, sign};
+use ellipticoin::{BurnProofs, BurnTransaction, PublicKey};
+// use crate::client::post_burn_proof;
 
 type Bytes = String;
 type U32 = String;
@@ -29,6 +31,7 @@ pub async fn post_block(
         .body(http_types::Body::from_json(&request_body).unwrap())
         .await;
 }
+
 #[derive(GraphQLQuery)]
 #[graphql(
     schema_path = "dist/schema.graphql",
@@ -92,6 +95,34 @@ pub async fn get_block(block_number: u32) -> Result<(models::block::Block, Vec<T
     // Err(())
     Ok(block_response.into())
 }
+
+// #[derive(GraphQLQuery)]
+// #[graphql(
+//     schema_path = "dist/schema.graphql",
+//     query_path = "dist/post_burn_proof.graphql",
+//     response_derives = "Debug",
+//     normalization = "rust"
+// )]
+// struct BurnProof;
+//
+// pub async fn post_burn_proof(
+//     peer: impl AsRef<str>,
+//     miner_to_burn: PublicKey,
+//     burn_proof: &Vec<BurnTransaction>,
+// ) {
+//     let signed_burn_proof = sign(burn_proof).await;
+//     let request_body = PostBurnProof::build_query(post_burn_proof::Variables {
+//         proof: base64_encode(signed_burn_proof),
+//     });
+//
+//     /******* TODO: KEEP DEFINING ENDPOINTS & MODELS NECESSARY FOR BURN LOGIC (start with PostBurnProofResponse)   ********/
+//
+//     let res: PostBurnProofResponse = surf::post(peer)
+//         .body(http_types::Body::from_json(&request_body).unwrap())
+//         .recv_json()
+//         .await;
+// }
+
 impl From<Response<block::ResponseData>> for models::block::Block {
     fn from(block: Response<block::ResponseData>) -> Self {
         Self {

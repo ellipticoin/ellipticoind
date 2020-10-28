@@ -80,7 +80,7 @@ impl ExpectedBlock {
         miner_count: usize,
         next_miner: &Miner,
     ) -> bool {
-        let count: usize;
+        let burn_count: usize;
         let burner_address: PublicKey = match Address::from(signed_burn_tx.kid()) {
             Address::PublicKey(pub_key) => pub_key,
             // TODO: Handle errors
@@ -90,18 +90,18 @@ impl ExpectedBlock {
         match self.burned_miners.get_mut::<PublicKey>(&self.miner.address) {
             Some(map) => {
                 map.insert(burner_address, signed_burn_tx.clone());
-                count = map.len();
+                burn_count = map.len();
             }
             None => {
                 let mut inner = HashMap::new();
                 inner.insert(self.miner.address.clone(), signed_burn_tx.clone());
                 self.burned_miners.insert(burner_address.clone(), inner);
-                count = 1;
+                burn_count = 1;
             }
         }
 
         // TODO: Eventually change from 100% to 51%
-        if count + 1 < miner_count {
+        if burn_count + 1 >= miner_count {
             self.miner = next_miner.clone();
             true
         } else {

@@ -12,7 +12,15 @@ use crate::{
     slasher::slash_winner,
     system_contracts::ellipticoin::Miner,
 };
-use async_std::{future::timeout, task::sleep};
+use async_std::{
+    future::timeout,
+    task::sleep,
+    sync::{
+        channel,
+        Sender,
+        Receiver,
+    },
+};
 use ellipticoin::PublicKey;
 use futures::future::{select_all, FutureExt};
 use serde_cose::Sign1;
@@ -20,6 +28,7 @@ use std::time::Duration;
 
 pub async fn run() {
     loop {
+        let mut next_miner_index: usize = 1;
         let number: u32;
         let miner: Miner;
         {
@@ -28,8 +37,9 @@ pub async fn run() {
             miner = next.miner.clone();
         }
 
+        let (cancel_sender, cancel_receiver): (Sender<bool>, Receiver<bool>) = channel(1);
         let (received_block, _, _) = select_all(vec![
-            wait_for_block().boxed(),
+            wait_for_block(cancel_receiver).boxed(),
             wait_for_block_timeout().boxed(),
         ])
         .await;
@@ -39,21 +49,35 @@ pub async fn run() {
                 number,
                 miner.clone(),
                 MINERS.count().await,
-                MINERS.second().await,
+                MINERS.miner_at_index(next_miner_index).await.unwrap(),
             )
             .await
         {
             continue;
         }
+        cancel_sender.send(true).await;
+        next_miner_index += 1;
 
-        // TODO: Wait for everybody to burn this guy or vote for it.
+
+
     }
 }
 
-async fn wait_for_block() -> bool {
-    let mined_block_number: u32 = BLOCK_CHANNEL.1.recv().map(Result::unwrap).await;
-    println!("Miner received block {}", mined_block_number);
-
+async fn wait_for_block(cancel_channel: Receiver<bool>) -> bool {
+    loop {
+       match BLOCK_CHANNEL.1.try_recv() {
+           Ok(mined_block_number) => {
+               println!("Miner received block {}", mined_block_number);
+               return true
+           }
+           Err(x) => {
+               if cancel_channel.try_recv().is_ok() {
+                   return false
+               }
+               sleep(Duration::from_millis(10)).await;
+           }
+       }
+    }
     true
 }
 
