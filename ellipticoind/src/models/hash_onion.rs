@@ -1,4 +1,6 @@
+use crate::constants::STATE;
 use crate::{
+    config::verification_key,
     diesel::{QueryDsl, RunQueryDsl},
     helpers::sha256,
     schema::{hash_onion, hash_onion::dsl::*},
@@ -11,7 +13,6 @@ use diesel::{
 };
 pub use diesel_migrations::revert_latest_migration;
 use indicatif::ProgressBar;
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::env;
 
@@ -49,15 +50,34 @@ impl HashOnion {
         skin
     }
 
+    pub fn skip(pg_db: &PooledConnection<ConnectionManager<PgConnection>>, number: usize) {
+        sql_query(format!(
+            "delete from hash_onion where id in (
+        select id from hash_onion order by id desc limit {}
+    )",
+            number
+        ))
+        .execute(pg_db)
+        .unwrap();
+    }
+
+    pub async fn skip_to_current(pg_db: &PooledConnection<ConnectionManager<PgConnection>>) {
+        if let Some(skin) = STATE.current_onion_skin().await {
+            sql_query(format!(
+                "delete from hash_onion where id in (
+            select id where id >= ((select id from hash_onion where layer=decode('{}', 'base64') limit 1)))",
+            base64::encode(skin.to_vec())))
+            .execute(pg_db)
+            .unwrap();
+        }
+    }
+
     pub fn generate(db: &PooledConnection<ConnectionManager<PgConnection>>) {
         let hash_onion_size = env::var(&"HASH_ONION_SIZE")
             .map(|hash_onion_size| hash_onion_size.parse().unwrap())
             .unwrap_or(31 * 24 * 60 * 60);
         let sql_query_size = 65534;
-        let mut center: Vec<u8> = rand::thread_rng()
-            .sample_iter(&rand::distributions::Standard)
-            .take(32)
-            .collect();
+        let mut center: Vec<u8> = verification_key().to_vec();
         println!("Generating Hash Onion");
         let pb = ProgressBar::new(hash_onion_size);
         pb.set_style(

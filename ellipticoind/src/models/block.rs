@@ -1,6 +1,6 @@
 use crate::{
     block_broadcaster::broadcast_block,
-    constants::{set_miners, MINERS, WEB_SOCKET_BROADCASTER},
+    constants::{NEW_BLOCK_CHANNEL, STATE, WEB_SOCKET_BROADCASTER},
 };
 pub use crate::{
     config::{get_pg_connection, verification_key},
@@ -10,13 +10,10 @@ pub use crate::{
     models::{self, HashOnion, Transaction},
     schema::{blocks, blocks::dsl, transactions},
     state::State,
-    system_contracts::ellipticoin::Miner,
+    system_contracts::ellipticoin::{self, Miner},
     transaction,
 };
-use diesel::{
-    dsl::{insert_into, max},
-    sql_query,
-};
+use diesel::dsl::{insert_into, max};
 use serde::{Deserialize, Serialize};
 
 #[derive(Queryable, Identifiable, Insertable, Clone, Debug, Serialize, Deserialize)]
@@ -58,21 +55,11 @@ impl Block {
         block
     }
 
-    pub async fn increment_block_number(number: i32) {
-        sql_query(format!(
-            "SELECT setval('blocks_number_seq', {}, true)",
-            number
-        ))
-        .execute(&get_pg_connection())
-        .unwrap();
-    }
-    pub async fn apply(self, transactions: Vec<models::Transaction>) -> Miner {
-        let number = insert_into(dsl::blocks)
+    pub async fn apply(self, transactions: Vec<models::Transaction>) -> ellipticoin::State {
+        insert_into(dsl::blocks)
             .values(&self)
-            .returning(blocks::dsl::number)
-            .get_result::<i32>(&get_pg_connection())
+            .execute(&get_pg_connection())
             .unwrap();
-        Block::increment_block_number(number as i32).await;
         let mut completed_transactions: Vec<Transaction> = vec![];
         for transaction in transactions {
             completed_transactions.push(
@@ -84,32 +71,33 @@ impl Block {
                 .await,
             );
         }
-        let miners = serde_cbor::from_slice::<Result<Vec<Miner>, wasm_rpc::error::Error>>(
-            &completed_transactions.last().unwrap().return_value,
-        )
-        .unwrap()
-        .unwrap();
-        *MINERS.lock().await = Some(miners.clone());
+        let state: ellipticoin::State =
+            serde_cbor::from_slice::<Result<_, wasm_rpc::error::Error>>(
+                &completed_transactions.last().unwrap().return_value,
+            )
+            .unwrap()
+            .unwrap();
+        *STATE.lock().await = state.clone();
         WEB_SOCKET_BROADCASTER
-            .broadcast(number as u32, miners.first().unwrap().host.clone())
+            .broadcast(
+                state.block_number as u32,
+                state.miners.first().unwrap().host.clone(),
+            )
             .await;
         println!("Applied block #{}", self.number);
-        miners.first().unwrap().clone()
+        state
     }
 
-    pub fn insert() -> Block {
-        let new_block: NewBlock = Default::default();
-        let number = insert_into(dsl::blocks)
-            .values(&new_block)
-            .returning(blocks::dsl::number)
-            .get_result::<i32>(&get_pg_connection())
+    pub fn insert(block_number: u32) -> Block {
+        let block = Block {
+            number: block_number as i32,
+            ..Default::default()
+        };
+        insert_into(dsl::blocks)
+            .values(&block)
+            .execute(&get_pg_connection())
             .unwrap();
-        Block {
-            number,
-            memory_changeset_hash: new_block.memory_changeset_hash,
-            storage_changeset_hash: new_block.storage_changeset_hash,
-            sealed: new_block.sealed,
-        }
+        block
     }
 
     pub async fn is_valid(&self) -> bool {
@@ -126,12 +114,14 @@ impl Block {
         );
         let seal_transaction =
             Transaction::run(&self, seal_transaction_request, transaction_position as i32);
-        let miners = serde_cbor::from_slice::<Result<Vec<Miner>, wasm_rpc::error::Error>>(
-            &seal_transaction.await.return_value,
-        )
-        .unwrap()
-        .unwrap();
-        set_miners(miners.clone()).await;
+        let state: ellipticoin::State =
+            serde_cbor::from_slice::<Result<_, wasm_rpc::error::Error>>(
+                &seal_transaction.await.return_value,
+            )
+            .unwrap()
+            .unwrap();
+        *STATE.lock().await = state.clone();
+        NEW_BLOCK_CHANNEL.0.send(state.clone()).await;
         self.sealed = true;
         diesel::update(dsl::blocks.filter(dsl::number.eq(self.number.clone())))
             .set(dsl::sealed.eq(true))
@@ -141,9 +131,12 @@ impl Block {
             .order(transactions::dsl::position.asc())
             .load::<Transaction>(&pg_db)
             .unwrap();
-        broadcast_block((self.clone(), transactions), miners.clone()).await;
+        broadcast_block((self.clone(), transactions), state.clone().miners).await;
         WEB_SOCKET_BROADCASTER
-            .broadcast(self.number as u32, miners.first().unwrap().host.clone())
+            .broadcast(
+                self.number as u32,
+                state.miners.first().unwrap().host.clone(),
+            )
             .await;
     }
 
