@@ -78,11 +78,7 @@ sudo ln -s /snap/bin/certbot /usr/bin/certbot
 ```
 certbot --nginx -d yourhost.yourdomain.com
 ```
-11. Update your nginx config
-```
-cat > /etc/nginx/sites-enabled/default
-```
-11.b. Paste the following text and then press `ctrl + D`:
+11. Add the following to `/etc/nginx/sites-enabled/default`
 ```
 upstream upstream {
   server 127.0.0.1:80;
