@@ -80,7 +80,7 @@ pub async fn reset_state() {
     reset_redis().await;
     reset_pg().await;
     reset_rocksdb().await;
-    // import_ethereum_balances().await;
+    import_ethereum_balances().await;
     load_genesis_state().await;
     HashOnion::generate(&pg_db);
     HashOnion::skip_to_current(&pg_db).await;
@@ -141,7 +141,7 @@ pub async fn reset_rocksdb() {
     println!("Reset RocksDB");
 }
 
-async fn _import_ethereum_balances() {
+async fn import_ethereum_balances() {
     let rocksdb = get_rocksdb();
     if rocksdb
         .prefix_iterator(db_key(
