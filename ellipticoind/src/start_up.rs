@@ -1,5 +1,3 @@
-use crate::diesel::RunQueryDsl;
-use crate::models::Transaction;
 use crate::{
     client::get_block,
     config::{
@@ -7,9 +5,10 @@ use crate::{
         verification_key, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
     },
     constants::{STATE, TOKEN_CONTRACT},
+    diesel::RunQueryDsl,
     helpers::{bytes_to_value, run_transaction},
     models,
-    models::{Block, HashOnion},
+    models::{Block, HashOnion, Transaction},
     state::{db_key, Memory, Storage},
     system_contracts,
     transaction::TransactionRequest,
