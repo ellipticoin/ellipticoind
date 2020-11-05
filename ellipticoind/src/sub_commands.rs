@@ -1,11 +1,10 @@
-use crate::models::verification_key;
 use crate::{
     api,
     config::{get_pg_connection, socket, ENABLE_MINER, GENESIS_NODE},
     constants::{NEW_BLOCK_CHANNEL, STATE},
     diesel::{BelongingToDsl, ExpressionMethods, GroupedBy, QueryDsl, RunQueryDsl},
     miner,
-    models::{Block, Transaction},
+    models::{verification_key, Block, Transaction},
     schema::{blocks::dsl as blocks_dsl, transactions::dsl as transactions_dsl},
     start_up,
 };

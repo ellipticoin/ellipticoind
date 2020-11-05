@@ -1,4 +1,3 @@
-use crate::system_contracts::ellipticoin::get_issuance_rewards;
 use crate::{
     api::{graphql::Context, types::*},
     config::get_pg_connection,
@@ -6,7 +5,7 @@ use crate::{
     models,
     models::transaction::next_nonce,
     schema::{blocks, blocks::columns::number, transactions},
-    system_contracts::{api::ReadOnlyAPI, exchange, token},
+    system_contracts::{api::ReadOnlyAPI, ellipticoin::get_issuance_rewards, exchange, token},
 };
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl};
 
