@@ -11,6 +11,6 @@ lazy_static! {
     };
     pub static ref MAX_SLIPPAGE_EXCEEDED: Error = Error {
         code: 3,
-        message: "Max slippage exceeded for this trade. Trade not executed".to_string(),
+        message: "Max slippage exceeded for this trade. Trade not executed.".to_string(),
     };
 }

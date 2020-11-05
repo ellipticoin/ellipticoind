@@ -1,5 +1,9 @@
+use crate::system_contracts::api::ReadOnlyAPI;
 use crate::{
-    models::Transaction, system_contracts::ellipticoin::Miner, transaction::TransactionRequest,
+    config::{get_redis_connection, get_rocksdb, verification_key},
+    models::Transaction,
+    system_contracts::ellipticoin::{Miner, State},
+    transaction::TransactionRequest,
 };
 use async_std::sync::{channel, Mutex, Receiver, Sender};
 use broadcaster::BroadcastChannel;
@@ -14,27 +18,54 @@ lazy_static! {
         Sender<(TransactionRequest, oneshot::Sender<Transaction>)>,
         Receiver<(TransactionRequest, oneshot::Sender<Transaction>)>
     ) = channel(*TRANSACTION_QUEUE_SIZE);
-    pub static ref CURRENT_MINER_CHANNEL: (Sender<Miner>, Receiver<Miner>) = channel(1);
-    pub static ref MINERS: Arc<Mutex<Option<Vec<Miner>>>> = Arc::new(Mutex::new(None));
+    pub static ref NEW_BLOCK_CHANNEL: (Sender<State>, Receiver<State>) = channel(1);
+    pub static ref STATE: Arc<Mutex<State>> = {
+        let mut read_only_api = ReadOnlyAPI::new(get_rocksdb(), get_redis_connection());
+
+        let block_number =
+            crate::system_contracts::ellipticoin::get_block_number(&mut read_only_api);
+        let miners = crate::system_contracts::ellipticoin::get_miners(&mut read_only_api);
+        Arc::new(Mutex::new(State {
+            miners,
+            block_number,
+        }))
+    };
     pub static ref SYNCING: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
     pub static ref WEB_SOCKET_BROADCASTER: BroadcastChannel<(u32, String)> =
         BroadcastChannel::new();
 }
 
-pub async fn set_miners(miners: Vec<Miner>) {
-    *MINERS.lock().await = Some(miners.clone());
-    CURRENT_MINER_CHANNEL
-        .0
-        .send(miners.first().clone().unwrap().clone())
-        .await;
-}
-impl MINERS {
-    pub async fn current(&self) -> Miner {
-        self.lock().await.as_ref().unwrap().first().unwrap().clone()
+// pub async fn set_miners(miners: Vec<Miner>) {
+//     // *MINERS.lock().await = Some(miners.clone());
+//     // CURRENT_MINER_CHANNEL
+//     //     .0
+//     //     .send(miners.first().clone().unwrap().clone())
+//     //     .await;
+// }
+impl STATE {
+    pub async fn current_miner(&self) -> Miner {
+        self.lock().await.miners.first().unwrap().clone()
     }
 
-    pub async fn _second(&self) -> Miner {
-        self.lock().await.as_ref().unwrap().get(1).unwrap().clone()
+    pub async fn _second_miner(&self) -> Miner {
+        self.lock().await.miners.get(1).unwrap().clone()
+    }
+
+    pub async fn current_onion_skin(&self) -> Option<[u8; 32]> {
+        self.lock()
+            .await
+            .miners
+            .iter()
+            .find(|miner| miner.address == verification_key())
+            .map(|miner| miner.hash_onion_skin)
+    }
+
+    pub async fn is_mining(&self) -> bool {
+        self.lock()
+            .await
+            .miners
+            .iter()
+            .any(|miner| miner.address == verification_key())
     }
 }
 

@@ -46,6 +46,12 @@ pub struct Miner {
     pub hash_onion_skin: [u8; 32],
 }
 
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct State {
+    pub block_number: u32,
+    pub miners: Vec<Miner>,
+}
+
 export_native! {
     pub fn harvest<API: ellipticoin::API>(api: &mut API) {
         let issuance_rewards = get_issuance_rewards(api, api.caller());
@@ -130,10 +136,10 @@ export_native! {
         Ok(Value::Null)
     }
 
-    pub fn seal<API: ellipticoin::API>(api: &mut API, value: [u8; 32]) -> Result<Vec<Miner>, Box<Error>> {
+    pub fn seal<API: ellipticoin::API>(api: &mut API, value: [u8; 32]) -> Result<State, Box<Error>> {
         let mut miners = get_miners(api);
+
         if api.caller() != ellipticoin::Address::PublicKey(miners.first().unwrap().address) {
-            println!("sender is not the winner");
             return Err(Box::new(errors::SENDER_IS_NOT_THE_WINNER.clone()));
         }
         if !miners
@@ -143,16 +149,17 @@ export_native! {
             .to_vec()
             .eq(&sha256(value.to_vec()))
         {
-            println!("invalid value submitted");
+            println!("expected: {}", base64::encode(miners.first().unwrap().hash_onion_skin));
+            println!("got: {}", base64::encode(&sha256(value.to_vec())));
             return Err(Box::new(errors::INVALID_VALUE.clone()));
         }
         miners.first_mut().unwrap().hash_onion_skin = value.clone();
         settle_block_rewards(api)?;
         shuffle_miners(api, &mut miners, value);
         issue_block_rewards(api)?;
-        increment_block_number(api);
+        let block_number = increment_block_number(api);
 
-        Ok(miners)
+        Ok(State{miners, block_number})
     }
 
 
@@ -192,9 +199,10 @@ fn issue_block_rewards<API: ellipticoin::API>(api: &mut API) -> Result<(), Box<E
     Ok(())
 }
 
-fn increment_block_number<API: ellipticoin::API>(api: &mut API) {
-    let block_number = get_block_number(api);
-    set_block_number(api, block_number + 1);
+fn increment_block_number<API: ellipticoin::API>(api: &mut API) -> u32 {
+    let block_number = get_block_number(api) + 1;
+    set_block_number(api, block_number);
+    block_number
 }
 
 fn shuffle_miners<API: ellipticoin::API>(api: &mut API, miners: &mut Vec<Miner>, value: [u8; 32]) {
@@ -346,7 +354,7 @@ mod tests {
         let carol_pub: [u8; 32] = Address::PublicKey(*CAROL).as_public_key().unwrap();
         native::whitelist_miner(&mut api, bob_pub).expect("whitelisting bob failed!");
 
-        let mut whitelist = get_miner_whitelist(&mut api);
+        let whitelist = get_miner_whitelist(&mut api);
         assert!(
             whitelist.contains(&alice_pub),
             "Alice's address not present in whitelist!"
