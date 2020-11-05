@@ -1,25 +1,17 @@
 use crate::models::verification_key;
 use crate::{
     api,
-    config::{
-        get_pg_connection, get_redis_connection, get_rocksdb, socket, SubCommand, ENABLE_MINER,
-        GENESIS_NODE, OPTS,
-    },
-    constants::{NEW_BLOCK_CHANNEL, STATE, TOKEN_CONTRACT},
+    config::{get_pg_connection, socket, ENABLE_MINER, GENESIS_NODE},
+    constants::{NEW_BLOCK_CHANNEL, STATE},
     diesel::{BelongingToDsl, ExpressionMethods, GroupedBy, QueryDsl, RunQueryDsl},
     miner,
     models::{Block, Transaction},
     schema::{blocks::dsl as blocks_dsl, transactions::dsl as transactions_dsl},
     start_up,
-    start_up::{load_genesis_state, reset_redis, reset_rocksdb},
-    state::{db_key, Memory, State, Storage},
-    system_contracts,
-    system_contracts::api::NativeAPI,
 };
 use async_std::task::spawn;
 use ed25519_zebra::{SigningKey, VerificationKey};
 use futures::future;
-use r2d2_redis::redis::Commands;
 use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, convert::TryFrom, fs::File, str};
@@ -50,77 +42,34 @@ pub fn generate_keypair() {
     );
 }
 
-pub async fn dump_state(block_number: Option<u32>) {
+pub async fn dump_blocks(block_number: Option<u32>, file_name: &str) {
     let pg_db = get_pg_connection();
-    let blocks = if let Some(block_number) = block_number {
+    let blocks_query = if let Some(block_number) = block_number {
         blocks_dsl::blocks
             .filter(blocks_dsl::number.le(block_number as i32))
-            .order(blocks_dsl::number.asc())
-            .load::<Block>(&pg_db)
-            .unwrap()
+            .into_boxed()
     } else {
-        blocks_dsl::blocks
-            .order(blocks_dsl::number.asc())
-            .load::<Block>(&pg_db)
-            .unwrap()
+        blocks_dsl::blocks.into_boxed()
     };
-    reset_redis().await;
-    reset_rocksdb().await;
-    load_genesis_state().await;
+    let blocks = blocks_query
+        .order(blocks_dsl::number.asc())
+        .load::<Block>(&pg_db)
+        .unwrap();
     let transactions = Transaction::belonging_to(&blocks)
         .order(transactions_dsl::position.asc())
         .load::<Transaction>(&pg_db)
         .unwrap()
         .grouped_by(&blocks);
-    let memory = Memory {
-        redis: get_redis_connection(),
-    };
-    let storage = Storage {
-        rocksdb: get_rocksdb(),
-    };
-    let mut state = State::new(memory, storage);
-    blocks
-        .into_iter()
-        .zip(transactions)
-        .for_each(|(block, transactions)| {
-            transactions.iter().for_each(|transaction| {
-                let mut api = NativeAPI {
-                    transaction: transaction.clone().into(),
-                    state: &mut state,
-                };
-                crate::system_contracts::run(&mut api, transaction.into());
-            });
-            println!("Applied block #{}", block.number);
-        });
-    let mut redis = get_redis_connection();
-    let redis_keys: Vec<Vec<u8>> = redis.keys("*").unwrap_or(vec![]);
-    println!("Saving state..");
-    let memory = redis_keys
-        .iter()
-        .map(|key| {
-            let value = redis.get(key.to_vec()).unwrap();
-            (key.clone(), value)
-        })
-        .collect::<HashMap<Vec<u8>, Vec<u8>>>();
-    let rocksdb = get_rocksdb();
-    let storage = rocksdb
-        .iterator(rocksdb::IteratorMode::Start)
-        .filter(|(key, _value)| {
-            !key.starts_with(&db_key(
-                &TOKEN_CONTRACT,
-                &vec![system_contracts::ellipticoin::StorageNamespace::EthereumBalances as u8],
-            ))
-        })
-        .map(|(key, value)| (key.to_vec(), value.to_vec()))
-        .collect::<HashMap<Vec<u8>, Vec<u8>>>();
-    let genesis = Genesis { memory, storage };
-    let genesis_file_name = match &OPTS.subcmd {
-        Some(SubCommand::DumpState { file, .. }) => file,
-        _ => panic!(),
-    };
-    let genesis_file = File::create(genesis_file_name).unwrap();
-    serde_cbor::to_writer(genesis_file, &genesis).unwrap();
-    println!("Saved to {}", genesis_file_name);
+
+    let file = File::create(file_name.clone()).unwrap();
+    serde_cbor::to_writer(
+        file,
+        &blocks
+            .into_iter()
+            .zip(transactions)
+            .collect::<Vec<(Block, Vec<Transaction>)>>(),
+    )
+    .unwrap();
 }
 
 pub async fn main() {
