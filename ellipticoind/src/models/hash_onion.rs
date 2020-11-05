@@ -1,6 +1,6 @@
-use crate::constants::STATE;
 use crate::{
     config::verification_key,
+    constants::STATE,
     diesel::{QueryDsl, RunQueryDsl},
     helpers::sha256,
     schema::{hash_onion, hash_onion::dsl::*},

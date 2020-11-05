@@ -62,6 +62,7 @@ export_native! {
         token: Token,
         amount: u64,
     ) -> Result<(), Box<Error>> {
+        validate_liquidity_amount(api, token.clone(), amount)?;
         let reserves = get_reserves(api, token.clone());
         let base_token_reserves = get_base_token_reserves(api, token.clone());
         let total_supply = token::get_total_supply(api, liquidity_token(token.clone()));
@@ -149,6 +150,19 @@ fn validate_base_token_amount<API: ellipticoin::API>(
 ) -> Result<(), Box<Error>> {
     let base_token_balance = token::get_balance(api, BASE_TOKEN.clone(), api.caller());
     if amount > base_token_balance {
+        Err(Box::new(token::errors::INSUFFICIENT_FUNDS.clone()))
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_liquidity_amount<API: ellipticoin::API>(
+    api: &mut API,
+    token: Token,
+    amount: u64,
+) -> Result<(), Box<Error>> {
+    let liquidity_balance = token::get_balance(api, liquidity_token(token.clone()), api.caller());
+    if amount > liquidity_balance {
         Err(Box::new(token::errors::INSUFFICIENT_FUNDS.clone()))
     } else {
         Ok(())
@@ -625,5 +639,26 @@ mod tests {
             ),
             100000000
         );
+    }
+
+    #[test]
+    fn test_remove_liqidity_insufficient_liquidity() {
+        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+        let mut state = TestState::new();
+        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
+        token::set_balance(
+            &mut api,
+            APPLES.clone(),
+            ellipticoin::Address::PublicKey(*ALICE),
+            1 * BASE_FACTOR,
+        );
+        token::set_balance(
+            &mut api,
+            BASE_TOKEN.clone().into(),
+            ellipticoin::Address::PublicKey(*ALICE),
+            1 * BASE_FACTOR,
+        );
+        native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, BASE_FACTOR).unwrap();
+        assert!(native::remove_liqidity(&mut api, APPLES.clone(), 2 * BASE_FACTOR).is_err());
     }
 }

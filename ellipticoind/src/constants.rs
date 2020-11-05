@@ -1,8 +1,10 @@
-use crate::system_contracts::api::ReadOnlyAPI;
 use crate::{
     config::{get_redis_connection, get_rocksdb, verification_key},
     models::Transaction,
-    system_contracts::ellipticoin::{Miner, State},
+    system_contracts::{
+        api::ReadOnlyAPI,
+        ellipticoin::{Miner, State},
+    },
     transaction::TransactionRequest,
 };
 use async_std::sync::{channel, Mutex, Receiver, Sender};

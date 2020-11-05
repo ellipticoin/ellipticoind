@@ -15,8 +15,7 @@ use issuance::block_reward_at;
 use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_cbor::Value;
-use std::collections::HashSet;
-use std::convert::TryInto;
+use std::{collections::HashSet, convert::TryInto};
 use wasm_rpc_macros::export_native;
 
 const CONTRACT_NAME: &'static str = "Ellipticoin";
