@@ -30,10 +30,6 @@ export_native! {
         starting_price: u64,
     ) -> Result<(), Box<Error>> {
         validate_base_token_amount(api, (amount * starting_price)/BASE_FACTOR)?;
-        let base_token_balance = token::get_balance(api, token.clone(), api.caller());
-        if (amount * starting_price) / BASE_FACTOR > base_token_balance {
-            return Err(Box::new(token::errors::INSUFFICIENT_FUNDS.clone()))
-        };
         charge!(api, token.clone(), api.caller(), amount)?;
         credit_reserves(api, token.clone(), amount);
         charge!(api, BASE_TOKEN.clone(), api.caller(), (amount * starting_price) / BASE_FACTOR)?;
