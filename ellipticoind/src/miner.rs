@@ -62,5 +62,5 @@ async fn mine_block(block_number: u32) {
         }
     })
     .await;
-    block.seal(transaction_position + 1).await;
+    block.seal(transaction_position).await;
 }
