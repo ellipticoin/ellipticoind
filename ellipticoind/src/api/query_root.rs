@@ -74,8 +74,7 @@ impl QueryRoot {
                 let price = exchange::get_price(&mut api, token.clone()).unwrap_or(0);
                 let share_of_pool =
                     exchange::share_of_pool(&mut api, token, address.0.clone().into());
-                let total_supply =
-                    token::get_total_supply(&mut api, liquidity_token.clone());
+                let total_supply = token::get_total_supply(&mut api, liquidity_token.clone());
 
                 LiquidityToken {
                     issuer,
