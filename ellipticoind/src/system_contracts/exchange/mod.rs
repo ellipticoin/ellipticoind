@@ -83,7 +83,6 @@ export_native! {
             book_input_entry = true;
             calculate_input_amount_in_base_token(api, input_token.clone(), apply_fee(input_amount))?
         };
-        charge!(api, input_token.clone(), api.caller(), input_amount)?;
 
         let output_token_amount = if output_token == BASE_TOKEN.clone() {
             input_amount_in_base_token
@@ -104,7 +103,9 @@ export_native! {
             debit_reserves(api, output_token.clone(), output_token_amount);
         }
 
+        charge!(api, input_token.clone(), api.caller(), input_amount)?;
         pay!(api, output_token.clone(), api.caller(), output_token_amount)?;
+
         Ok(())
     }
 }
