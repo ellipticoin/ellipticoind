@@ -74,26 +74,34 @@ export_native! {
         input_amount: u64,
         minimum_output_token_amount: u64
     ) -> Result<(), Box<Error>> {
+        let mut book_input_entry = false;
+        let mut book_output_entry = false;
+
         let input_amount_in_base_token = if input_token == BASE_TOKEN.clone() {
             input_amount
         } else {
-            let amount_in_base_token = calculate_input_amount_in_base_token(api, input_token.clone(), apply_fee(input_amount))?;
-            credit_reserves(api, input_token.clone(), input_amount);
-            debit_base_token_reserves(api, input_token.clone(), amount_in_base_token);
-            amount_in_base_token
+            book_input_entry = true;
+            calculate_input_amount_in_base_token(api, input_token.clone(), apply_fee(input_amount))?
         };
         charge!(api, input_token.clone(), api.caller(), input_amount)?;
 
         let output_token_amount = if output_token == BASE_TOKEN.clone() {
             input_amount_in_base_token
         } else {
-            let output_token_amount = calculate_amount_in_output_token(api, output_token.clone(), apply_fee(input_amount_in_base_token))?;
-            credit_base_token_reserves(api, output_token.clone(), input_amount_in_base_token);
-            debit_reserves(api, output_token.clone(), output_token_amount);
-            output_token_amount
+            book_output_entry = true;
+            calculate_amount_in_output_token(api, output_token.clone(), apply_fee(input_amount_in_base_token))?
         };
         if output_token_amount < minimum_output_token_amount {
             return Err(Box::new(errors::MAX_SLIPPAGE_EXCEEDED.clone()))
+        }
+
+        if book_input_entry {
+            credit_reserves(api, input_token.clone(), input_amount);
+            debit_base_token_reserves(api, input_token.clone(), input_amount_in_base_token);
+        }
+        if book_output_entry {
+            credit_base_token_reserves(api, output_token.clone(), input_amount_in_base_token);
+            debit_reserves(api, output_token.clone(), output_token_amount);
         }
 
         pay!(api, output_token.clone(), api.caller(), output_token_amount)?;
