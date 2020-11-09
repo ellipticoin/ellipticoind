@@ -96,7 +96,6 @@ export_native! {
             return Err(Box::new(errors::MAX_SLIPPAGE_EXCEEDED.clone()))
         }
 
-
         pay!(api, output_token.clone(), api.caller(), output_token_amount)?;
         Ok(())
     }
@@ -125,8 +124,8 @@ fn calculate_input_amount_in_base_token<API: ellipticoin::API>(
     token: Token,
     amount: u64,
 ) -> Result<u64, Box<Error>> {
-    let total_value = get_total_value(api, token.clone());
-    let new_base_token_reserves = total_value / (get_reserves(api, token.clone()) + amount);
+    let invariant = get_pool_invariant(api, token.clone());
+    let new_base_token_reserves = invariant / (get_reserves(api, token.clone()) + amount);
     Ok(get_base_token_reserves(api, token.clone()) - new_base_token_reserves)
 }
 
@@ -135,9 +134,9 @@ fn calculate_amount_in_output_token<API: ellipticoin::API>(
     output_token: Token,
     amount_in_base_token: u64,
 ) -> Result<u64, Box<Error>> {
-    let total_value = get_total_value(api, output_token.clone());
+    let invariant = get_pool_invariant(api, output_token.clone());
     let new_token_reserves =
-        total_value / (get_base_token_reserves(api, output_token.clone()) + amount_in_base_token);
+        invariant / (get_base_token_reserves(api, output_token.clone()) + amount_in_base_token);
     Ok(get_reserves(api, output_token.clone()) - new_token_reserves)
 }
 
@@ -154,7 +153,7 @@ pub fn get_price<API: ellipticoin::API>(api: &mut API, token: Token) -> Result<u
     }
 }
 
-fn get_total_value<API: ellipticoin::API>(api: &mut API, token: Token) -> u64 {
+fn get_pool_invariant<API: ellipticoin::API>(api: &mut API, token: Token) -> u64 {
     get_base_token_reserves(api, token.clone()) * get_reserves(api, token)
 }
 
