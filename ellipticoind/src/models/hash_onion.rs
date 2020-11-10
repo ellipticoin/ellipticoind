@@ -1,5 +1,5 @@
 use crate::{
-    config::verification_key,
+    config::signing_key,
     constants::STATE,
     diesel::{QueryDsl, RunQueryDsl},
     helpers::sha256,
@@ -77,7 +77,7 @@ impl HashOnion {
             .map(|hash_onion_size| hash_onion_size.parse().unwrap())
             .unwrap_or(31 * 24 * 60 * 60);
         let sql_query_size = 65534;
-        let mut center: Vec<u8> = verification_key().to_vec();
+        let mut center = sha256(<[u8; 32]>::from(signing_key()).to_vec()).to_vec();
         println!("Generating Hash Onion");
         let pb = ProgressBar::new(hash_onion_size);
         pb.set_style(
@@ -85,11 +85,11 @@ impl HashOnion {
                 .template("[{elapsed_precise}] [{bar}] {pos}/{len} ({percent}%)")
                 .progress_chars("=> "),
         );
-        for _ in (0..hash_onion_size).step_by(sql_query_size) {
-            pb.inc(sql_query_size as u64);
+        for chunk in (0..hash_onion_size).collect::<Vec<_>>().chunks(sql_query_size) {
+            pb.inc(chunk.len() as u64);
             let mut onion: Vec<Vec<u8>> = vec![];
-            for _ in 0..(sql_query_size) {
-                center = sha256(center.to_vec().clone()).to_vec();
+            for _ in chunk {
+                center = sha256(center.clone().to_vec().clone()).to_vec();
                 onion.push(center.clone());
             }
             let values: Vec<HashOnion> = onion

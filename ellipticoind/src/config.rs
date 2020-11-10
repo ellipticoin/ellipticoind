@@ -51,6 +51,8 @@ pub struct Opts {
     pub websocket_port: u16,
     #[clap(short = 'i', long = "insecure")]
     pub insecure: bool,
+    #[clap(short = 's', long = "skip-genesis-blocks")]
+    pub skip_genesis_blocks: bool,
 }
 
 #[derive(Clap, Debug)]
