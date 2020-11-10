@@ -108,6 +108,9 @@ pub async fn load_genesis_state() {
 }
 
 pub async fn load_genesis_blocks() {
+    if OPTS.skip_genesis_blocks {
+        return;
+    }
     let genesis_blocks_file = File::open(OPTS.genesis_blocks_path.clone()).expect(&format!(
         "Genesis transactions file {} not found",
         &OPTS.genesis_blocks_path
