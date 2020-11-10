@@ -9,4 +9,8 @@ lazy_static! {
         code: 2,
         message: "Insufficient balance".to_string(),
     };
+    pub static ref MAX_SLIPPAGE_EXCEEDED: Error = Error {
+        code: 3,
+        message: "Max slippage exceeded for this trade. Trade not executed.".to_string(),
+    };
 }
