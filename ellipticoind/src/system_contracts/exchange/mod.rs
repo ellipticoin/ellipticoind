@@ -7,7 +7,7 @@ use crate::{
 };
 use constants::{BASE_TOKEN, FEE};
 use ellipticoin::{charge, memory_accessors, pay, Address, Token};
-use std::{boxed::Box, collections::HashSet};
+use std::{boxed::Box, collections::HashSet, str};
 use wasm_rpc::error::Error;
 use wasm_rpc_macros::export_native;
 
@@ -75,24 +75,40 @@ export_native! {
         input_token: Token,
         output_token: Token,
         input_amount: u64,
+        minimum_output_token_amount: u64
     ) -> Result<(), Box<Error>> {
-        let base_token_amount = if input_token == BASE_TOKEN.clone() {
+        let mut book_input_entry = false;
+        let mut book_output_entry = false;
+
+        let input_amount_in_base_token = if input_token == BASE_TOKEN.clone() {
             input_amount
         } else {
-            rebalance_base_token(api, input_token.clone(), apply_fee(input_amount))?
+            book_input_entry = true;
+            calculate_input_amount_in_base_token(api, input_token.clone(), apply_fee(input_amount))?
         };
-        charge!(api, input_token.clone(), api.caller(), input_amount)?;
-        credit_reserves(api, input_token.clone(), input_amount);
-        debit_base_token_reserves(api, input_token.clone(), base_token_amount);
-        let token_amount = if output_token == BASE_TOKEN.clone() {
-            base_token_amount
+
+        let output_token_amount = if output_token == BASE_TOKEN.clone() {
+            input_amount_in_base_token
         } else {
-            let token_amount = rebalance(api, output_token.clone(), apply_fee(base_token_amount))?;
-            credit_base_token_reserves(api, output_token.clone(), base_token_amount);
-            debit_reserves(api, output_token.clone(), token_amount);
-            token_amount
+            book_output_entry = true;
+            calculate_amount_in_output_token(api, output_token.clone(), apply_fee(input_amount_in_base_token))?
         };
-        pay!(api, output_token.clone(), api.caller(), token_amount)?;
+        if output_token_amount < minimum_output_token_amount {
+            return Err(Box::new(errors::MAX_SLIPPAGE_EXCEEDED.clone()))
+        }
+
+        if book_input_entry {
+            credit_reserves(api, input_token.clone(), input_amount);
+            debit_base_token_reserves(api, input_token.clone(), input_amount_in_base_token);
+        }
+        if book_output_entry {
+            credit_base_token_reserves(api, output_token.clone(), input_amount_in_base_token);
+            debit_reserves(api, output_token.clone(), output_token_amount);
+        }
+
+        charge!(api, input_token.clone(), api.caller(), input_amount)?;
+        pay!(api, output_token.clone(), api.caller(), output_token_amount)?;
+
         Ok(())
     }
 }
@@ -115,25 +131,25 @@ fn burn<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) -> Resu
     Ok(())
 }
 
-fn rebalance_base_token<API: ellipticoin::API>(
+fn calculate_input_amount_in_base_token<API: ellipticoin::API>(
     api: &mut API,
     token: Token,
     amount: u64,
 ) -> Result<u64, Box<Error>> {
-    let total_value = get_total_value(api, token.clone());
-    let new_base_token_reserves = total_value / (get_reserves(api, token.clone()) + amount);
+    let invariant = get_pool_invariant(api, token.clone());
+    let new_base_token_reserves = invariant / (get_reserves(api, token.clone()) + amount);
     Ok(get_base_token_reserves(api, token.clone()) - new_base_token_reserves)
 }
 
-fn rebalance<API: ellipticoin::API>(
+fn calculate_amount_in_output_token<API: ellipticoin::API>(
     api: &mut API,
-    token: Token,
-    amount: u64,
+    output_token: Token,
+    amount_in_base_token: u64,
 ) -> Result<u64, Box<Error>> {
-    let total_value = get_total_value(api, token.clone());
-    credit_base_token_reserves(api, token.clone(), amount);
-    let new_token_reserves = total_value / get_base_token_reserves(api, token.clone());
-    Ok(get_reserves(api, token.clone()) - new_token_reserves)
+    let invariant = get_pool_invariant(api, output_token.clone());
+    let new_token_reserves =
+        invariant / (get_base_token_reserves(api, output_token.clone()) + amount_in_base_token);
+    Ok(get_reserves(api, output_token.clone()) - new_token_reserves)
 }
 
 fn apply_fee(amount: u64) -> u64 {
@@ -174,7 +190,7 @@ pub fn get_price<API: ellipticoin::API>(api: &mut API, token: Token) -> Result<u
     }
 }
 
-fn get_total_value<API: ellipticoin::API>(api: &mut API, token: Token) -> u64 {
+fn get_pool_invariant<API: ellipticoin::API>(api: &mut API, token: Token) -> u64 {
     get_base_token_reserves(api, token.clone()) * get_reserves(api, token)
 }
 
@@ -436,7 +452,14 @@ mod tests {
             ellipticoin::Address::PublicKey(*BOB),
             100 * BASE_FACTOR,
         );
-        native::exchange(&mut api, APPLES.clone(), BANANAS.clone(), 100 * BASE_FACTOR).unwrap();
+        native::exchange(
+            &mut api,
+            APPLES.clone(),
+            BANANAS.clone(),
+            100 * BASE_FACTOR,
+            0,
+        )
+        .unwrap();
         assert_eq!(
             token::get_balance(
                 &mut api,
@@ -448,6 +471,52 @@ mod tests {
     }
 
     #[test]
+    fn test_exchange_max_slippage_exceeded() {
+        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+        let mut state = TestState::new();
+        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
+        token::set_balance(
+            &mut api,
+            APPLES.clone(),
+            ellipticoin::Address::PublicKey(*ALICE),
+            100 * BASE_FACTOR,
+        );
+        token::set_balance(
+            &mut api,
+            BANANAS.clone().into(),
+            ellipticoin::Address::PublicKey(*ALICE),
+            100 * BASE_FACTOR,
+        );
+        token::set_balance(
+            &mut api,
+            BASE_TOKEN.clone(),
+            ellipticoin::Address::PublicKey(*ALICE),
+            200 * BASE_FACTOR,
+        );
+        native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
+        native::create_pool(&mut api, BANANAS.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
+        api.caller = Address::PublicKey(BOB.clone());
+        token::set_balance(
+            &mut api,
+            APPLES.clone().into(),
+            ellipticoin::Address::PublicKey(*BOB),
+            100 * BASE_FACTOR,
+        );
+        match native::exchange(
+            &mut api,
+            APPLES.clone(),
+            BANANAS.clone(),
+            100 * BASE_FACTOR,
+            33_233_235,
+        ) {
+            Err(x) => assert!(
+                x.code == errors::MAX_SLIPPAGE_EXCEEDED.code,
+                "Should have resulted in a max slippage error!"
+            ),
+            Ok(_) => assert!(false, "Should have resulted in a max slippage error!"),
+        };
+    }
+
     fn test_exchange_base_token() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
@@ -478,6 +547,7 @@ mod tests {
             BASE_TOKEN.clone(),
             APPLES.clone(),
             100 * BASE_FACTOR,
+            0,
         )
         .unwrap();
         assert_eq!(
@@ -520,6 +590,7 @@ mod tests {
             APPLES.clone(),
             BASE_TOKEN.clone(),
             100 * BASE_FACTOR,
+            0,
         )
         .unwrap();
         assert_eq!(
@@ -570,7 +641,14 @@ mod tests {
             ellipticoin::Address::PublicKey(*BOB),
             100 * BASE_FACTOR,
         );
-        native::exchange(&mut api, BANANAS.clone(), APPLES.clone(), 100 * BASE_FACTOR).unwrap();
+        native::exchange(
+            &mut api,
+            BANANAS.clone(),
+            APPLES.clone(),
+            100 * BASE_FACTOR,
+            0,
+        )
+        .unwrap();
         api.caller = Address::PublicKey(ALICE.clone());
         native::remove_liqidity(&mut api, APPLES.clone(), 100 * BASE_FACTOR).unwrap();
         assert_eq!(
@@ -587,7 +665,7 @@ mod tests {
                 BASE_TOKEN.clone(),
                 ellipticoin::Address::PublicKey(*ALICE)
             ),
-            199_700_002
+            149_924_888
         );
     }
 
@@ -615,6 +693,7 @@ mod tests {
             APPLES.clone(),
             BASE_TOKEN.clone(),
             1 * BASE_FACTOR,
+            0,
         )
         .unwrap();
         api.caller = Address::PublicKey(ALICE.clone());
