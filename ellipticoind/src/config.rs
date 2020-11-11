@@ -36,6 +36,11 @@ pub struct Opts {
         default_value = "./ellipticoind/dist/genesis.cbor"
     )]
     pub genesis_state_path: String,
+    #[clap(
+        long = "genesis-blocks-path",
+        default_value = "./ellipticoind/dist/genesis-blocks.cbor"
+    )]
+    pub genesis_blocks_path: String,
     #[clap(long = "save-state")]
     pub save_state: bool,
     #[clap(long = "redis-url", default_value = "redis://127.0.0.1")]
@@ -46,17 +51,19 @@ pub struct Opts {
     pub websocket_port: u16,
     #[clap(short = 'i', long = "insecure")]
     pub insecure: bool,
+    #[clap(short = 's', long = "skip-genesis-blocks")]
+    pub skip_genesis_blocks: bool,
 }
 
 #[derive(Clap, Debug)]
 pub enum SubCommand {
     #[clap(name = "generate-keypair")]
     GenerateKeypair,
-    #[clap(name = "dump-state")]
-    DumpState {
+    #[clap(name = "dump-blocks")]
+    DumpBlocks {
         #[clap(long = "at-block")]
         block_number: Option<u32>,
-        #[clap(long = "file", default_value = "genesis.cbor")]
+        #[clap(long = "file", default_value = "genesis-blocks.cbor")]
         file: String,
     },
 }

@@ -1,13 +1,14 @@
-use crate::constants::STATE;
-use crate::system_contracts::ellipticoin::State;
 use crate::{
     config::verification_key,
-    constants::{BLOCK_TIME, NEW_BLOCK_CHANNEL, TRANSACTION_QUEUE},
+    constants::{BLOCK_TIME, NEW_BLOCK_CHANNEL, STATE, TRANSACTION_QUEUE},
     helpers::run_for,
     models::{Block, Transaction},
+    system_contracts::ellipticoin::State,
 };
-use async_std::future::TimeoutError;
-use async_std::{future::timeout, task::sleep};
+use async_std::{
+    future::{timeout, TimeoutError},
+    task::sleep,
+};
 use futures::future::FutureExt;
 use std::time::Duration;
 
@@ -62,5 +63,5 @@ async fn mine_block(block_number: u32) {
         }
     })
     .await;
-    block.seal(transaction_position + 1).await;
+    block.seal(transaction_position).await;
 }

@@ -1,4 +1,3 @@
-use crate::diesel::RunQueryDsl;
 use crate::{
     client::get_block,
     config::{
@@ -6,9 +5,10 @@ use crate::{
         verification_key, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
     },
     constants::{STATE, TOKEN_CONTRACT},
+    diesel::RunQueryDsl,
     helpers::{bytes_to_value, run_transaction},
     models,
-    models::{Block, HashOnion},
+    models::{Block, HashOnion, Transaction},
     state::{db_key, Memory, Storage},
     system_contracts,
     transaction::TransactionRequest,
@@ -82,6 +82,7 @@ pub async fn reset_state() {
     reset_rocksdb().await;
     import_ethereum_balances().await;
     load_genesis_state().await;
+    load_genesis_blocks().await;
     HashOnion::generate(&pg_db);
     HashOnion::skip_to_current(&pg_db).await;
 }
@@ -103,6 +104,22 @@ pub async fn load_genesis_state() {
     }
     for (key, value) in state.storage {
         storage.set(&key, &value);
+    }
+}
+
+pub async fn load_genesis_blocks() {
+    if OPTS.skip_genesis_blocks {
+        return;
+    }
+    let genesis_blocks_file = File::open(OPTS.genesis_blocks_path.clone()).expect(&format!(
+        "Genesis transactions file {} not found",
+        &OPTS.genesis_blocks_path
+    ));
+    let blocks: Vec<(Block, Vec<Transaction>)> =
+        serde_cbor::from_reader(genesis_blocks_file).unwrap();
+    println!("Applying genesis blocks");
+    for (block, transactions) in blocks {
+        block.apply(transactions).await;
     }
 }
 

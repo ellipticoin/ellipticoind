@@ -1,7 +1,10 @@
 mod helpers;
-use crate::config::host_uri;
-use crate::config::random_bootnode;
-use crate::{models, models::transaction::Transaction, transaction::TransactionRequest};
+use crate::{
+    config::{host_uri, random_bootnode},
+    models,
+    models::transaction::Transaction,
+    transaction::TransactionRequest,
+};
 use graphql_client::*;
 use helpers::{base64_encode, sign};
 
