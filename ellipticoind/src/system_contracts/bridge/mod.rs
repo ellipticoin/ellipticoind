@@ -8,7 +8,8 @@ use std::boxed::Box;
 use wasm_rpc::error::Error;
 use wasm_rpc_macros::export_native;
 
-const CONTRACT_NAME: &'static str = "Bridge";
+pub const CONTRACT_NAME: &'static str = "Bridge";
+pub const RELEASE_FUNCTION_NAME: &'static str = "release";
 
 export_native! {
     pub fn mint<API: ellipticoin::API>(

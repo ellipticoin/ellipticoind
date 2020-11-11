@@ -1,3 +1,4 @@
+use crate::system_contracts::bridge;
 use crate::system_contracts::ellipticoin::get_issuance_rewards;
 use crate::{
     api::{graphql::Context, types::*},
@@ -142,6 +143,27 @@ impl QueryRoot {
             .ok()
             .flatten()
             .map(Transaction::from)
+    }
+
+    async fn exit_transactions(
+        _context: &Context,
+        sender_address: Bytes,
+        page: U64,
+        page_size: U64,
+    ) -> Vec<Transaction> {
+        let con = get_pg_connection();
+        transactions::dsl::transactions
+            .filter(transactions::sender.eq(<Vec<u8>>::from(sender_address)))
+            .filter(transactions::contract.eq(bridge::CONTRACT_NAME))
+            .filter(transactions::function.eq(bridge::RELEASE_FUNCTION_NAME))
+            .order_by(transactions::id.desc())
+            .limit(page_size.0.clone() as i64)
+            .offset((page.0 as i64) * (page_size.0 as i64))
+            .load::<models::Transaction>(&con)
+            .expect("Error loading exit transactions for")
+            .into_iter()
+            .map(Transaction::from)
+            .collect()
     }
 
     async fn next_nonce(_context: &Context, address: Bytes) -> U32 {
