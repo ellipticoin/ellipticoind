@@ -3,7 +3,7 @@
 **/db*
 **/node_modules
 **/target
+ellipticoind/static/*
 
 .idea
 *.iml
-ellipticoind/dist/ethereum-balances-10054080.bin

@@ -1,5 +1,5 @@
 use crate::{
-    client::get_block,
+    client::{download, get_block},
     config::{
         ethereum_balances_path, get_pg_connection, get_redis_connection, get_rocksdb,
         verification_key, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
@@ -10,12 +10,14 @@ use crate::{
     models,
     models::{Block, HashOnion, Transaction},
     state::{db_key, Memory, Storage},
+    static_files::STATIC_FILES,
     system_contracts,
     transaction::TransactionRequest,
 };
 use diesel::sql_query;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::Path;
 
 use indicatif::ProgressBar;
 use r2d2_redis::redis::{self};
@@ -75,7 +77,16 @@ pub async fn catch_up() {
     println!("Syncing complete");
 }
 
+pub async fn download_static_files() {
+    let static_dir = Path::new("ellipticoind/static");
+    for (file_name, hash) in STATIC_FILES.iter() {
+        if !static_dir.join(file_name).exists() {
+            download(file_name, static_dir.join(file_name), *hash).await
+        }
+    }
+}
 pub async fn reset_state() {
+    download_static_files().await;
     let pg_db = get_pg_connection();
     reset_redis().await;
     reset_pg().await;
@@ -172,7 +183,6 @@ async fn import_ethereum_balances() {
         return;
     }
     let file = File::open(ethereum_balances_path()).unwrap();
-
     let metadata = std::fs::metadata(ethereum_balances_path()).unwrap();
     let pb = ProgressBar::new(metadata.len() / 24);
     println!("Importing Ethereum Balances");
