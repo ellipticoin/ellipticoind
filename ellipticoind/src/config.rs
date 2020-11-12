@@ -33,12 +33,12 @@ pub struct Opts {
     pub rocksdb_path: String,
     #[clap(
         long = "genesis-path",
-        default_value = "./ellipticoind/dist/genesis.cbor"
+        default_value = "./ellipticoind/static/genesis.cbor"
     )]
     pub genesis_state_path: String,
     #[clap(
         long = "genesis-blocks-path",
-        default_value = "./ellipticoind/dist/genesis-blocks.cbor"
+        default_value = "./ellipticoind/static/genesis-blocks.cbor"
     )]
     pub genesis_blocks_path: String,
     #[clap(long = "save-state")]
@@ -189,5 +189,5 @@ pub fn host_uri(host: &str) -> String {
 
 pub fn ethereum_balances_path() -> String {
     env::var("ETHEREUM_BALANCES_PATH")
-        .unwrap_or("./ellipticoind/dist/ethereum-balances-10054080.bin".to_string())
+        .unwrap_or("./ellipticoind/static/ethereum-balances-10054080.bin".to_string())
 }

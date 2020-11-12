@@ -1,12 +1,20 @@
-mod helpers;
+use crate::sha2::Digest;
 use crate::{
     config::{host_uri, random_bootnode},
     models,
     models::transaction::Transaction,
     transaction::TransactionRequest,
 };
+use futures::AsyncReadExt;
 use graphql_client::*;
 use helpers::{base64_encode, sign};
+use indicatif::ProgressBar;
+use sha2::Sha256;
+use std::fs::File;
+use std::io::{BufWriter, Write};
+use std::path::PathBuf;
+
+mod helpers;
 
 type Bytes = String;
 type U32 = String;
@@ -141,3 +149,45 @@ impl From<&block::BlockBlockTransactions> for models::transaction::Transaction {
 }
 
 pub async fn random_peer() {}
+
+pub async fn download(file_name: &str, path: PathBuf, expected_hash: [u8; 32]) {
+    let mut response = surf::get(format!(
+        "{}/{}/{}",
+        host_uri(&random_bootnode().host),
+        "static",
+        file_name
+    ))
+    .await
+    .unwrap();
+    const CHUNK_SIZE: usize = 1024;
+    let mut buf = [0_u8; CHUNK_SIZE];
+    let length = response.len().unwrap();
+    let mut body = response.take_body().into_reader();
+    let file = File::create(path).unwrap();
+    let mut buf_writer = BufWriter::new(file);
+    let mut hasher = Sha256::new();
+    let pb = ProgressBar::new(length as u64);
+    pb.set_style(
+        indicatif::ProgressStyle::default_bar()
+            .template("{msg}\n[{elapsed_precise}] [{bar}] {pos}/{len} ({percent}%)")
+            .progress_chars("=> "),
+    );
+    pb.set_message(&format!("Downloading {}", file_name));
+    for _ in (0..length).step_by(CHUNK_SIZE) {
+        pb.inc(CHUNK_SIZE as u64);
+        let bytes_read = body.read(&mut buf).await.unwrap();
+        hasher.update(&buf[0..bytes_read]);
+        buf_writer.write_all(&buf[0..bytes_read]).unwrap();
+    }
+    pb.finish();
+    println!("Downloaded {}", file_name);
+    let hash: [u8; 32] = hasher.finalize().into();
+    if hash != expected_hash {
+        panic!(
+            "Invalid hash of {}. Expected {} but got {}",
+            file_name,
+            hex::encode(expected_hash),
+            hex::encode(hash.to_vec())
+        );
+    }
+}

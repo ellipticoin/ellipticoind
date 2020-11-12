@@ -25,6 +25,7 @@ mod pg;
 mod schema;
 mod start_up;
 mod state;
+mod static_files;
 pub mod sub_commands;
 mod system_contracts;
 pub mod transaction;
