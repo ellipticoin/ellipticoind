@@ -85,7 +85,10 @@ impl HashOnion {
                 .template("[{elapsed_precise}] [{bar}] {pos}/{len} ({percent}%)")
                 .progress_chars("=> "),
         );
-        for chunk in (0..hash_onion_size).collect::<Vec<_>>().chunks(sql_query_size) {
+        for chunk in (0..hash_onion_size)
+            .collect::<Vec<_>>()
+            .chunks(sql_query_size)
+        {
             pb.inc(chunk.len() as u64);
             let mut onion: Vec<Vec<u8>> = vec![];
             for _ in chunk {

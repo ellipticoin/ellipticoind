@@ -37,13 +37,6 @@ lazy_static! {
         BroadcastChannel::new();
 }
 
-// pub async fn set_miners(miners: Vec<Miner>) {
-//     // *MINERS.lock().await = Some(miners.clone());
-//     // CURRENT_MINER_CHANNEL
-//     //     .0
-//     //     .send(miners.first().clone().unwrap().clone())
-//     //     .await;
-// }
 impl STATE {
     pub async fn current_miner(&self) -> Miner {
         self.lock().await.miners.first().unwrap().clone()
