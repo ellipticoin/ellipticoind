@@ -1,6 +1,10 @@
 use bytes::Bytes;
+use errors::INVALID_ADDRESS_LENGTH;
+use std::convert::TryFrom;
 use std::convert::TryInto;
+use wasm_rpc::error::Error;
 use wasm_rpc::serde::{Deserialize, Serialize};
+
 #[derive(Clone, Deserialize, Serialize, PartialEq, Debug)]
 pub struct Token {
     pub issuer: Address,
@@ -25,15 +29,26 @@ impl From<&str> for Address {
     }
 }
 
-impl From<Vec<u8>> for Address {
-    fn from(public_key: Vec<u8>) -> Self {
-        Address::PublicKey(public_key[..].try_into().unwrap())
+impl TryFrom<Vec<u8>> for Address {
+    type Error = Box<Error>;
+    fn try_from(public_key: Vec<u8>) -> Result<Self, Self::Error> {
+        Ok(Address::PublicKey(
+            public_key[..]
+                .try_into()
+                .map_err(|_| Box::new(INVALID_ADDRESS_LENGTH.clone()))?,
+        ))
     }
 }
 
-impl From<Bytes> for Address {
-    fn from(public_key: Bytes) -> Self {
-        Address::PublicKey(public_key.into_vec()[..].try_into().unwrap())
+impl TryFrom<Bytes> for Address {
+    type Error = Box<Error>;
+
+    fn try_from(public_key: Bytes) -> Result<Self, Self::Error> {
+        Ok(Address::PublicKey(
+            public_key.into_vec()[..]
+                .try_into()
+                .map_err(|_| Box::new(INVALID_ADDRESS_LENGTH.clone()))?,
+        ))
     }
 }
 
