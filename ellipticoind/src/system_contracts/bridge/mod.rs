@@ -5,6 +5,7 @@ use crate::system_contracts::token::{self};
 use constants::SIGNERS;
 use ellipticoin::{Address, Bytes, Token};
 use std::boxed::Box;
+use std::convert::TryInto;
 use wasm_rpc::error::Error;
 use wasm_rpc_macros::export_native;
 
@@ -21,7 +22,7 @@ export_native! {
         .iter()
         .any(|&signer| Address::PublicKey(signer) == api.caller())
     {
-        token::mint(api, token(token_id), address.into(), amount)?;
+        token::mint(api, token(token_id), address.try_into()?, amount)?;
     } else {
         return Err(Box::new(errors::INVALID_SIGNER.clone()));
     }
