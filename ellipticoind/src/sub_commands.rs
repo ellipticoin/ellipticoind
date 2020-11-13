@@ -54,13 +54,18 @@ pub async fn dump_blocks(block_number: Option<u32>, file_name: &str) {
         .order(blocks_dsl::number.asc())
         .load::<Block>(&pg_db)
         .unwrap();
-    let transactions = Transaction::belonging_to(&blocks)
-        .order(transactions_dsl::position.asc())
-        .load::<Transaction>(&pg_db)
-        .unwrap()
-        .grouped_by(&blocks);
-
     let file = File::create(file_name.clone()).unwrap();
+    let mut transactions = vec![];
+    for blocks_chunk in blocks.chunks(u16::MAX as usize) {
+        transactions.extend(
+            Transaction::belonging_to(blocks_chunk)
+                .order(transactions_dsl::position.asc())
+                .load::<Transaction>(&pg_db)
+                .unwrap()
+                .grouped_by(&blocks_chunk),
+        );
+    }
+
     serde_cbor::to_writer(
         file,
         &blocks
