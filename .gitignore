@@ -7,3 +7,4 @@ ellipticoind/static/*
 
 .idea
 *.iml
+!.gitkeep
