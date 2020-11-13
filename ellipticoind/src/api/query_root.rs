@@ -160,6 +160,29 @@ impl QueryRoot {
             .map(Transaction::from)
     }
 
+    async fn transactions_by_contract_function(
+        _context: &Context,
+        sender_address: Bytes,
+        contract_name: String,
+        function_name: String,
+        page: U64,
+        page_size: U64,
+    ) -> Vec<Transaction> {
+        let con = get_pg_connection();
+        transactions::dsl::transactions
+            .filter(transactions::sender.eq(<Vec<u8>>::from(sender_address)))
+            .filter(transactions::contract.eq(contract_name))
+            .filter(transactions::function.eq(function_name))
+            .order_by(transactions::id.desc())
+            .limit(page_size.0.clone() as i64)
+            .offset((page.0 as i64) * (page_size.0 as i64))
+            .load::<models::Transaction>(&con)
+            .expect("Error loading exit transactions for")
+            .into_iter()
+            .map(Transaction::from)
+            .collect()
+    }
+
     async fn next_nonce(_context: &Context, address: Bytes) -> U32 {
         U32(next_nonce(address.0))
     }
