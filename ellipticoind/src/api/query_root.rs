@@ -1,3 +1,4 @@
+use crate::api::graphql::Error;
 use crate::{
     api::{graphql::Context, types::*},
     config::get_pg_connection,
@@ -8,15 +9,26 @@ use crate::{
     system_contracts::{api::ReadOnlyAPI, ellipticoin::get_issuance_rewards, exchange, token},
 };
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl};
+use ellipticoin::Address;
+use std::convert::TryInto;
 
 pub struct QueryRoot;
 #[juniper::graphql_object(
     Context = Context,
 )]
 impl QueryRoot {
-    async fn tokens(context: &Context, token_ids: Vec<TokenId>, address: Bytes) -> Vec<Token> {
+    async fn tokens(
+        context: &Context,
+        token_ids: Vec<TokenId>,
+        address: Bytes,
+    ) -> Result<Vec<Token>, Error> {
+        let address: Address = address
+            .0
+            .clone()
+            .try_into()
+            .map_err(|e: Box<wasm_rpc::error::Error>| Error(e.to_string()))?;
         let mut api = ReadOnlyAPI::new(context.rocksdb.clone(), context.redis_pool.get().unwrap());
-        token_ids
+        Ok(token_ids
             .iter()
             .cloned()
             .map(|TokenId { id, issuer }| {
@@ -26,7 +38,7 @@ impl QueryRoot {
                         issuer: issuer.as_str().into(),
                         id: id.0.clone().into(),
                     },
-                    address.0.clone().into(),
+                    address.clone(),
                 );
                 let total_supply = token::get_total_supply(
                     &mut api,
@@ -51,16 +63,21 @@ impl QueryRoot {
                     total_supply: U64(total_supply),
                 }
             })
-            .collect()
+            .collect())
     }
 
     async fn liquidity_tokens(
         context: &Context,
         token_ids: Vec<TokenId>,
         address: Bytes,
-    ) -> Vec<LiquidityToken> {
+    ) -> Result<Vec<LiquidityToken>, Error> {
+        let address: Address = address
+            .0
+            .clone()
+            .try_into()
+            .map_err(|e: Box<wasm_rpc::error::Error>| Error(e.to_string()))?;
         let mut api = ReadOnlyAPI::new(context.rocksdb.clone(), context.redis_pool.get().unwrap());
-        token_ids
+        Ok(token_ids
             .iter()
             .cloned()
             .map(|token| {
@@ -69,10 +86,9 @@ impl QueryRoot {
                 let token = ellipticoin::Token::from(token);
                 let liquidity_token = exchange::liquidity_token(token.clone());
                 let balance =
-                    token::get_balance(&mut api, liquidity_token.clone(), address.0.clone().into());
+                    token::get_balance(&mut api, liquidity_token.clone(), address.clone());
                 let price = exchange::get_price(&mut api, token.clone()).unwrap_or(0);
-                let share_of_pool =
-                    exchange::share_of_pool(&mut api, token, address.0.clone().into());
+                let share_of_pool = exchange::share_of_pool(&mut api, token, address.clone());
                 let total_supply = token::get_total_supply(&mut api, liquidity_token.clone());
 
                 LiquidityToken {
@@ -85,7 +101,7 @@ impl QueryRoot {
                     total_supply: U64(total_supply),
                 }
             })
-            .collect()
+            .collect())
     }
 
     async fn block(_context: &Context, block_number: U32) -> Option<Block> {
@@ -112,7 +128,8 @@ impl QueryRoot {
 
     async fn issuance_rewards(context: &Context, address: Bytes) -> Option<U64> {
         let mut api = ReadOnlyAPI::new(context.rocksdb.clone(), context.redis_pool.get().unwrap());
-        let issuance_rewards = get_issuance_rewards(&mut api, <Vec<u8>>::from(address).into());
+        let issuance_rewards =
+            get_issuance_rewards(&mut api, <Vec<u8>>::from(address).try_into().ok()?);
         Some(issuance_rewards.into())
     }
 

@@ -3,6 +3,7 @@ pub mod errors;
 
 use ellipticoin::{memory_accessors, Address, Bytes, Token};
 use errors::Error;
+use std::convert::TryInto;
 use wasm_rpc_macros::export_native;
 
 pub const BASE_FACTOR: u64 = 1_000_000;
@@ -21,7 +22,7 @@ export_native! {
         amount: u64,
     ) -> Result<(), Box<Error>> {
         debit(api, token.clone(), api.caller(), amount.clone())?;
-        credit(api, token, to.into(), amount);
+        credit(api, token, to.try_into()?, amount);
         Ok(())
     }
 
@@ -37,7 +38,7 @@ export_native! {
                 issuer: api.caller(),
                 id: token_id,
             },
-            address.into(),
+            address.try_into()?,
             amount,
         )
     }
