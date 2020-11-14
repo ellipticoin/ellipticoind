@@ -191,7 +191,9 @@ pub fn get_price<API: ellipticoin::API>(api: &mut API, token: Token) -> Result<u
 }
 
 fn get_pool_invariant<API: ellipticoin::API>(api: &mut API, token: Token) -> u64 {
-    get_base_token_reserves(api, token.clone()) * get_reserves(api, token)
+    let base_token_reserves = get_base_token_reserves(api, token.clone());
+    let reserves = get_reserves(api, token);
+    base_token_reserves * reserves
 }
 
 fn credit_base_token_reserves<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) {
