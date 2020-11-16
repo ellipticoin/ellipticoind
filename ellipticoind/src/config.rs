@@ -121,6 +121,7 @@ pub fn bootnodes() -> Vec<Bootnode> {
         .bootnodes
         .clone()
         .unwrap_or("./ellipticoind/dist/bootnodes.yaml".to_string());
+
     let string = std::fs::read_to_string(path).unwrap();
     serde_yaml::from_str(&string).unwrap()
 }
