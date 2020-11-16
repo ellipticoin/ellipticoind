@@ -532,6 +532,7 @@ mod tests {
         };
     }
 
+    #[test]
     fn test_exchange_base_token() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
