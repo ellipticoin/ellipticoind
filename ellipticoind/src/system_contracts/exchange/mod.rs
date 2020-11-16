@@ -17,8 +17,8 @@ lazy_static! {
 }
 
 memory_accessors!(
-    base_token_reserves(token: Token) -> u64;
-    reserves(token: Token) -> u64;
+    pool_supply_of_base_token(token: Token) -> u64;
+    pool_supply_of_token(token: Token) -> u64;
     share_holders(token: Token) -> HashSet<Address>;
 );
 
@@ -31,9 +31,9 @@ export_native! {
     ) -> Result<(), Box<Error>> {
         validate_base_token_amount(api, (amount * starting_price)/BASE_FACTOR)?;
         charge!(api, token.clone(), api.caller(), amount)?;
-        credit_reserves(api, token.clone(), amount);
+        credit_pool_supply_of_token(api, token.clone(), amount);
         charge!(api, BASE_TOKEN.clone(), api.caller(), (amount * starting_price) / BASE_FACTOR)?;
-        credit_base_token_reserves(api, token.clone(), (amount * starting_price) / BASE_FACTOR);
+        credit_pool_supply_of_base_token(api, token.clone(), (amount * starting_price) / BASE_FACTOR);
         mint(api, token, amount)?;
         Ok(())
     }
@@ -46,9 +46,9 @@ export_native! {
         let price = get_price(api, token.clone())?;
         validate_base_token_amount(api, (amount * price)/BASE_FACTOR)?;
         charge!(api, token.clone(), api.caller(), amount)?;
-        credit_reserves(api, token.clone(), amount);
+        credit_pool_supply_of_token(api, token.clone(), amount);
         charge!(api, BASE_TOKEN.clone(), api.caller(), (amount * price)/BASE_FACTOR)?;
-        credit_base_token_reserves(api, token.clone(), (amount * price)/BASE_FACTOR);
+        credit_pool_supply_of_base_token(api, token.clone(), (amount * price)/BASE_FACTOR);
         mint(api, token, amount)?;
         Ok(())
     }
@@ -59,13 +59,13 @@ export_native! {
         amount: u64,
     ) -> Result<(), Box<Error>> {
         validate_liquidity_amount(api, token.clone(), amount)?;
-        let reserves = get_reserves(api, token.clone());
-        let base_token_reserves = get_base_token_reserves(api, token.clone());
+        let token_supply = get_pool_supply_of_token(api, token.clone());
+        let base_token_supply = get_pool_supply_of_base_token(api, token.clone());
         let total_supply = token::get_total_supply(api, liquidity_token(token.clone()));
-        debit_base_token_reserves(api, token.clone(), (base_token_reserves * amount) / total_supply);
-        pay!(api, token.clone(), api.caller(), (reserves * amount) / total_supply)?;
-        debit_reserves(api, token.clone(), (reserves * amount) / total_supply);
-        pay!(api, BASE_TOKEN.clone(), api.caller(), (base_token_reserves * amount) / total_supply)?;
+        debit_pool_supply_of_base_token(api, token.clone(), (base_token_supply * amount) / total_supply);
+        pay!(api, token.clone(), api.caller(), (token_supply * amount) / total_supply)?;
+        debit_pool_supply_of_token(api, token.clone(), (token_supply * amount) / total_supply);
+        pay!(api, BASE_TOKEN.clone(), api.caller(), (base_token_supply * amount) / total_supply)?;
         burn(api, token, amount)?;
         Ok(())
     }
@@ -98,12 +98,12 @@ export_native! {
         }
 
         if book_input_entry {
-            credit_reserves(api, input_token.clone(), input_amount);
-            debit_base_token_reserves(api, input_token.clone(), input_amount_in_base_token);
+            credit_pool_supply_of_token(api, input_token.clone(), input_amount);
+            debit_pool_supply_of_base_token(api, input_token.clone(), input_amount_in_base_token);
         }
         if book_output_entry {
-            credit_base_token_reserves(api, output_token.clone(), input_amount_in_base_token);
-            debit_reserves(api, output_token.clone(), output_token_amount);
+            credit_pool_supply_of_base_token(api, output_token.clone(), input_amount_in_base_token);
+            debit_pool_supply_of_token(api, output_token.clone(), output_token_amount);
         }
 
         charge!(api, input_token.clone(), api.caller(), input_amount)?;
@@ -137,8 +137,12 @@ fn calculate_input_amount_in_base_token<API: ellipticoin::API>(
     amount: u64,
 ) -> Result<u64, Box<Error>> {
     let invariant = get_pool_invariant(api, token.clone());
-    let new_base_token_reserves = invariant / (get_reserves(api, token.clone()) + amount);
-    Ok(get_base_token_reserves(api, token.clone()) - new_base_token_reserves)
+    let divisor = get_pool_supply_of_token(api, token.clone()) + amount;
+    if divisor == 0 {
+        return Ok(0);
+    }
+    let new_base_token_supply = invariant / divisor;
+    Ok(get_pool_supply_of_base_token(api, token.clone()) - new_base_token_supply)
 }
 
 fn calculate_amount_in_output_token<API: ellipticoin::API>(
@@ -147,9 +151,12 @@ fn calculate_amount_in_output_token<API: ellipticoin::API>(
     amount_in_base_token: u64,
 ) -> Result<u64, Box<Error>> {
     let invariant = get_pool_invariant(api, output_token.clone());
-    let new_token_reserves =
-        invariant / (get_base_token_reserves(api, output_token.clone()) + amount_in_base_token);
-    Ok(get_reserves(api, output_token.clone()) - new_token_reserves)
+    let divisor = get_pool_supply_of_base_token(api, output_token.clone()) + amount_in_base_token;
+    if divisor == 0 {
+        return Ok(0);
+    }
+    let new_token_supply = invariant / divisor;
+    Ok(get_pool_supply_of_token(api, output_token.clone()) - new_token_supply)
 }
 
 fn apply_fee(amount: u64) -> u64 {
@@ -182,36 +189,46 @@ fn validate_liquidity_amount<API: ellipticoin::API>(
 }
 
 pub fn get_price<API: ellipticoin::API>(api: &mut API, token: Token) -> Result<u64, Box<Error>> {
-    let base_token_reserves = get_base_token_reserves(api, token.clone());
-    if base_token_reserves == 0 {
+    let base_token_supply = get_pool_supply_of_base_token(api, token.clone());
+    if base_token_supply == 0 {
         Err(Box::new(errors::POOL_NOT_FOUND.clone()))
     } else {
-        Ok(base_token_reserves * BASE_FACTOR / get_reserves(api, token))
+        Ok(base_token_supply * BASE_FACTOR / get_pool_supply_of_token(api, token))
     }
 }
 
 fn get_pool_invariant<API: ellipticoin::API>(api: &mut API, token: Token) -> u64 {
-    get_base_token_reserves(api, token.clone()) * get_reserves(api, token)
+    let base_token_supply = get_pool_supply_of_base_token(api, token.clone());
+    let token_supply = get_pool_supply_of_token(api, token);
+    base_token_supply * token_supply
 }
 
-fn credit_base_token_reserves<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) {
-    let base_token_reserves = get_base_token_reserves(api, token.clone());
-    set_base_token_reserves(api, token.clone(), base_token_reserves + amount);
+fn credit_pool_supply_of_base_token<API: ellipticoin::API>(
+    api: &mut API,
+    token: Token,
+    amount: u64,
+) {
+    let base_token_supply = get_pool_supply_of_base_token(api, token.clone());
+    set_pool_supply_of_base_token(api, token.clone(), base_token_supply + amount);
 }
 
-fn debit_base_token_reserves<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) {
-    let base_token_reserves = get_base_token_reserves(api, token.clone());
-    set_base_token_reserves(api, token.clone(), base_token_reserves - amount);
+fn debit_pool_supply_of_base_token<API: ellipticoin::API>(
+    api: &mut API,
+    token: Token,
+    amount: u64,
+) {
+    let base_token_supply = get_pool_supply_of_base_token(api, token.clone());
+    set_pool_supply_of_base_token(api, token.clone(), base_token_supply - amount);
 }
 
-fn credit_reserves<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) {
-    let reserves = get_reserves(api, token.clone());
-    set_reserves(api, token.clone(), reserves + amount);
+fn credit_pool_supply_of_token<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) {
+    let token_supply = get_pool_supply_of_token(api, token.clone());
+    set_pool_supply_of_token(api, token.clone(), token_supply + amount);
 }
 
-fn debit_reserves<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) {
-    let reserves = get_reserves(api, token.clone());
-    set_reserves(api, token.clone(), reserves - amount);
+fn debit_pool_supply_of_token<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) {
+    let token_supply = get_pool_supply_of_token(api, token.clone());
+    set_pool_supply_of_token(api, token.clone(), token_supply - amount);
 }
 
 pub fn liquidity_token(token: Token) -> Token {
@@ -225,11 +242,11 @@ pub fn price<API: ellipticoin::API>(api: &mut API, token: Token) -> u64 {
     if token == BASE_TOKEN.clone() {
         return BASE_FACTOR;
     }
-    let base_token_reserves = get_base_token_reserves(api, token.clone());
-    if base_token_reserves == 0 {
+    let base_token_supply = get_pool_supply_of_base_token(api, token.clone());
+    if base_token_supply == 0 {
         0
     } else {
-        base_token_reserves * BASE_FACTOR / get_reserves(api, token)
+        base_token_supply * BASE_FACTOR / get_pool_supply_of_token(api, token)
     }
 }
 
@@ -535,7 +552,7 @@ mod tests {
         );
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
         api.caller = Address::PublicKey(BOB.clone());
-        credit_base_token_reserves(&mut api, BASE_TOKEN.clone(), 100 * BASE_FACTOR);
+        credit_pool_supply_of_base_token(&mut api, BASE_TOKEN.clone(), 100 * BASE_FACTOR);
         token::set_balance(
             &mut api,
             BASE_TOKEN.clone().into(),
