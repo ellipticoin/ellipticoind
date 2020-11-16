@@ -41,6 +41,7 @@ pub struct LiquidityToken {
     pub balance: U64,
     pub share_of_pool: U32,
     pub total_supply: U64,
+    pub total_pool_supply: U64,
 }
 
 #[juniper::graphql_object]
@@ -67,6 +68,10 @@ impl LiquidityToken {
 
     fn total_supply(&self) -> U64 {
         self.total_supply.clone()
+    }
+
+    fn total_pool_supply(&self) -> U64 {
+        self.total_pool_supply.clone()
     }
 }
 
