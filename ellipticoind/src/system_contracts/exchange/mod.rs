@@ -96,7 +96,7 @@ export_native! {
         if output_token_amount < minimum_output_token_amount {
             return Err(Box::new(errors::MAX_SLIPPAGE_EXCEEDED.clone()))
         }
-
+        charge!(api, input_token.clone(), api.caller(), input_amount)?;
         if book_input_entry {
             credit_pool_supply_of_token(api, input_token.clone(), input_amount);
             debit_pool_supply_of_base_token(api, input_token.clone(), input_amount_in_base_token);
@@ -105,8 +105,6 @@ export_native! {
             credit_pool_supply_of_base_token(api, output_token.clone(), input_amount_in_base_token);
             debit_pool_supply_of_token(api, output_token.clone(), output_token_amount);
         }
-
-        charge!(api, input_token.clone(), api.caller(), input_amount)?;
         pay!(api, output_token.clone(), api.caller(), output_token_amount)?;
 
         Ok(())
