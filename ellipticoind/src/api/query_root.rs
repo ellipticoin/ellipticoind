@@ -91,7 +91,8 @@ impl QueryRoot {
                 let share_of_pool =
                     exchange::share_of_pool(&mut api, token.clone(), address.clone());
                 let total_supply = token::get_total_supply(&mut api, liquidity_token.clone());
-                let total_pool_supply = exchange::get_pool_supply_of_token(&mut api, token.clone());
+                let pool_supply_of_token = exchange::get_pool_supply_of_token(&mut api, token.clone());
+                let pool_supply_of_base_token = exchange::get_pool_supply_of_base_token(&mut api, token.clone());
 
                 LiquidityToken {
                     issuer,
@@ -101,7 +102,8 @@ impl QueryRoot {
 
                     share_of_pool: U32(share_of_pool),
                     total_supply: U64(total_supply),
-                    total_pool_supply: U64(total_pool_supply),
+                    pool_supply_of_token: U64(pool_supply_of_token),
+                    pool_supply_of_base_token: U64(pool_supply_of_base_token)
                 }
             })
             .collect())

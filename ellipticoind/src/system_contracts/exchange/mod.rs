@@ -22,6 +22,14 @@ memory_accessors!(
     share_holders(token: Token) -> HashSet<Address>;
 );
 
+fn mint<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) -> Result<(), Box<Error>> {
+    token::mint(api, liquidity_token(token.clone()), api.caller(), amount)?;
+    let mut share_holders = get_share_holders(api, token.clone());
+    share_holders.insert(api.caller());
+    set_share_holders(api, token, share_holders);
+    Ok(())
+}
+
 export_native! {
     pub fn create_pool<API: ellipticoin::API>(
         api: &mut API,
@@ -59,14 +67,19 @@ export_native! {
         amount: u64,
     ) -> Result<(), Box<Error>> {
         validate_liquidity_amount(api, token.clone(), amount)?;
-        let token_supply = get_pool_supply_of_token(api, token.clone());
-        let base_token_supply = get_pool_supply_of_base_token(api, token.clone());
-        let total_supply = token::get_total_supply(api, liquidity_token(token.clone()));
-        debit_pool_supply_of_base_token(api, token.clone(), (base_token_supply * amount) / total_supply);
-        pay!(api, token.clone(), api.caller(), (token_supply * amount) / total_supply)?;
-        debit_pool_supply_of_token(api, token.clone(), (token_supply * amount) / total_supply);
-        pay!(api, BASE_TOKEN.clone(), api.caller(), (base_token_supply * amount) / total_supply)?;
-        burn(api, token, amount)?;
+        let current_token_balance = get_pool_supply_of_token(api, token.clone());
+        let current_base_token_balance = get_pool_supply_of_base_token(api, token.clone());
+        let deposited_token_amount = token::get_total_supply(api, liquidity_token(token.clone()));
+
+        let base_token_amount = amount * current_base_token_balance / current_token_balance;
+
+        debit_pool_supply_of_base_token(api, token.clone(), base_token_amount);
+        pay!(api, BASE_TOKEN.clone(), api.caller(), base_token_amount)?;
+        debit_pool_supply_of_token(api, token.clone(), amount);
+        pay!(api, token.clone(), api.caller(), amount)?;
+
+        burn(api, token, amount * deposited_token_amount / current_token_balance)?;
+
         Ok(())
     }
 
@@ -111,14 +124,6 @@ export_native! {
 
         Ok(())
     }
-}
-
-fn mint<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) -> Result<(), Box<Error>> {
-    token::mint(api, liquidity_token(token.clone()), api.caller(), amount)?;
-    let mut share_holders = get_share_holders(api, token.clone());
-    share_holders.insert(api.caller());
-    set_share_holders(api, token, share_holders);
-    Ok(())
 }
 
 fn burn<API: ellipticoin::API>(api: &mut API, token: Token, amount: u64) -> Result<(), Box<Error>> {
@@ -180,8 +185,14 @@ fn validate_liquidity_amount<API: ellipticoin::API>(
     token: Token,
     amount: u64,
 ) -> Result<(), Box<Error>> {
+    let total_deposited = token::get_total_supply(api, liquidity_token(token.clone()));
+    if total_deposited == 0 {
+        return Err(Box::new(token::errors::INSUFFICIENT_FUNDS.clone()));
+    }
+    let pool_balance = get_pool_supply_of_token(api, token.clone());
     let liquidity_balance = token::get_balance(api, liquidity_token(token.clone()), api.caller());
-    if amount > liquidity_balance {
+    let balance = liquidity_balance * pool_balance / total_deposited;
+    if amount > balance {
         Err(Box::new(token::errors::INSUFFICIENT_FUNDS.clone()))
     } else {
         Ok(())
