@@ -411,7 +411,7 @@ mod tests {
         exchange::native::create_pool(&mut api, ETH.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR)
             .unwrap();
         api.caller = Address::PublicKey(*BOB);
-        exchange::native::add_liqidity(&mut api, ETH.clone(), 1 * BASE_FACTOR).unwrap();
+        exchange::native::add_liquidity(&mut api, ETH.clone(), 1 * BASE_FACTOR).unwrap();
         api.caller = Address::PublicKey(*ALICE);
         native::start_mining(&mut api, HOST.to_string(), 1, *alices_onion.last().unwrap()).unwrap();
         api.caller = Address::PublicKey(*BOB);
