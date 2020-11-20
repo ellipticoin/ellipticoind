@@ -46,39 +46,45 @@ export_native! {
         Ok(())
     }
 
-    pub fn add_liqidity<API: ellipticoin::API>(
+    pub fn add_liquidity<API: ellipticoin::API>(
         api: &mut API,
         token: Token,
         amount: u64,
     ) -> Result<(), Box<Error>> {
         let price = get_price(api, token.clone())?;
         validate_base_token_amount(api, (amount * price)/BASE_FACTOR)?;
+
+        let current_token_balance = get_pool_supply_of_token(api, token.clone());
+        let current_liquidity_token_balance = token::get_total_supply(api, liquidity_token(token.clone()));
+
+        let amount_to_mint = amount / current_token_balance * current_liquidity_token_balance;
+
         charge!(api, token.clone(), api.caller(), amount)?;
         credit_pool_supply_of_token(api, token.clone(), amount);
         charge!(api, BASE_TOKEN.clone(), api.caller(), (amount * price)/BASE_FACTOR)?;
         credit_pool_supply_of_base_token(api, token.clone(), (amount * price)/BASE_FACTOR);
-        mint(api, token, amount)?;
+        mint(api, token, amount_to_mint)?;
         Ok(())
     }
 
-    pub fn remove_liqidity<API: ellipticoin::API>(
+    pub fn remove_liquidity<API: ellipticoin::API>(
         api: &mut API,
         token: Token,
         amount: u64,
     ) -> Result<(), Box<Error>> {
         validate_liquidity_amount(api, token.clone(), amount)?;
-        let current_token_balance = get_pool_supply_of_token(api, token.clone());
-        let current_base_token_balance = get_pool_supply_of_base_token(api, token.clone());
-        let deposited_token_amount = token::get_total_supply(api, liquidity_token(token.clone()));
+        let token_balance = get_pool_supply_of_token(api, token.clone());
+        let base_token_balance = get_pool_supply_of_base_token(api, token.clone());
+        let liquidity_token_supply = token::get_total_supply(api, liquidity_token(token.clone()));
 
-        let base_token_amount = amount * current_base_token_balance / current_token_balance;
+        let remove_ratio = amount / token_balance;
 
-        debit_pool_supply_of_base_token(api, token.clone(), base_token_amount);
-        pay!(api, BASE_TOKEN.clone(), api.caller(), base_token_amount)?;
+        debit_pool_supply_of_base_token(api, token.clone(), base_token_balance * remove_ratio);
+        pay!(api, BASE_TOKEN.clone(), api.caller(), base_token_balance * remove_ratio)?;
         debit_pool_supply_of_token(api, token.clone(), amount);
         pay!(api, token.clone(), api.caller(), amount)?;
 
-        burn(api, token, amount * deposited_token_amount / current_token_balance)?;
+        burn(api, token, liquidity_token_supply * remove_ratio)?;
 
         Ok(())
     }
@@ -185,14 +191,16 @@ fn validate_liquidity_amount<API: ellipticoin::API>(
     token: Token,
     amount: u64,
 ) -> Result<(), Box<Error>> {
-    let total_deposited = token::get_total_supply(api, liquidity_token(token.clone()));
-    if total_deposited == 0 {
+    let liquidity_token_supply = token::get_total_supply(api, liquidity_token(token.clone()));
+    if liquidity_token_supply == 0 {
         return Err(Box::new(token::errors::INSUFFICIENT_FUNDS.clone()));
     }
-    let pool_balance = get_pool_supply_of_token(api, token.clone());
-    let liquidity_balance = token::get_balance(api, liquidity_token(token.clone()), api.caller());
-    let balance = liquidity_balance * pool_balance / total_deposited;
-    if amount > balance {
+
+    let token_supply = get_pool_supply_of_token(api, token.clone());
+    let requester_liquidity_token_balance =
+        token::get_balance(api, liquidity_token(token.clone()), api.caller());
+
+    if amount / token_supply > requester_liquidity_token_balance / liquidity_token_supply {
         Err(Box::new(token::errors::INSUFFICIENT_FUNDS.clone()))
     } else {
         Ok(())
@@ -270,6 +278,14 @@ pub fn share_of_pool<API: ellipticoin::API>(api: &mut API, token: Token, address
     (balance * BASE_FACTOR / total_supply) as u32
 }
 
+pub fn tokens_in_pool<API: ellipticoin::API>(api: &mut API, token: Token) -> u64 {
+    get_pool_supply_of_token(api, token)
+}
+
+pub fn base_tokens_in_pool<API: ellipticoin::API>(api: &mut API, token: Token) -> u64 {
+    get_pool_supply_of_base_token(api, token)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{native, *};
@@ -292,7 +308,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add_liqidity() {
+    fn test_add_liquidity() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
         let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
@@ -309,7 +325,7 @@ mod tests {
             2 * BASE_FACTOR,
         );
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
-        native::add_liqidity(&mut api, APPLES.clone(), 1 * BASE_FACTOR).unwrap();
+        native::add_liquidity(&mut api, APPLES.clone(), 1 * BASE_FACTOR).unwrap();
 
         assert_eq!(
             token::get_balance(
@@ -329,7 +345,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add_liqidity_insufficient_base_token_funds() {
+    fn test_add_liquidity_insufficient_base_token_funds() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
         let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
@@ -346,7 +362,7 @@ mod tests {
             1 * BASE_FACTOR,
         );
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
-        assert!(native::add_liqidity(&mut api, APPLES.clone(), 1 * BASE_FACTOR).is_err());
+        assert!(native::add_liquidity(&mut api, APPLES.clone(), 1 * BASE_FACTOR).is_err());
 
         assert_eq!(
             token::get_balance(&mut api, APPLES.clone(), Address::PublicKey(*ALICE)),
@@ -632,7 +648,7 @@ mod tests {
     }
 
     #[test]
-    fn test_remove_liqidity() {
+    fn test_remove_liquidity() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
         let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
@@ -677,15 +693,19 @@ mod tests {
             0,
         )
         .unwrap();
+
         api.caller = Address::PublicKey(ALICE.clone());
-        native::remove_liqidity(&mut api, APPLES.clone(), 100 * BASE_FACTOR).unwrap();
+        let apples_in_pool = tokens_in_pool(&mut api, APPLES.clone().into());
+        let base_token_in_pool = base_tokens_in_pool(&mut api, APPLES.clone().into());
+
+        native::remove_liquidity(&mut api, APPLES.clone(), apples_in_pool).unwrap();
         assert_eq!(
             token::get_balance(
                 &mut api,
                 APPLES.clone().into(),
                 ellipticoin::Address::PublicKey(*ALICE)
             ),
-            66_766_766
+            apples_in_pool
         );
         assert_eq!(
             token::get_balance(
@@ -693,12 +713,12 @@ mod tests {
                 BASE_TOKEN.clone(),
                 ellipticoin::Address::PublicKey(*ALICE)
             ),
-            149_924_888
+            base_token_in_pool
         );
     }
 
     #[test]
-    fn test_remove_liqidity_after_trade() {
+    fn test_remove_liquidity_after_trade() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
         let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
@@ -725,27 +745,42 @@ mod tests {
         )
         .unwrap();
         api.caller = Address::PublicKey(ALICE.clone());
-        native::remove_liqidity(&mut api, APPLES.clone(), 100 * BASE_FACTOR).unwrap();
+
+        let alice_token_balance_before = token::get_balance(
+            &mut api,
+            APPLES.clone().into(),
+            ellipticoin::Address::PublicKey(*ALICE),
+        );
+        let pool_token_supply = tokens_in_pool(&mut api, APPLES.clone().into());
+
+        let alice_base_token_balance_before = token::get_balance(
+            &mut api,
+            BASE_TOKEN.clone().into(),
+            ellipticoin::Address::PublicKey(*ALICE),
+        );
+        let pool_base_token_supply = base_tokens_in_pool(&mut api, APPLES.clone().into());
+
+        native::remove_liquidity(&mut api, APPLES.clone(), pool_token_supply).unwrap();
         assert_eq!(
             token::get_balance(
                 &mut api,
                 APPLES.clone().into(),
                 ellipticoin::Address::PublicKey(*ALICE)
-            ),
-            101000000
+            ) - alice_token_balance_before,
+            pool_token_supply
         );
         assert_eq!(
             token::get_balance(
                 &mut api,
                 BASE_TOKEN.clone().into(),
                 ellipticoin::Address::PublicKey(*ALICE)
-            ),
-            100000000
+            ) - alice_base_token_balance_before,
+            pool_base_token_supply
         );
     }
 
     #[test]
-    fn test_remove_liqidity_insufficient_liquidity() {
+    fn test_remove_liquidity_insufficient_liquidity() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         let mut state = TestState::new();
         let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
@@ -762,6 +797,6 @@ mod tests {
             1 * BASE_FACTOR,
         );
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, BASE_FACTOR).unwrap();
-        assert!(native::remove_liqidity(&mut api, APPLES.clone(), 2 * BASE_FACTOR).is_err());
+        assert!(native::remove_liquidity(&mut api, APPLES.clone(), 2 * BASE_FACTOR).is_err());
     }
 }
