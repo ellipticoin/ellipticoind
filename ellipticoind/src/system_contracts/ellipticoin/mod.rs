@@ -266,9 +266,10 @@ fn distribute(mut amount: u64, mut values: Vec<u64>) -> Vec<u64> {
     values.reverse();
     for balance in values.clone() {
         let denominator = rest.iter().sum::<u64>();
-        let distribution = match denominator {
-            0 => 0,
-            _ => (amount * balance) / denominator,
+        let distribution = if denominator == 0 {
+            0
+        } else {
+            (amount * balance) / denominator
         };
         amount -= distribution;
         distributions.push(distribution);
