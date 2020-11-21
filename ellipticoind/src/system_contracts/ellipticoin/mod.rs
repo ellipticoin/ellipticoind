@@ -265,7 +265,12 @@ fn distribute(mut amount: u64, mut values: Vec<u64>) -> Vec<u64> {
     let mut distributions: Vec<u64> = Default::default();
     values.reverse();
     for balance in values.clone() {
-        let distribution = (amount * balance) / rest.iter().sum::<u64>();
+        let denominator = rest.iter().sum::<u64>();
+        let distribution = if denominator == 0 {
+            0
+        } else {
+            (amount * balance) / denominator
+        };
         amount -= distribution;
         distributions.push(distribution);
         rest.pop();
@@ -411,7 +416,7 @@ mod tests {
         exchange::native::create_pool(&mut api, ETH.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR)
             .unwrap();
         api.caller = Address::PublicKey(*BOB);
-        exchange::native::add_liqidity(&mut api, ETH.clone(), 1 * BASE_FACTOR).unwrap();
+        exchange::native::add_liquidity(&mut api, ETH.clone(), 1 * BASE_FACTOR).unwrap();
         api.caller = Address::PublicKey(*ALICE);
         native::start_mining(&mut api, HOST.to_string(), 1, *alices_onion.last().unwrap()).unwrap();
         api.caller = Address::PublicKey(*BOB);
