@@ -129,9 +129,27 @@ pub async fn load_genesis_blocks() {
     let blocks: Vec<(Block, Vec<Transaction>)> =
         serde_cbor::from_reader(genesis_blocks_file).unwrap();
     println!("Applying genesis blocks");
-    for (block, transactions) in blocks {
+    for (block, mut transactions) in blocks {
+        transactions = if (0..343866_i32).contains(&block.number) {
+            transactions
+                .iter()
+                .cloned()
+                .map(fix_spelling_errors)
+                .collect()
+        } else {
+            transactions
+        };
         block.apply(transactions).await;
     }
+}
+
+pub fn fix_spelling_errors(mut transaction: Transaction) -> Transaction {
+    transaction.function = match transaction.function.as_str() {
+        "add_liqidity" => "add_liquidity".to_string(),
+        "remove_liqidity" => "remove_liquidity".to_string(),
+        function => function.to_string(),
+    };
+    transaction
 }
 
 pub async fn reset_redis() {
