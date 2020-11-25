@@ -11,11 +11,21 @@ lazy_static! {
 const BLOCKS_PER_ERA: u32 = 8_000_000;
 const NUMBER_OF_ERAS: u32 = 8;
 
+const V1_ISSUANCE: u64 = 130_036_019_000;
+const FIRST_ERA_BASE_ISSUANCE_PER_BLOCK: u64 = BASE_FACTOR * 128 / 100;
+const LAST_BLOCK_OF_FIRST_ERA: u32 = (((BLOCKS_PER_ERA as u64 * FIRST_ERA_BASE_ISSUANCE_PER_BLOCK)
+    - V1_ISSUANCE)
+    / FIRST_ERA_BASE_ISSUANCE_PER_BLOCK) as u32;
+
 pub fn block_reward_at(block: u32) -> u64 {
     if block > BLOCKS_PER_ERA * NUMBER_OF_ERAS {
         return 0;
     }
-    let era = block / BLOCKS_PER_ERA;
+    if block <= LAST_BLOCK_OF_FIRST_ERA {
+        return FIRST_ERA_BASE_ISSUANCE_PER_BLOCK as u64;
+    }
+
+    let era = ((block - LAST_BLOCK_OF_FIRST_ERA) / BLOCKS_PER_ERA) + 1;
     BASE_FACTOR * 128 * 10u64.pow(6) / 2u64.pow(era) / 10u64.pow(8)
 }
 
