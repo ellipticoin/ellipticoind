@@ -1,12 +1,15 @@
-use crate::api::graphql::Error;
 use crate::{
-    api::{graphql::Context, types::*},
+    api::{
+        graphql::{Context, Error},
+        types::*,
+    },
     config::get_pg_connection,
     diesel::{BelongingToDsl, RunQueryDsl},
     models,
     models::transaction::next_nonce,
     schema::{blocks, blocks::columns::number, transactions},
-    system_contracts::{api::ReadOnlyAPI, ellipticoin::get_issuance_rewards, exchange, token},
+    state::IN_MEMORY_STATE,
+    system_contracts::{api::InMemoryAPI, ellipticoin::get_issuance_rewards, exchange, token},
 };
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl};
 use ellipticoin::Address;
@@ -18,7 +21,7 @@ pub struct QueryRoot;
 )]
 impl QueryRoot {
     async fn tokens(
-        context: &Context,
+        _context: &Context,
         token_ids: Vec<TokenId>,
         address: Bytes,
     ) -> Result<Vec<Token>, Error> {
@@ -27,7 +30,8 @@ impl QueryRoot {
             .clone()
             .try_into()
             .map_err(|e: Box<wasm_rpc::error::Error>| Error(e.to_string()))?;
-        let mut api = ReadOnlyAPI::new(context.rocksdb.clone(), context.redis_pool.get().unwrap());
+        let mut state = IN_MEMORY_STATE.lock().await;
+        let mut api = InMemoryAPI::new(&mut state, None);
         Ok(token_ids
             .iter()
             .cloned()
@@ -67,7 +71,7 @@ impl QueryRoot {
     }
 
     async fn liquidity_tokens(
-        context: &Context,
+        _context: &Context,
         token_ids: Vec<TokenId>,
         address: Bytes,
     ) -> Result<Vec<LiquidityToken>, Error> {
@@ -76,7 +80,8 @@ impl QueryRoot {
             .clone()
             .try_into()
             .map_err(|e: Box<wasm_rpc::error::Error>| Error(e.to_string()))?;
-        let mut api = ReadOnlyAPI::new(context.rocksdb.clone(), context.redis_pool.get().unwrap());
+        let mut state = IN_MEMORY_STATE.lock().await;
+        let mut api = InMemoryAPI::new(&mut state, None);
         Ok(token_ids
             .iter()
             .cloned()
@@ -133,8 +138,9 @@ impl QueryRoot {
         Some(block_number.into())
     }
 
-    async fn issuance_rewards(context: &Context, address: Bytes) -> Option<U64> {
-        let mut api = ReadOnlyAPI::new(context.rocksdb.clone(), context.redis_pool.get().unwrap());
+    async fn issuance_rewards(_context: &Context, address: Bytes) -> Option<U64> {
+        let mut state = IN_MEMORY_STATE.lock().await;
+        let mut api = InMemoryAPI::new(&mut state, None);
         let issuance_rewards =
             get_issuance_rewards(&mut api, <Vec<u8>>::from(address).try_into().ok()?);
         Some(issuance_rewards.into())

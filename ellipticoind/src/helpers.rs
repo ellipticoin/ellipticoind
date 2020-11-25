@@ -1,9 +1,6 @@
 use crate::{
-    client::post_transaction,
-    config::verification_key,
-    constants::{STATE, TRANSACTION_QUEUE},
-    models::transaction::Transaction,
-    transaction::TransactionRequest,
+    client::post_transaction, config::verification_key, constants::TRANSACTION_QUEUE,
+    models::transaction::Transaction, state::current_miner, transaction::TransactionRequest,
 };
 use async_std::{future::Future, prelude::FutureExt as asyncStdFutureExt, task::sleep};
 use futures::future::FutureExt;
@@ -29,11 +26,11 @@ pub fn bytes_to_value(bytes: Vec<u8>) -> Value {
 }
 
 pub async fn run_transaction(transaction_request: TransactionRequest) -> Transaction {
-    if STATE.current_miner().await.address == verification_key() {
+    if current_miner().await.address == verification_key() {
         let receiver = TRANSACTION_QUEUE.push(transaction_request).await;
         receiver.await.unwrap()
     } else {
-        post_transaction(&STATE.current_miner().await.host, transaction_request).await
+        post_transaction(&current_miner().await.host, transaction_request).await
     }
 }
 

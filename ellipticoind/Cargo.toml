@@ -25,12 +25,9 @@ http-service = "0.5.0"
 indicatif = "0.15.0"
 juniper = { git = "https://github.com/graphql-rust/juniper" }
 lazy_static = "1.4.0"
-libsecp256k1 = "0.3.5"
 num-bigint = { version = "*", features = ["serde"] }
 num-traits = "0.2.12"
-r2d2_redis = { git = "https://github.com/sorccu/r2d2-redis" }
 rand = {version = "0.7.3", features = ["small_rng"]}
-rocksdb = "0.15.0"
 serde = { version = "1.0.117", features = ["derive"] }
 serde_bytes = "0.11.5"
 serde_cbor = "0.11.1"
@@ -40,7 +37,6 @@ sha2 = "0.9.1"
 surf = "2.0.0"
 tide = { git = "https://github.com/http-rs/tide", branch="listen_with", features = ["logger"]}
 time = "0.2.22"
-tiny-keccak = {version = "2.0.1", features = ["keccak"] }
 wasm-rpc = "0.2.17"
 wasm-rpc-macros = "0.2.17"
 

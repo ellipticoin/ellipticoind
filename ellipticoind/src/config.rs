@@ -1,5 +1,4 @@
-extern crate clap;
-use crate::{pg, types};
+use crate::pg;
 use clap::Clap;
 use diesel::{
     pg::PgConnection,
@@ -7,14 +6,12 @@ use diesel::{
 };
 use dotenv::dotenv;
 use ed25519_zebra::{SigningKey, VerificationKey};
-use r2d2_redis::RedisConnectionManager;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Deserializer};
 use std::{
     convert::TryFrom,
     env,
     net::{IpAddr, SocketAddr},
-    sync::Arc,
 };
 
 #[derive(Clap, Debug)]
@@ -33,7 +30,7 @@ pub struct Opts {
     pub rocksdb_path: String,
     #[clap(
         long = "genesis-path",
-        default_value = "./ellipticoind/static/genesis.cbor"
+        default_value = "./ellipticoind/dist/genesis.cbor"
     )]
     pub genesis_state_path: String,
     #[clap(
@@ -43,8 +40,6 @@ pub struct Opts {
     pub genesis_blocks_path: String,
     #[clap(long = "save-state")]
     pub save_state: bool,
-    #[clap(long = "redis-url", default_value = "redis://127.0.0.1")]
-    pub redis_url: String,
     #[clap(subcommand)]
     pub subcmd: Option<SubCommand>,
     #[clap(long = "websocket-port", default_value = "81")]
@@ -86,18 +81,10 @@ lazy_static! {
             0
         }
     };
-    pub static ref REDIS_POOL: types::redis::Pool = {
-        let redis_manager = RedisConnectionManager::new(OPTS.redis_url.clone()).unwrap();
-        r2d2_redis::r2d2::Pool::builder()
-            .build(redis_manager)
-            .unwrap()
-    };
     pub static ref PG_POOL: pg::Pool = {
         let manager = ConnectionManager::<PgConnection>::new(&database_url());
         Pool::new(manager).unwrap()
     };
-    pub static ref ROCKSDB: Arc<rocksdb::DB> =
-        Arc::new(rocksdb::DB::open_default(&OPTS.rocksdb_path).unwrap());
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -163,21 +150,8 @@ pub fn random_bootnode() -> Bootnode {
     (*bootnodes().choose(&mut rng).unwrap()).clone()
 }
 
-pub fn get_redis_connection() -> types::redis::Connection {
-    REDIS_POOL.get().unwrap()
-}
-
 pub fn get_pg_connection() -> pg::Connection {
     PG_POOL.get().unwrap()
-}
-
-pub fn get_rocksdb() -> Arc<rocksdb::DB> {
-    (*ROCKSDB).clone()
-}
-pub async fn websocket_socket() -> SocketAddr {
-    let mut websocket_socket = socket().clone();
-    websocket_socket.set_port(OPTS.websocket_port);
-    websocket_socket
 }
 
 pub fn host_uri(host: &str) -> String {

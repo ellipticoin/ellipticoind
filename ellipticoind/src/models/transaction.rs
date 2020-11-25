@@ -9,8 +9,8 @@ use crate::{
             dsl::transactions as transactions_table,
         },
     },
-    state::STATE,
-    system_contracts::{self, api::NativeAPI},
+    state::IN_MEMORY_STATE,
+    system_contracts::{self, api::InMemoryAPI},
     transaction::TransactionRequest,
 };
 use diesel::{insert_into, OptionalExtension, QueryDsl};
@@ -78,8 +78,8 @@ impl Transaction {
         vm_transaction: TransactionRequest,
         position: i32,
     ) -> Self {
-        let mut state = STATE.lock().await;
-        let mut api = NativeAPI {
+        let mut state = IN_MEMORY_STATE.lock().await;
+        let mut api = InMemoryAPI {
             transaction: vm_transaction.clone(),
             state: &mut state,
         };

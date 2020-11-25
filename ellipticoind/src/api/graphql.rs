@@ -2,13 +2,10 @@ extern crate juniper;
 use crate::api::{mutations::Mutations, query_root::QueryRoot};
 use juniper::{graphql_value, EmptySubscription, Variables};
 use serde_json::json;
-use std::{fmt, sync::Arc};
+use std::fmt;
 use tide::{http::StatusCode, Body, Request, Response};
 
-pub struct Context {
-    pub rocksdb: Arc<rocksdb::DB>,
-    pub redis_pool: crate::types::redis::Pool,
-}
+pub struct Context {}
 impl juniper::Context for Context {}
 
 #[derive(Debug)]
@@ -33,10 +30,7 @@ impl fmt::Display for Error {
 
 pub type Schema = juniper::RootNode<'static, QueryRoot, Mutations, EmptySubscription<Context>>;
 pub async fn handle_graphql(mut request: Request<()>) -> tide::Result {
-    let ctx = Context {
-        rocksdb: crate::config::ROCKSDB.clone(),
-        redis_pool: crate::config::REDIS_POOL.clone(),
-    };
+    let ctx = Context {};
 
     let body_json = request
         .body_json::<std::collections::HashMap<String, serde_json::value::Value>>()

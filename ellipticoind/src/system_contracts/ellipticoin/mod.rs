@@ -1,5 +1,4 @@
 mod errors;
-mod ethereum;
 mod hashing;
 mod issuance;
 
@@ -7,7 +6,7 @@ use super::token;
 use crate::system_contracts::{
     ellipticoin::issuance::INCENTIVISED_POOLS, exchange, exchange::liquidity_token, token::mint,
 };
-use ellipticoin::{constants::ELC, memory_accessors, pay, storage_accessors, Address};
+use ellipticoin::{constants::ELC, pay, state_accessors, Address};
 
 use errors::Error;
 use hashing::sha256;
@@ -24,17 +23,11 @@ lazy_static! {
     pub static ref ADDRESS: std::string::String = CONTRACT_NAME.to_string();
 }
 
-storage_accessors!(
+state_accessors!(
     block_number() -> u32;
-    ethereum_balances(address: Vec<u8>) -> u64;
-    miners() -> Vec<Miner>;
-    total_unlocked_ethereum() -> u64;
-    unlocked_ethereum_balances(ethereum_address: Vec<u8>) -> bool;
-    miner_whitelist() -> HashSet<[u8; 32]>;
-);
-
-memory_accessors!(
     issuance_rewards(address: Address) -> u64;
+    miner_whitelist() -> HashSet<[u8; 32]>;
+    miners() -> Vec<Miner>;
 );
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
@@ -63,35 +56,6 @@ export_native! {
         let current_miner = miners.first().unwrap().address.clone();
         token::transfer_from(api, ELC.clone(), api.caller(), ellipticoin::Address::PublicKey(current_miner), amount)?;
     Ok(())
-    }
-
-    pub fn unlock_ether<API: ellipticoin::API>(
-        api: &mut API,
-        unlock_signature: [u8; 32],
-        ellipticoin_address: [u8; 32],
-    ) -> Result<Value, Box<Error>> {
-        let encoded_ellipticoin_adress =
-            base64::encode_config(&ellipticoin_address, base64::URL_SAFE_NO_PAD);
-        let message = format!(
-            "Unlock Ellipticoin at address: {}",
-            encoded_ellipticoin_adress
-        );
-        let address = ethereum::ecrecover_address(message.as_bytes(), &unlock_signature);
-        if get_unlocked_ethereum_balances(api, address.clone()) {
-            return Err(Box::new(errors::BALANCE_ALREADY_UNLOCKED.clone()));
-        };
-        let balance: u64 = get_ethereum_balances(api, address.clone());
-        let mut total_unlocked_ethereum: u64 = get_total_unlocked_ethereum(api);
-        if total_unlocked_ethereum + balance > 1000000 * 10000 {
-            return Err(Box::new(errors::BALANCE_EXCEEDS_THIS_PHASE.clone()));
-        } else {
-            total_unlocked_ethereum += balance;
-            set_total_unlocked_ethereum(api, total_unlocked_ethereum);
-        }
-        native::credit(api, Address::PublicKey(ellipticoin_address), balance);
-        native::set_unlocked_ethereum_balances(api, address, true);
-
-        Ok(balance.into())
     }
 
     pub fn whitelist_miner<API: ellipticoin::API>(
@@ -287,11 +251,11 @@ mod tests {
         helpers::generate_hash_onion,
         system_contracts::{
             exchange::constants::BASE_TOKEN,
-            test_api::{TestAPI, TestState},
+            test_api::TestAPI,
             token::{constants::ETH, get_balance, BASE_FACTOR},
         },
     };
-    use std::env;
+    use std::{collections::HashMap, env};
 
     use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB, CAROL};
 
@@ -299,7 +263,7 @@ mod tests {
     fn test_harvest() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         env::set_var("HOST", "localhost");
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = TestAPI::new(&mut state, *ALICE, "Ellipticoin".to_string());
         mint(&mut api, ELC.clone(), Address::Contract(ADDRESS.clone()), 1).unwrap();
         credit_issuance_rewards(&mut api, Address::PublicKey(*ALICE), 1);
@@ -314,7 +278,7 @@ mod tests {
     fn test_whitelist_miner() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         env::set_var("HOST", "localhost");
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = TestAPI::new(&mut state, *ALICE, "Ellipticoin".to_string());
 
         let alice_pub: [u8; 32] = Address::PublicKey(*ALICE).as_public_key().unwrap();
@@ -350,7 +314,7 @@ mod tests {
     fn test_whitelist_miner_failure() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         env::set_var("HOST", "localhost");
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = TestAPI::new(&mut state, *ALICE, "Ellipticoin".to_string());
 
         let alice_pub: [u8; 32] = Address::PublicKey(*ALICE).as_public_key().unwrap();
@@ -380,7 +344,7 @@ mod tests {
     fn test_commit_and_seal() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
         env::set_var("HOST", "localhost");
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = TestAPI::new(&mut state, *ALICE, "Ellipticoin".to_string());
         credit(&mut api, Address::PublicKey(*ALICE), 5);
         credit(&mut api, Address::PublicKey(*BOB), 5);
