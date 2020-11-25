@@ -39,6 +39,7 @@ export_native! {
     ) -> Result<(), Box<Error>> {
         validate_token_amount(api, amount, token.clone())?;
         validate_base_token_amount(api, (amount * starting_price)/BASE_FACTOR)?;
+        validate_pool_does_not_exist(api, token.clone())?;
 
         charge!(api, token.clone(), api.caller(), amount)?;
         credit_pool_supply_of_token(api, token.clone(), amount);
@@ -106,6 +107,7 @@ export_native! {
         let input_amount_in_base_token = if input_token == BASE_TOKEN.clone() {
             input_amount
         } else {
+            validate_pool_exists(api, input_token.clone())?;
             book_input_entry = true;
             calculate_input_amount_in_base_token(api, input_token.clone(), apply_fee(input_amount))?
         };
@@ -113,6 +115,7 @@ export_native! {
         let output_token_amount = if output_token == BASE_TOKEN.clone() {
             input_amount_in_base_token
         } else {
+            validate_pool_exists(api, output_token.clone())?;
             book_output_entry = true;
             calculate_amount_in_output_token(api, output_token.clone(), apply_fee(input_amount_in_base_token))?
         };
@@ -174,6 +177,28 @@ fn calculate_amount_in_output_token<API: ellipticoin::API>(
 
 fn apply_fee(amount: u64) -> u64 {
     amount - ((amount * FEE) / BASE_FACTOR)
+}
+
+fn validate_pool_does_not_exist<API: ellipticoin::API>(
+    api: &mut API,
+    token: Token,
+) -> Result<(), Box<Error>> {
+    if get_pool_supply_of_base_token(api, token.clone()) != 0 {
+        Err(Box::new(errors::POOL_ALREADY_EXISTS.clone()))
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_pool_exists<API: ellipticoin::API>(
+    api: &mut API,
+    token: Token,
+) -> Result<(), Box<Error>> {
+    if get_pool_supply_of_base_token(api, token.clone()) == 0 {
+        Err(Box::new(errors::POOL_NOT_FOUND.clone()))
+    } else {
+        Ok(())
+    }
 }
 
 fn validate_base_token_amount<API: ellipticoin::API>(
@@ -316,23 +341,214 @@ mod tests {
         };
     }
 
-    #[test]
-    fn test_add_liquidity() {
+    struct TokenBalance {
+        token: Token,
+        balance: u64,
+    }
+    impl TokenBalance {
+        pub fn new(token: Token, balance: u64) -> Self {
+            Self { token, balance }
+        }
+    }
+
+    struct AddressBalance {
+        address: ellipticoin::Address,
+        balances: Vec<TokenBalance>,
+    }
+    impl AddressBalance {
+        pub fn new(address: ellipticoin::Address, balances: Vec<TokenBalance>) -> Self {
+            Self { address, balances }
+        }
+    }
+
+    fn setup(balances: Vec<AddressBalance>, state: &mut TestState) -> TestAPI {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+
+        let mut api = TestAPI::new(state, *ALICE, "Token".to_string());
+
+        for person_balance in balances.iter() {
+            for token_balance in person_balance.balances.iter() {
+                token::set_balance(
+                    &mut api,
+                    token_balance.token.clone(),
+                    person_balance.address.clone(),
+                    token_balance.balance * BASE_FACTOR,
+                );
+            }
+        }
+
+        api
+    }
+
+    #[test]
+    fn test_create_pool() {
+        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
+            ellipticoin::Address::PublicKey(*ALICE),
+            vec![
+                TokenBalance::new(APPLES.clone(), 1),
+                TokenBalance::new(BASE_TOKEN.clone(), 1),
+            ],
+        )];
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
-        token::set_balance(
+        let mut api = setup(balances, &mut state);
+
+        native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
+
+        assert_eq!(
+            token::get_balance(
+                &mut api,
+                liquidity_token(APPLES.clone()),
+                Address::PublicKey(*ALICE)
+            ),
+            1 * BASE_FACTOR
+        );
+        assert_eq!(
+            get_share_holders(&mut api, APPLES.clone(),)
+                .iter()
+                .cloned()
+                .collect::<Vec<Address>>(),
+            vec![Address::PublicKey(*ALICE)]
+        );
+    }
+
+    #[test]
+    fn test_recreate_pool() {
+        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
+            ellipticoin::Address::PublicKey(*ALICE),
+            vec![
+                TokenBalance::new(APPLES.clone(), 2),
+                TokenBalance::new(BASE_TOKEN.clone(), 2),
+            ],
+        )];
+        let mut state = TestState::new();
+        let mut api = setup(balances, &mut state);
+
+        native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
+        match native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR) {
+            Ok(_) => assert!(false, "Should have received error recreating pool!"),
+            Err(x) => assert!(
+                (*x).code == errors::POOL_ALREADY_EXISTS.code,
+                "Should have received pool already exists error!"
+            ),
+        }
+
+        assert_eq!(
+            token::get_balance(
+                &mut api,
+                liquidity_token(APPLES.clone()),
+                Address::PublicKey(*ALICE)
+            ),
+            1 * BASE_FACTOR
+        );
+        assert_eq!(
+            get_share_holders(&mut api, APPLES.clone(),)
+                .iter()
+                .cloned()
+                .collect::<Vec<Address>>(),
+            vec![Address::PublicKey(*ALICE)]
+        );
+    }
+
+    #[test]
+    fn test_create_pool_insufficient_base_token_funds() {
+        let apple_balance = 2;
+        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
+            ellipticoin::Address::PublicKey(*ALICE),
+            vec![
+                TokenBalance::new(APPLES.clone(), apple_balance),
+                TokenBalance::new(BASE_TOKEN.clone(), apple_balance / 2),
+            ],
+        )];
+        let mut state = TestState::new();
+        let mut api = setup(balances, &mut state);
+
+        assert!(native::create_pool(
             &mut api,
             APPLES.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            2 * BASE_FACTOR,
+            apple_balance * BASE_FACTOR,
+            apple_balance * BASE_FACTOR
+        )
+        .is_err());
+
+        assert_eq!(
+            token::get_balance(
+                &mut api,
+                liquidity_token(APPLES.clone()),
+                Address::PublicKey(*ALICE)
+            ),
+            0
         );
-        token::set_balance(
+        assert_eq!(
+            token::get_balance(&mut api, APPLES.clone(), Address::PublicKey(*ALICE)),
+            apple_balance * BASE_FACTOR
+        );
+        assert_eq!(
+            get_share_holders(&mut api, APPLES.clone(),)
+                .iter()
+                .cloned()
+                .collect::<Vec<Address>>(),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn test_create_pool_insufficient_token_funds() {
+        let apple_balance = 1;
+        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
+            ellipticoin::Address::PublicKey(*ALICE),
+            vec![
+                TokenBalance::new(APPLES.clone(), apple_balance),
+                TokenBalance::new(BASE_TOKEN.clone(), apple_balance * 2),
+            ],
+        )];
+        let mut state = TestState::new();
+        let mut api = setup(balances, &mut state);
+
+        assert!(native::create_pool(
             &mut api,
-            BASE_TOKEN.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            2 * BASE_FACTOR,
+            APPLES.clone(),
+            apple_balance * 2 * BASE_FACTOR,
+            apple_balance * 2 * BASE_FACTOR
+        )
+        .is_err());
+
+        assert_eq!(
+            token::get_balance(
+                &mut api,
+                liquidity_token(APPLES.clone()),
+                Address::PublicKey(*ALICE)
+            ),
+            0
         );
+        assert_eq!(
+            token::get_balance(&mut api, APPLES.clone(), Address::PublicKey(*ALICE)),
+            apple_balance * BASE_FACTOR
+        );
+        assert_eq!(
+            token::get_balance(&mut api, BASE_TOKEN.clone(), Address::PublicKey(*ALICE)),
+            apple_balance * 2 * BASE_FACTOR
+        );
+        assert_eq!(
+            get_share_holders(&mut api, APPLES.clone(),)
+                .iter()
+                .cloned()
+                .collect::<Vec<Address>>(),
+            vec![]
+        );
+    }
+
+    #[test]
+    fn test_add_liquidity() {
+        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
+            ellipticoin::Address::PublicKey(*ALICE),
+            vec![
+                TokenBalance::new(APPLES.clone(), 2),
+                TokenBalance::new(BASE_TOKEN.clone(), 2),
+            ],
+        )];
+        let mut state = TestState::new();
+        let mut api = setup(balances, &mut state);
+
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
         native::add_liquidity(&mut api, APPLES.clone(), 1 * BASE_FACTOR).unwrap();
 
@@ -354,22 +570,50 @@ mod tests {
     }
 
     #[test]
-    fn test_add_liquidity_insufficient_base_token_funds() {
-        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+    fn test_add_to_existing_liquidity() {
+        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
+            ellipticoin::Address::PublicKey(*ALICE),
+            vec![
+                TokenBalance::new(APPLES.clone(), 3),
+                TokenBalance::new(BASE_TOKEN.clone(), 3),
+            ],
+        )];
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
-        token::set_balance(
-            &mut api,
-            APPLES.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            2 * BASE_FACTOR,
+        let mut api = setup(balances, &mut state);
+
+        native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
+        native::add_liquidity(&mut api, APPLES.clone(), 1 * BASE_FACTOR).unwrap();
+        native::add_liquidity(&mut api, APPLES.clone(), 1 * BASE_FACTOR).unwrap();
+
+        assert_eq!(
+            token::get_balance(
+                &mut api,
+                liquidity_token(APPLES.clone()),
+                Address::PublicKey(*ALICE)
+            ),
+            3 * BASE_FACTOR
         );
-        token::set_balance(
-            &mut api,
-            BASE_TOKEN.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            1 * BASE_FACTOR,
+        assert_eq!(
+            get_share_holders(&mut api, APPLES.clone(),)
+                .iter()
+                .cloned()
+                .collect::<Vec<Address>>(),
+            vec![Address::PublicKey(*ALICE)]
         );
+    }
+
+    #[test]
+    fn test_add_liquidity_insufficient_base_token_funds() {
+        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
+            ellipticoin::Address::PublicKey(*ALICE),
+            vec![
+                TokenBalance::new(APPLES.clone(), 2),
+                TokenBalance::new(BASE_TOKEN.clone(), 1),
+            ],
+        )];
+        let mut state = TestState::new();
+        let mut api = setup(balances, &mut state);
+
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
         assert!(native::add_liquidity(&mut api, APPLES.clone(), 1 * BASE_FACTOR).is_err());
 
@@ -395,24 +639,28 @@ mod tests {
     }
 
     #[test]
-    fn test_create_pool() {
-        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+    fn test_add_liquidity_insufficient_token_funds() {
+        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
+            ellipticoin::Address::PublicKey(*ALICE),
+            vec![
+                TokenBalance::new(APPLES.clone(), 1),
+                TokenBalance::new(BASE_TOKEN.clone(), 2),
+            ],
+        )];
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
-        token::set_balance(
-            &mut api,
-            APPLES.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            1 * BASE_FACTOR,
-        );
-        token::set_balance(
-            &mut api,
-            BASE_TOKEN.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            1 * BASE_FACTOR,
-        );
-        native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
+        let mut api = setup(balances, &mut state);
 
+        native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
+        assert!(native::add_liquidity(&mut api, APPLES.clone(), 1 * BASE_FACTOR).is_err());
+
+        assert_eq!(
+            token::get_balance(&mut api, APPLES.clone(), Address::PublicKey(*ALICE)),
+            0
+        );
+        assert_eq!(
+            token::get_balance(&mut api, BASE_TOKEN.clone(), Address::PublicKey(*ALICE)),
+            1 * BASE_FACTOR
+        );
         assert_eq!(
             token::get_balance(
                 &mut api,
@@ -431,270 +679,90 @@ mod tests {
     }
 
     #[test]
-    fn test_create_pool_insufficient_base_token_funds() {
-        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
-        let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
-        token::set_balance(
-            &mut api,
-            APPLES.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            1 * BASE_FACTOR,
-        );
-        token::set_balance(
-            &mut api,
-            BASE_TOKEN.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            1 * BASE_FACTOR / 2,
-        );
-        assert!(
-            native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR)
-                .is_err()
-        );
-
-        assert_eq!(
-            token::get_balance(
-                &mut api,
-                liquidity_token(APPLES.clone()),
-                Address::PublicKey(*ALICE)
+    fn test_remove_liquidity() {
+        let balances: Vec<AddressBalance> = vec![
+            AddressBalance::new(
+                ellipticoin::Address::PublicKey(*ALICE),
+                vec![
+                    TokenBalance::new(APPLES.clone(), 100),
+                    TokenBalance::new(BANANAS.clone(), 100),
+                    TokenBalance::new(BASE_TOKEN.clone(), 200),
+                ],
             ),
-            0
-        );
-        assert_eq!(
-            token::get_balance(&mut api, APPLES.clone(), Address::PublicKey(*ALICE)),
-            1 * BASE_FACTOR
-        );
-        assert_eq!(
-            get_share_holders(&mut api, APPLES.clone(),)
-                .iter()
-                .cloned()
-                .collect::<Vec<Address>>(),
-            vec![]
-        );
-    }
-
-    #[test]
-    fn test_exchange() {
-        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+            AddressBalance::new(
+                ellipticoin::Address::PublicKey(*BOB),
+                vec![TokenBalance::new(BANANAS.clone(), 100)],
+            ),
+            AddressBalance::new(
+                ellipticoin::Address::Contract(ADDRESS.clone()),
+                vec![TokenBalance::new(ELC.clone(), 100)],
+            ),
+        ];
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
-        token::set_balance(
-            &mut api,
-            APPLES.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            100 * BASE_FACTOR,
-        );
-        token::set_balance(
-            &mut api,
-            BANANAS.clone().into(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            100 * BASE_FACTOR,
-        );
-        token::set_balance(
-            &mut api,
-            BASE_TOKEN.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            200 * BASE_FACTOR,
-        );
+        let mut api = setup(balances, &mut state);
+
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
+        let apples_in_pool = get_pool_supply_of_token(&mut api, APPLES.clone().into());
+        assert_eq!(apples_in_pool, 100 * BASE_FACTOR);
+        let base_token_in_pool = get_pool_supply_of_base_token(&mut api, APPLES.clone().into());
+        assert_eq!(base_token_in_pool, 100 * BASE_FACTOR);
+
         native::create_pool(&mut api, BANANAS.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
-        api.caller = Address::PublicKey(BOB.clone());
-        token::set_balance(
-            &mut api,
-            APPLES.clone().into(),
-            ellipticoin::Address::PublicKey(*BOB),
-            100 * BASE_FACTOR,
-        );
-        native::exchange(
-            &mut api,
-            APPLES.clone(),
-            BANANAS.clone(),
-            100 * BASE_FACTOR,
-            0,
-        )
-        .unwrap();
+        let bananas_in_pool = get_pool_supply_of_token(&mut api, BANANAS.clone().into());
+        assert_eq!(bananas_in_pool, 100 * BASE_FACTOR);
+        let base_token_in_pool = get_pool_supply_of_base_token(&mut api, BANANAS.clone().into());
+        assert_eq!(base_token_in_pool, 100 * BASE_FACTOR);
+
+        native::remove_liquidity(&mut api, APPLES.clone(), apples_in_pool).unwrap();
         assert_eq!(
             token::get_balance(
                 &mut api,
-                BANANAS.clone(),
-                ellipticoin::Address::PublicKey(*BOB)
+                APPLES.clone().into(),
+                ellipticoin::Address::PublicKey(*ALICE)
             ),
-            33_233_234
+            100 * BASE_FACTOR
         );
-    }
-
-    #[test]
-    fn test_exchange_max_slippage_exceeded() {
-        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
-        let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
-        token::set_balance(
-            &mut api,
-            APPLES.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            100 * BASE_FACTOR,
-        );
-        token::set_balance(
-            &mut api,
-            BANANAS.clone().into(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            100 * BASE_FACTOR,
-        );
-        token::set_balance(
-            &mut api,
-            BASE_TOKEN.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            200 * BASE_FACTOR,
-        );
-        native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
-        native::create_pool(&mut api, BANANAS.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
-        api.caller = Address::PublicKey(BOB.clone());
-        token::set_balance(
-            &mut api,
-            APPLES.clone().into(),
-            ellipticoin::Address::PublicKey(*BOB),
-            100 * BASE_FACTOR,
-        );
-        match native::exchange(
-            &mut api,
-            APPLES.clone(),
-            BANANAS.clone(),
-            100 * BASE_FACTOR,
-            33_233_235,
-        ) {
-            Err(x) => assert!(
-                x.code == errors::MAX_SLIPPAGE_EXCEEDED.code,
-                "Should have resulted in a max slippage error!"
-            ),
-            Ok(_) => assert!(false, "Should have resulted in a max slippage error!"),
-        };
-    }
-
-    #[test]
-    fn test_exchange_base_token() {
-        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
-        let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
-        token::set_balance(
-            &mut api,
-            APPLES.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            100 * BASE_FACTOR,
-        );
-        token::set_balance(
-            &mut api,
-            BASE_TOKEN.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            100 * BASE_FACTOR,
-        );
-        native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
-        api.caller = Address::PublicKey(BOB.clone());
-        credit_pool_supply_of_base_token(&mut api, BASE_TOKEN.clone(), 100 * BASE_FACTOR);
-        token::set_balance(
-            &mut api,
-            BASE_TOKEN.clone().into(),
-            ellipticoin::Address::PublicKey(*BOB),
-            100 * BASE_FACTOR,
-        );
-        native::exchange(
-            &mut api,
-            BASE_TOKEN.clone(),
-            APPLES.clone(),
-            100 * BASE_FACTOR,
-            0,
-        )
-        .unwrap();
-        assert_eq!(
-            token::get_balance(
-                &mut api,
-                APPLES.clone(),
-                ellipticoin::Address::PublicKey(*BOB)
-            ),
-            49_924_888
-        );
-    }
-
-    #[test]
-    fn test_exchange_for_base_token() {
-        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
-        let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
-        token::set_balance(
-            &mut api,
-            APPLES.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            100 * BASE_FACTOR,
-        );
-        token::set_balance(
-            &mut api,
-            BASE_TOKEN.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            100 * BASE_FACTOR,
-        );
-        native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
-        api.caller = Address::PublicKey(BOB.clone());
-        token::set_balance(
-            &mut api,
-            APPLES.clone().into(),
-            ellipticoin::Address::PublicKey(*BOB),
-            100 * BASE_FACTOR,
-        );
-        native::exchange(
-            &mut api,
-            APPLES.clone(),
-            BASE_TOKEN.clone(),
-            100 * BASE_FACTOR,
-            0,
-        )
-        .unwrap();
         assert_eq!(
             token::get_balance(
                 &mut api,
                 BASE_TOKEN.clone(),
-                ellipticoin::Address::PublicKey(*BOB)
+                ellipticoin::Address::PublicKey(*ALICE)
             ),
-            49_924_888
+            100 * BASE_FACTOR
         );
+
+        let bananas_in_pool = get_pool_supply_of_token(&mut api, BANANAS.clone().into());
+        assert_eq!(bananas_in_pool, 100 * BASE_FACTOR);
+        let base_token_in_pool = get_pool_supply_of_base_token(&mut api, BANANAS.clone().into());
+        assert_eq!(base_token_in_pool, 100 * BASE_FACTOR);
     }
 
     #[test]
-    fn test_remove_liquidity() {
-        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+    fn test_remove_liquidity_after_trade() {
+        let balances: Vec<AddressBalance> = vec![
+            AddressBalance::new(
+                ellipticoin::Address::PublicKey(*ALICE),
+                vec![
+                    TokenBalance::new(APPLES.clone(), 100),
+                    TokenBalance::new(BANANAS.clone(), 100),
+                    TokenBalance::new(BASE_TOKEN.clone(), 200),
+                ],
+            ),
+            AddressBalance::new(
+                ellipticoin::Address::PublicKey(*BOB),
+                vec![TokenBalance::new(BANANAS.clone(), 100)],
+            ),
+            AddressBalance::new(
+                ellipticoin::Address::Contract(ADDRESS.clone()),
+                vec![TokenBalance::new(ELC.clone(), 100)],
+            ),
+        ];
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
-        token::set_balance(
-            &mut api,
-            APPLES.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            100 * BASE_FACTOR,
-        );
-        token::set_balance(
-            &mut api,
-            BANANAS.clone().into(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            100 * BASE_FACTOR,
-        );
-        token::set_balance(
-            &mut api,
-            BASE_TOKEN.clone().into(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            200 * BASE_FACTOR,
-        );
-        token::set_balance(
-            &mut api,
-            ELC.clone().into(),
-            ellipticoin::Address::Contract(ADDRESS.clone()),
-            100 * BASE_FACTOR,
-        );
+        let mut api = setup(balances, &mut state);
+
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
         native::create_pool(&mut api, BANANAS.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
         api.caller = Address::PublicKey(BOB.clone());
-        token::set_balance(
-            &mut api,
-            BANANAS.clone(),
-            ellipticoin::Address::PublicKey(*BOB),
-            100 * BASE_FACTOR,
-        );
         native::exchange(
             &mut api,
             BANANAS.clone(),
@@ -728,85 +796,225 @@ mod tests {
     }
 
     #[test]
-    fn test_remove_liquidity_after_trade() {
-        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+    fn test_remove_liquidity_insufficient_liquidity() {
+        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
+            ellipticoin::Address::PublicKey(*ALICE),
+            vec![
+                TokenBalance::new(APPLES.clone(), 1),
+                TokenBalance::new(BASE_TOKEN.clone(), 1),
+            ],
+        )];
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
-        token::set_balance(
-            &mut api,
-            APPLES.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            101 * BASE_FACTOR,
-        );
-        token::set_balance(
-            &mut api,
-            BASE_TOKEN.clone().into(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            100 * BASE_FACTOR,
-        );
+        let mut api = setup(balances, &mut state);
+
+        native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, BASE_FACTOR).unwrap();
+        assert!(native::remove_liquidity(&mut api, APPLES.clone(), 2 * BASE_FACTOR).is_err());
+    }
+
+    #[test]
+    fn test_exchange() {
+        let balances: Vec<AddressBalance> = vec![
+            AddressBalance::new(
+                ellipticoin::Address::PublicKey(*ALICE),
+                vec![
+                    TokenBalance::new(APPLES.clone(), 100),
+                    TokenBalance::new(BANANAS.clone(), 100),
+                    TokenBalance::new(BASE_TOKEN.clone(), 200),
+                ],
+            ),
+            AddressBalance::new(
+                ellipticoin::Address::PublicKey(*BOB),
+                vec![TokenBalance::new(APPLES.clone(), 100)],
+            ),
+        ];
+        let mut state = TestState::new();
+        let mut api = setup(balances, &mut state);
+
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
-        api.caller = Address::PublicKey(ALICE.clone());
+        native::create_pool(&mut api, BANANAS.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
+
+        api.caller = Address::PublicKey(BOB.clone());
         native::exchange(
             &mut api,
             APPLES.clone(),
-            BASE_TOKEN.clone(),
-            1 * BASE_FACTOR,
+            BANANAS.clone(),
+            100 * BASE_FACTOR,
             0,
         )
         .unwrap();
-        api.caller = Address::PublicKey(ALICE.clone());
-
-        let alice_token_balance_before = token::get_balance(
-            &mut api,
-            APPLES.clone().into(),
-            ellipticoin::Address::PublicKey(*ALICE),
-        );
-        let pool_token_supply = get_pool_supply_of_token(&mut api, APPLES.clone().into());
-
-        let alice_base_token_balance_before = token::get_balance(
-            &mut api,
-            BASE_TOKEN.clone().into(),
-            ellipticoin::Address::PublicKey(*ALICE),
-        );
-        let pool_base_token_supply = get_pool_supply_of_base_token(&mut api, APPLES.clone().into());
-
-        native::remove_liquidity(&mut api, APPLES.clone(), pool_token_supply).unwrap();
         assert_eq!(
             token::get_balance(
                 &mut api,
-                APPLES.clone().into(),
-                ellipticoin::Address::PublicKey(*ALICE)
-            ) - alice_token_balance_before,
-            pool_token_supply
-        );
-        assert_eq!(
-            token::get_balance(
-                &mut api,
-                BASE_TOKEN.clone().into(),
-                ellipticoin::Address::PublicKey(*ALICE)
-            ) - alice_base_token_balance_before,
-            pool_base_token_supply
+                BANANAS.clone(),
+                ellipticoin::Address::PublicKey(*BOB)
+            ),
+            33_233_234
         );
     }
 
     #[test]
-    fn test_remove_liquidity_insufficient_liquidity() {
-        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
+    fn test_exchange_base_token() {
+        let balances: Vec<AddressBalance> = vec![
+            AddressBalance::new(
+                ellipticoin::Address::PublicKey(*ALICE),
+                vec![
+                    TokenBalance::new(APPLES.clone(), 100),
+                    TokenBalance::new(BASE_TOKEN.clone(), 100),
+                ],
+            ),
+            AddressBalance::new(
+                ellipticoin::Address::PublicKey(*BOB),
+                vec![TokenBalance::new(BASE_TOKEN.clone(), 100)],
+            ),
+        ];
         let mut state = TestState::new();
-        let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
-        token::set_balance(
+        let mut api = setup(balances, &mut state);
+
+        native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
+        api.caller = Address::PublicKey(BOB.clone());
+        credit_pool_supply_of_base_token(&mut api, BASE_TOKEN.clone(), 100 * BASE_FACTOR);
+
+        native::exchange(
+            &mut api,
+            BASE_TOKEN.clone(),
+            APPLES.clone(),
+            100 * BASE_FACTOR,
+            0,
+        )
+        .unwrap();
+        assert_eq!(
+            token::get_balance(
+                &mut api,
+                APPLES.clone(),
+                ellipticoin::Address::PublicKey(*BOB)
+            ),
+            49_924_888
+        );
+    }
+
+    #[test]
+    fn test_exchange_for_base_token() {
+        let balances: Vec<AddressBalance> = vec![
+            AddressBalance::new(
+                ellipticoin::Address::PublicKey(*ALICE),
+                vec![
+                    TokenBalance::new(APPLES.clone(), 100),
+                    TokenBalance::new(BASE_TOKEN.clone(), 100),
+                ],
+            ),
+            AddressBalance::new(
+                ellipticoin::Address::PublicKey(*BOB),
+                vec![TokenBalance::new(APPLES.clone(), 100)],
+            ),
+        ];
+        let mut state = TestState::new();
+        let mut api = setup(balances, &mut state);
+
+        native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
+
+        api.caller = Address::PublicKey(BOB.clone());
+        native::exchange(
             &mut api,
             APPLES.clone(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            1 * BASE_FACTOR,
+            BASE_TOKEN.clone(),
+            100 * BASE_FACTOR,
+            0,
+        )
+        .unwrap();
+        assert_eq!(
+            token::get_balance(
+                &mut api,
+                BASE_TOKEN.clone(),
+                ellipticoin::Address::PublicKey(*BOB)
+            ),
+            49_924_888
         );
-        token::set_balance(
+    }
+
+    #[test]
+    fn test_exchange_max_slippage_exceeded() {
+        let balances: Vec<AddressBalance> = vec![
+            AddressBalance::new(
+                ellipticoin::Address::PublicKey(*ALICE),
+                vec![
+                    TokenBalance::new(APPLES.clone(), 100),
+                    TokenBalance::new(BANANAS.clone(), 100),
+                    TokenBalance::new(BASE_TOKEN.clone(), 200),
+                ],
+            ),
+            AddressBalance::new(
+                ellipticoin::Address::PublicKey(*BOB),
+                vec![TokenBalance::new(APPLES.clone(), 100)],
+            ),
+        ];
+        let mut state = TestState::new();
+        let mut api = setup(balances, &mut state);
+
+        native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
+        native::create_pool(&mut api, BANANAS.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
+        api.caller = Address::PublicKey(BOB.clone());
+
+        match native::exchange(
             &mut api,
-            BASE_TOKEN.clone().into(),
-            ellipticoin::Address::PublicKey(*ALICE),
-            1 * BASE_FACTOR,
+            APPLES.clone(),
+            BANANAS.clone(),
+            100 * BASE_FACTOR,
+            33_233_235,
+        ) {
+            Err(x) => assert!(
+                x.code == errors::MAX_SLIPPAGE_EXCEEDED.code,
+                "Should have resulted in a max slippage error!"
+            ),
+            _ => assert!(false, "Should have resulted in a max slippage error!"),
+        };
+    }
+
+    #[test]
+    fn test_exchange_no_pool_exists() {
+        let balances: Vec<AddressBalance> = vec![
+            AddressBalance::new(
+                ellipticoin::Address::PublicKey(*ALICE),
+                vec![
+                    TokenBalance::new(APPLES.clone(), 100),
+                    TokenBalance::new(BANANAS.clone(), 100),
+                    TokenBalance::new(BASE_TOKEN.clone(), 200),
+                ],
+            ),
+            AddressBalance::new(
+                ellipticoin::Address::PublicKey(*BOB),
+                vec![TokenBalance::new(APPLES.clone(), 100)],
+            ),
+        ];
+        let mut state = TestState::new();
+        let mut api = setup(balances, &mut state);
+
+        api.caller = Address::PublicKey(BOB.clone());
+        let exchange_res = native::exchange(
+            &mut api,
+            APPLES.clone(),
+            BANANAS.clone(),
+            100 * BASE_FACTOR,
+            0,
         );
-        native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, BASE_FACTOR).unwrap();
-        assert!(native::remove_liquidity(&mut api, APPLES.clone(), 2 * BASE_FACTOR).is_err());
+
+        match exchange_res {
+            Err(x) => assert!(
+                (*x).code == errors::POOL_NOT_FOUND.code,
+                "Should have returned pool not found error"
+            ),
+            _ => assert!(
+                false,
+                "Should not have been able to exchange without a pool!"
+            ),
+        };
+
+        assert_eq!(
+            token::get_balance(
+                &mut api,
+                APPLES.clone(),
+                ellipticoin::Address::PublicKey(*BOB)
+            ),
+            100 * BASE_FACTOR
+        );
     }
 }
