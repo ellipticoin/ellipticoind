@@ -13,4 +13,8 @@ lazy_static! {
         code: 3,
         message: "Max slippage exceeded for this trade. Trade not executed.".to_string(),
     };
+    pub static ref POOL_ALREADY_EXISTS: Error = Error {
+        code: 4,
+        message: "Pool already exists for the provided token. New pool not created.".to_string(),
+    };
 }
