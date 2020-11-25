@@ -53,4 +53,17 @@ mod tests {
         assert_eq!(total_issuance, 20400000 * BASE_FACTOR);
         assert_eq!(total_time.as_secs() / SECONDS_IN_A_YEAR, 6);
     }
+
+    #[test]
+    fn test_halvenings() {
+        let mut last_block_reward: u64 = block_reward_at(LAST_BLOCK_OF_FIRST_ERA);
+        let mut block: u32 = LAST_BLOCK_OF_FIRST_ERA + 1;
+
+        for _era in 1..=NUMBER_OF_ERAS - 1 {
+            let new_reward: u64 = block_reward_at(block);
+            assert_eq!(new_reward, last_block_reward / 2);
+            block += BLOCKS_PER_ERA;
+            last_block_reward = new_reward;
+        }
+    }
 }
