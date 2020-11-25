@@ -1,100 +1,40 @@
 use crate::{
-    config::{get_redis_connection, get_rocksdb},
-    helpers::sha256,
-    system_contracts::ellipticoin,
-    types,
+    models::verification_key,
+    system_contracts::{
+        api::InMemoryAPI,
+        ellipticoin::{Miner, State},
+    },
 };
 use async_std::sync::{Arc, Mutex};
-use serde_cbor::from_slice;
-use std::{collections::HashMap, ops::DerefMut};
+use std::collections::HashMap;
 
 lazy_static! {
-    pub static ref STATE: async_std::sync::Arc<Mutex<State>> = {
-        let memory = Memory {
-            redis: get_redis_connection(),
-        };
-        let storage = Storage {
-            rocksdb: get_rocksdb(),
-        };
-        Arc::new(Mutex::new(State::new(memory, storage)))
-    };
+    pub static ref IN_MEMORY_STATE: async_std::sync::Arc<Mutex<HashMap<Vec<u8>, Vec<u8>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
 }
 
-pub type Changeset = HashMap<Vec<u8>, Vec<u8>>;
-pub struct State {
-    pub memory: Memory,
-    pub storage: Storage,
-    pub memory_changeset: Changeset,
-    pub storage_changeset: Changeset,
-}
-
-pub struct Memory {
-    pub redis: types::redis::Connection,
-}
-
-impl Memory {
-    pub fn set(&mut self, key: &[u8], value: &[u8]) {
-        r2d2_redis::redis::Commands::set::<&[u8], &[u8], ()>(self.redis.deref_mut(), key, value)
-            .unwrap()
-    }
-
-    pub fn get(&mut self, key: &[u8]) -> Vec<u8> {
-        r2d2_redis::redis::Commands::get::<&[u8], Vec<u8>>(self.redis.deref_mut(), key).unwrap()
+pub async fn get_state() -> State {
+    let mut state = IN_MEMORY_STATE.lock().await;
+    let mut api = InMemoryAPI::new(&mut state, None);
+    let miners = crate::system_contracts::ellipticoin::get_miners(&mut api);
+    let block_number = crate::system_contracts::ellipticoin::get_block_number(&mut api);
+    State {
+        miners,
+        block_number,
     }
 }
-
-pub struct Storage {
-    pub rocksdb: std::sync::Arc<rocksdb::DB>,
+pub async fn is_mining() -> bool {
+    let mut state = IN_MEMORY_STATE.lock().await;
+    let mut api = InMemoryAPI::new(&mut state, None);
+    let miners = crate::system_contracts::ellipticoin::get_miners(&mut api);
+    miners
+        .iter()
+        .any(|miner| miner.address == verification_key())
 }
 
-impl Storage {
-    pub fn set(&mut self, key: &[u8], value: &[u8]) {
-        self.rocksdb.put(key.to_vec(), value).unwrap()
-    }
-
-    pub fn get(&mut self, key: &[u8]) -> Vec<u8> {
-        rocksdb::DB::get(&self.rocksdb, key)
-            .unwrap()
-            .and_then(|value| Some(value))
-            .unwrap_or(vec![])
-    }
-}
-
-impl State {
-    pub fn new(memory: Memory, storage: Storage) -> Self {
-        let vm_state = Self {
-            memory,
-            storage,
-            memory_changeset: Changeset::new(),
-            storage_changeset: Changeset::new(),
-        };
-        vm_state
-    }
-
-    pub fn get_memory(&mut self, key: &[u8]) -> Vec<u8> {
-        self.memory.get(key)
-    }
-
-    pub fn set_memory(&mut self, key: &[u8], value: &[u8]) {
-        self.memory_changeset.insert(key.to_vec(), value.to_vec());
-        self.memory.set(key, value);
-    }
-
-    pub fn get_storage(&mut self, key: &[u8]) -> Vec<u8> {
-        self.storage.get(key)
-    }
-
-    pub fn set_storage(&mut self, key: &[u8], value: &[u8]) {
-        self.storage_changeset.insert(key.to_vec(), value.to_vec());
-        self.storage.set(key, value);
-    }
-
-    pub fn block_number(&mut self) -> u32 {
-        let bytes = self.get_storage(&vec![ellipticoin::StorageNamespace::BlockNumber as u8]);
-        from_slice(&bytes).unwrap_or(0)
-    }
-}
-
-pub fn db_key(contract: &str, key: &[u8]) -> Vec<u8> {
-    [&sha256(contract.as_bytes().to_vec())[..], key].concat()
+pub async fn current_miner() -> Miner {
+    let mut state = IN_MEMORY_STATE.lock().await;
+    let mut api = InMemoryAPI::new(&mut state, None);
+    let miners = crate::system_contracts::ellipticoin::get_miners(&mut api);
+    miners.first().unwrap().clone()
 }

@@ -1,12 +1,13 @@
 use crate::{
     api,
     config::{get_pg_connection, socket, ENABLE_MINER, GENESIS_NODE},
-    constants::{NEW_BLOCK_CHANNEL, STATE},
+    constants::NEW_BLOCK_CHANNEL,
     diesel::{BelongingToDsl, ExpressionMethods, GroupedBy, QueryDsl, RunQueryDsl},
     miner,
     models::{verification_key, Block, Transaction},
     schema::{blocks::dsl as blocks_dsl, transactions::dsl as transactions_dsl},
     start_up,
+    state::get_state,
 };
 use async_std::task::spawn;
 use ed25519_zebra::{SigningKey, VerificationKey};
@@ -81,8 +82,7 @@ pub async fn main() {
     if !*GENESIS_NODE {
         start_up::catch_up().await;
     }
-    let state = { STATE.lock().await.clone() };
-    NEW_BLOCK_CHANNEL.0.send(state.clone()).await;
+    NEW_BLOCK_CHANNEL.0.send(get_state().await).await;
     let api = api::API::new();
     spawn(
         api.app

@@ -6,7 +6,7 @@ use crate::{
     system_contracts::token::{self, BASE_FACTOR},
 };
 use constants::{BASE_TOKEN, FEE};
-use ellipticoin::{charge, memory_accessors, pay, Address, Token};
+use ellipticoin::{charge, pay, state_accessors, Address, Token};
 use std::{boxed::Box, collections::HashSet, str};
 use wasm_rpc::error::Error;
 use wasm_rpc_macros::export_native;
@@ -16,7 +16,7 @@ lazy_static! {
     pub static ref ADDRESS: std::string::String = CONTRACT_NAME.to_string();
 }
 
-memory_accessors!(
+state_accessors!(
     pool_supply_of_base_token(token: Token) -> u64;
     pool_supply_of_token(token: Token) -> u64;
     share_holders(token: Token) -> HashSet<Address>;
@@ -323,13 +323,11 @@ pub fn share_of_pool<API: ellipticoin::API>(api: &mut API, token: Token, address
 #[cfg(test)]
 mod tests {
     use super::{native, *};
-    use crate::system_contracts::{
-        test_api::{TestAPI, TestState},
-        token,
-    };
+    use crate::system_contracts::{test_api::TestAPI, token};
     use ellipticoin::constants::ELC;
     use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB};
-    use std::env;
+    use std::{collections::HashMap, env};
+
     lazy_static! {
         static ref APPLES: Token = Token {
             issuer: Address::PublicKey(*ALICE),
@@ -361,7 +359,7 @@ mod tests {
         }
     }
 
-    fn setup(balances: Vec<AddressBalance>, state: &mut TestState) -> TestAPI {
+    fn setup(balances: Vec<AddressBalance>, state: &mut HashMap<Vec<u8>, Vec<u8>>) -> TestAPI {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
 
         let mut api = TestAPI::new(state, *ALICE, "Token".to_string());
@@ -389,7 +387,7 @@ mod tests {
                 TokenBalance::new(BASE_TOKEN.clone(), 1),
             ],
         )];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
@@ -420,7 +418,7 @@ mod tests {
                 TokenBalance::new(BASE_TOKEN.clone(), 2),
             ],
         )];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
@@ -501,7 +499,7 @@ mod tests {
                 TokenBalance::new(BASE_TOKEN.clone(), apple_balance * 2),
             ],
         )];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         assert!(native::create_pool(
@@ -546,7 +544,7 @@ mod tests {
                 TokenBalance::new(BASE_TOKEN.clone(), 2),
             ],
         )];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
@@ -611,7 +609,7 @@ mod tests {
                 TokenBalance::new(BASE_TOKEN.clone(), 1),
             ],
         )];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
@@ -757,7 +755,7 @@ mod tests {
                 vec![TokenBalance::new(ELC.clone(), 100)],
             ),
         ];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
@@ -827,7 +825,7 @@ mod tests {
                 vec![TokenBalance::new(APPLES.clone(), 100)],
             ),
         ];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();

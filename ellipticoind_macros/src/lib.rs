@@ -53,15 +53,7 @@ impl Parse for Attribute {
 }
 
 #[proc_macro]
-pub fn memory_accessors(item: TokenStream) -> TokenStream {
-    accessors(item, "memory")
-}
-#[proc_macro]
-pub fn storage_accessors(item: TokenStream) -> TokenStream {
-    accessors(item, "storage")
-}
-
-fn accessors(item: TokenStream, ty: &str) -> TokenStream {
+pub fn state_accessors(item: TokenStream) -> TokenStream {
     let AccessorArgs { attrs, .. } = parse(item).unwrap();
 
     let attrs2: Vec<(
@@ -80,12 +72,8 @@ fn accessors(item: TokenStream, ty: &str) -> TokenStream {
              }| { (ident, inputs, output) },
         )
         .collect();
-    let get_fn = Ident::new(&format!("get_{}", ty), Span::call_site());
-    let base_namespace = Ident::new(
-        &format!("{}Namespace", ty.to_camel_case()),
-        Span::call_site(),
-    );
-    // println!("{}", namespace);
+    let get_fn = Ident::new(&"get_state", Span::call_site());
+    let base_namespace = Ident::new("Namespace", Span::call_site());
     let getters = attrs2
         .iter()
         .map(|(ident, inputs, ty)| {
@@ -116,7 +104,7 @@ fn accessors(item: TokenStream, ty: &str) -> TokenStream {
             })
         })
         .collect::<Vec<syn::ItemFn>>();
-    let set_fn = Ident::new(&format!("set_{}", ty), Span::call_site());
+    let set_fn = Ident::new(&"set_state", Span::call_site());
     let setters = attrs2
         .iter()
         .map(|(ident, inputs, ty)| {

@@ -1,10 +1,8 @@
 extern crate hex;
 extern crate rand;
-extern crate rocksdb;
 extern crate serde;
 extern crate serde_cbor;
 extern crate sha2;
-extern crate tiny_keccak;
 #[macro_use]
 extern crate diesel;
 #[macro_use]
@@ -29,4 +27,3 @@ mod static_files;
 pub mod sub_commands;
 mod system_contracts;
 pub mod transaction;
-mod types;

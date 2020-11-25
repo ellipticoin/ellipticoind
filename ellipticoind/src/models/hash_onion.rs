@@ -1,8 +1,8 @@
 use crate::{
     config::signing_key,
-    constants::STATE,
     diesel::{QueryDsl, RunQueryDsl},
     helpers::sha256,
+    models::get_pg_connection,
     schema::{hash_onion, hash_onion::dsl::*},
 };
 use diesel::{
@@ -61,18 +61,8 @@ impl HashOnion {
         .unwrap();
     }
 
-    pub async fn skip_to_current(pg_db: &PooledConnection<ConnectionManager<PgConnection>>) {
-        if let Some(skin) = STATE.current_onion_skin().await {
-            sql_query(format!(
-                "delete from hash_onion where id in (
-            select id where id >= ((select id from hash_onion where layer=decode('{}', 'base64') limit 1)))",
-            base64::encode(skin.to_vec())))
-            .execute(pg_db)
-            .unwrap();
-        }
-    }
-
-    pub fn generate(db: &PooledConnection<ConnectionManager<PgConnection>>) {
+    pub async fn generate() {
+        let pg_db = get_pg_connection();
         let hash_onion_size = env::var(&"HASH_ONION_SIZE")
             .map(|hash_onion_size| hash_onion_size.parse().unwrap())
             .unwrap_or(31 * 24 * 60 * 60);
@@ -102,7 +92,7 @@ impl HashOnion {
                 })
                 .collect();
             let query = insert_into(hash_onion).values(&values);
-            query.execute(db).unwrap();
+            query.execute(&pg_db).unwrap();
         }
         pb.finish();
     }

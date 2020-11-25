@@ -7,56 +7,29 @@ use wasm_rpc::{
 };
 pub use wasm_rpc_macros::{export, export_native};
 
-pub trait MemoryAPI {
+pub trait StateAPI {
     fn get(&mut self, key: &[u8]) -> Vec<u8>;
     fn set(&mut self, key: &[u8], value: &[u8]);
 }
 
-pub trait StorageAPI {
-    fn get(&mut self, key: &[u8]) -> Vec<u8>;
-    fn set(&mut self, key: &[u8], value: &[u8]);
-}
-
-pub trait API: MemoryAPI + StorageAPI {
+pub trait API: StateAPI {
     fn caller(&self) -> Address;
-    fn get_memory<K: Into<Vec<u8>>, V: DeserializeOwned>(
+    fn get_state<K: Into<Vec<u8>>, V: DeserializeOwned>(
         &mut self,
         contract: &'static str,
         key: K,
     ) -> Result<V, serde_cbor::Error> {
-        from_slice(&MemoryAPI::get(self, &db_key(&contract, &key.into())))
+        from_slice(&StateAPI::get(self, &db_key(&contract, &key.into())))
     }
 
-    fn set_memory<K: Into<Vec<u8>>, V: Serialize>(
+    fn set_state<K: Into<Vec<u8>>, V: Serialize>(
         &mut self,
 
         contract: &'static str,
         key: K,
         value: V,
     ) {
-        MemoryAPI::set(
-            self,
-            &db_key(&contract, &key.into()),
-            &to_vec(&value).unwrap(),
-        )
-    }
-
-    fn get_storage<K: Into<Vec<u8>>, V: DeserializeOwned>(
-        &mut self,
-        contract: &'static str,
-        key: K,
-    ) -> Result<V, serde_cbor::Error> {
-        from_slice(&StorageAPI::get(self, &db_key(&contract, &key.into())))
-    }
-
-    fn set_storage<K: Into<Vec<u8>>, V: Serialize>(
-        &mut self,
-        contract: &'static str,
-
-        key: K,
-        value: V,
-    ) {
-        StorageAPI::set(
+        StateAPI::set(
             self,
             &db_key(&contract, &key.into()),
             &to_vec(&value).unwrap(),
