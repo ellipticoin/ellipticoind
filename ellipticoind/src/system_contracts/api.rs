@@ -1,78 +1,37 @@
-use crate::{
-    state::{Memory, State, Storage},
-    transaction::TransactionRequest,
-};
+use crate::transaction::TransactionRequest;
 use ellipticoin::Address;
+use std::collections::HashMap;
 
-pub struct NativeAPI<'a> {
-    pub state: &'a mut State,
+pub struct InMemoryAPI<'a> {
+    pub state: &'a mut HashMap<Vec<u8>, Vec<u8>>,
     pub transaction: TransactionRequest,
 }
 
-impl<'a> ellipticoin::MemoryAPI for NativeAPI<'a> {
+impl<'a> InMemoryAPI<'a> {
+    pub fn new(
+        state: &'a mut async_std::sync::MutexGuard<'_, HashMap<Vec<u8>, Vec<u8>>>,
+        transaction_request: Option<TransactionRequest>,
+    ) -> InMemoryAPI<'a> {
+        InMemoryAPI {
+            transaction: transaction_request.unwrap_or(TransactionRequest {
+                ..Default::default()
+            }),
+            state,
+        }
+    }
+}
+impl<'a> ellipticoin::StateAPI for InMemoryAPI<'a> {
     fn get(&mut self, key: &[u8]) -> Vec<u8> {
-        self.state.get_memory(key)
+        self.state.get(key).unwrap_or(&vec![]).to_vec()
     }
 
     fn set(&mut self, key: &[u8], value: &[u8]) {
-        self.state.set_memory(key, value)
+        self.state.insert(key.to_vec(), value.to_vec());
     }
 }
 
-impl<'a> ellipticoin::StorageAPI for NativeAPI<'a> {
-    fn get(&mut self, key: &[u8]) -> Vec<u8> {
-        self.state.get_storage(key)
-    }
-
-    fn set(&mut self, key: &[u8], value: &[u8]) {
-        self.state.set_storage(key, value)
-    }
-}
-
-impl<'a> ellipticoin::API for NativeAPI<'a> {
+impl<'a> ellipticoin::API for InMemoryAPI<'a> {
     fn caller(&self) -> Address {
         Address::PublicKey(self.transaction.sender.clone())
-    }
-}
-
-pub struct ReadOnlyAPI {
-    pub state: State,
-}
-impl ReadOnlyAPI {
-    pub fn new(
-        rocksdb: std::sync::Arc<rocksdb::DB>,
-        redis: crate::types::redis::Connection,
-    ) -> Self {
-        let memory = Memory { redis };
-        let storage = Storage {
-            rocksdb: rocksdb.clone(),
-        };
-        let state = crate::state::State::new(memory, storage);
-        Self { state }
-    }
-}
-impl ellipticoin::MemoryAPI for ReadOnlyAPI {
-    fn get(&mut self, key: &[u8]) -> Vec<u8> {
-        self.state.get_memory(key)
-    }
-
-    fn set(&mut self, _key: &[u8], _value: &[u8]) {
-        panic!("tried to write in a read-only context")
-    }
-}
-
-impl ellipticoin::StorageAPI for ReadOnlyAPI {
-    fn get(&mut self, key: &[u8]) -> Vec<u8> {
-        self.state.get_storage(key)
-    }
-
-    fn set(&mut self, _key: &[u8], _value: &[u8]) {
-        panic!("tried to write in a read-only context")
-    }
-}
-
-impl ellipticoin::API for ReadOnlyAPI {
-    fn caller(&self) -> Address {
-        panic!("called `caller` in a read-only context")
     }
 }

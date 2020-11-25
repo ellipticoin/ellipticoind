@@ -1,8 +1,8 @@
-use crate::sha2::Digest;
 use crate::{
     config::{host_uri, random_bootnode},
     models,
     models::transaction::Transaction,
+    sha2::Digest,
     transaction::TransactionRequest,
 };
 use futures::AsyncReadExt;
@@ -10,9 +10,11 @@ use graphql_client::*;
 use helpers::{base64_encode, sign};
 use indicatif::ProgressBar;
 use sha2::Sha256;
-use std::fs::File;
-use std::io::{BufWriter, Write};
-use std::path::PathBuf;
+use std::{
+    fs::File,
+    io::{BufWriter, Write},
+    path::PathBuf,
+};
 
 mod helpers;
 

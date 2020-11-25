@@ -1,8 +1,9 @@
 use crate::{
     config::verification_key,
-    constants::{BLOCK_TIME, NEW_BLOCK_CHANNEL, STATE, TRANSACTION_QUEUE},
+    constants::{BLOCK_TIME, NEW_BLOCK_CHANNEL, TRANSACTION_QUEUE},
     helpers::run_for,
     models::{Block, Transaction},
+    state::current_miner,
     system_contracts::ellipticoin::State,
 };
 use async_std::{
@@ -27,7 +28,7 @@ pub async fn run() {
 }
 
 async fn wait_for_peer() {
-    let current_miner = STATE.current_miner().await;
+    let current_miner = current_miner().await;
     println!(
         "Waiting for peer: {} ({})",
         current_miner.host,

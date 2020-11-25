@@ -4,9 +4,10 @@ use crate::{
         helpers::validate_signature,
         types::{Bytes, Transaction},
     },
-    constants::{NEW_BLOCK_CHANNEL, STATE},
+    constants::NEW_BLOCK_CHANNEL,
     helpers::run_transaction,
     models,
+    state::current_miner,
 };
 
 pub struct Mutations;
@@ -27,7 +28,8 @@ impl Mutations {
     pub async fn post_block(_context: &Context, block: Bytes) -> Result<bool, Error> {
         let block: (models::block::Block, Vec<models::transaction::Transaction>) =
             validate_signature(&block.0)?;
-        let state = block.0.apply(block.1).await;
+        let state = block.clone().0.apply(block.1).await;
+        println!("Applied block #{}", block.0.number);
         NEW_BLOCK_CHANNEL.0.send(state).await;
 
         Ok(true)
@@ -38,7 +40,7 @@ impl Mutations {
         if message != "Slash" {
             return Err(Error("Message didn't start with \"Slash\"".to_string()));
         }
-        if STATE.current_miner().await.address == winner {
+        if current_miner().await.address == winner {
             println!("Slash winner")
         }
         Ok(true)

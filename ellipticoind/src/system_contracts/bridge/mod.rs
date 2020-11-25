@@ -4,8 +4,7 @@ mod errors;
 use crate::system_contracts::token::{self};
 use constants::SIGNERS;
 use ellipticoin::{Address, Bytes, Token};
-use std::boxed::Box;
-use std::convert::TryInto;
+use std::{boxed::Box, convert::TryInto};
 use wasm_rpc::error::Error;
 use wasm_rpc_macros::export_native;
 
@@ -50,20 +49,17 @@ pub fn token(token_id: Bytes) -> Token {
 #[cfg(test)]
 mod tests {
     use super::{native, *};
-    use crate::system_contracts::{
-        test_api::{TestAPI, TestState},
-        token,
-        token::BASE_FACTOR,
-    };
+    use crate::system_contracts::{test_api::TestAPI, token, token::BASE_FACTOR};
     use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY};
-    use std::env;
+    use std::{collections::HashMap, env};
+
     const BTC: [u8; 20] = [0; 20];
     const ETH_ADDRESS: [u8; 20] = [0; 20];
 
     #[test]
     fn test_mint() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = TestAPI::new(&mut state, SIGNERS[0], "Token".to_string());
         native::mint(
             &mut api,
@@ -85,7 +81,7 @@ mod tests {
     #[test]
     fn test_mint_invalid_sender() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = TestAPI::new(&mut state, *ALICE, "Token".to_string());
         assert!(native::mint(
             &mut api,
@@ -99,7 +95,7 @@ mod tests {
     #[test]
     fn test_release() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = TestAPI::new(&mut state, SIGNERS[0], "Token".to_string());
         native::mint(
             &mut api,

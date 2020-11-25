@@ -1,27 +1,27 @@
 use crate::{
     client::{download, get_block},
-    config::{
-        ethereum_balances_path, get_pg_connection, get_redis_connection, get_rocksdb,
-        verification_key, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS,
-    },
-    constants::{STATE, TOKEN_CONTRACT},
-    diesel::RunQueryDsl,
+    config::{get_pg_connection, verification_key, BURN_PER_BLOCK, GENESIS_NODE, HOST, OPTS},
+    constants::TOKEN_CONTRACT,
+    diesel::{ExpressionMethods, QueryDsl, RunQueryDsl},
     helpers::{bytes_to_value, run_transaction},
     models,
     models::{Block, HashOnion, Transaction},
-    state::{db_key, Memory, Storage},
+    schema::{blocks::dsl as blocks_dsl, transactions::dsl as transactions_dsl},
+    serde_cbor::Deserializer,
+    state::{is_mining, IN_MEMORY_STATE},
     static_files::STATIC_FILES,
     system_contracts,
+    system_contracts::api::InMemoryAPI,
     transaction::TransactionRequest,
 };
-use diesel::sql_query;
+use diesel::{
+    delete,
+    dsl::{exists, not},
+    sql_query,
+};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::Path;
+use std::{collections::HashMap, fs::File, path::Path};
 
-use indicatif::ProgressBar;
-use r2d2_redis::redis::{self};
-use std::{convert::TryInto, fs::File, io::BufRead, ops::DerefMut};
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct VMState {
     pub memory: HashMap<Vec<u8>, Vec<u8>>,
@@ -29,7 +29,7 @@ pub struct VMState {
 }
 
 pub async fn start_miner() {
-    if STATE.is_mining().await {
+    if is_mining().await {
         return;
     }
     let pg_db = get_pg_connection();
@@ -87,60 +87,63 @@ pub async fn download_static_files() {
 }
 pub async fn reset_state() {
     download_static_files().await;
-    let pg_db = get_pg_connection();
-    reset_redis().await;
-    reset_pg().await;
-    reset_rocksdb().await;
-    import_ethereum_balances().await;
     load_genesis_state().await;
-    load_genesis_blocks().await;
-    HashOnion::generate(&pg_db);
-    HashOnion::skip_to_current(&pg_db).await;
+
+    if OPTS.save_state {
+        run_transactions_in_db().await;
+    } else {
+        reset_pg().await;
+        HashOnion::generate().await;
+    }
 }
 
 pub async fn load_genesis_state() {
-    let mut memory = Memory {
-        redis: get_redis_connection(),
-    };
-    let mut storage = Storage {
-        rocksdb: get_rocksdb(),
-    };
+    let mut state = IN_MEMORY_STATE.lock().await;
     let genesis_file = File::open(OPTS.genesis_state_path.clone()).expect(&format!(
         "Genesis file {} not found",
         &OPTS.genesis_state_path
     ));
-    let state: VMState = serde_cbor::from_reader(genesis_file).unwrap();
-    for (key, value) in state.memory {
-        let _: () = memory.set(&key, &value);
-    }
-    for (key, value) in state.storage {
-        storage.set(&key, &value);
+
+    for (key, value) in Deserializer::from_reader(&genesis_file)
+        .into_iter::<(Vec<u8>, Vec<u8>)>()
+        .map(Result::unwrap)
+    {
+        state.insert(key, value);
     }
 }
 
-pub async fn load_genesis_blocks() {
-    if OPTS.skip_genesis_blocks {
-        return;
-    }
-    let genesis_blocks_file = File::open(OPTS.genesis_blocks_path.clone()).expect(&format!(
-        "Genesis transactions file {} not found",
-        &OPTS.genesis_blocks_path
-    ));
-    let blocks: Vec<(Block, Vec<Transaction>)> =
-        serde_cbor::from_reader(genesis_blocks_file).unwrap();
-    println!("Applying genesis blocks");
-    for (block, mut transactions) in blocks {
-        transactions = if (0..343866_i32).contains(&block.number) {
-            transactions
-                .iter()
-                .cloned()
-                .map(fix_spelling_errors)
-                .collect()
-        } else {
-            transactions
+pub async fn run_transactions_in_db() {
+    let pg_db = get_pg_connection();
+    let transactions = transactions_dsl::transactions
+        .order((
+            transactions_dsl::block_number.asc(),
+            transactions_dsl::position.asc(),
+        ))
+        .load::<Transaction>(&pg_db)
+        .unwrap();
+    let mut state = IN_MEMORY_STATE.lock().await;
+    for mut transaction in transactions {
+        if (0..343866_i32).contains(&transaction.block_number) {
+            transaction = fix_spelling_errors(transaction.clone())
+        }
+        let mut api = InMemoryAPI::new(&mut state, Some(transaction.clone().into()));
+        system_contracts::run(&mut api, TransactionRequest::from(transaction.clone()));
+        if transaction.id % 10000 == 0 && transaction.id != 0 {
+            println!(
+                "Applied transactions #{}-#{}",
+                transaction.id - 10000,
+                transaction.id
+            )
         };
-        block.apply(transactions).await;
     }
+    delete(blocks_dsl::blocks)
+        .filter(not(exists(
+            transactions_dsl::transactions
+                .select(transactions_dsl::block_number)
+                .filter(transactions_dsl::block_number.eq(blocks_dsl::number)),
+        )))
+        .execute(&pg_db)
+        .unwrap();
 }
 
 pub fn fix_spelling_errors(mut transaction: Transaction) -> Transaction {
@@ -152,11 +155,6 @@ pub fn fix_spelling_errors(mut transaction: Transaction) -> Transaction {
     transaction
 }
 
-pub async fn reset_redis() {
-    let mut redis = get_redis_connection();
-    let _: () = redis::cmd("FLUSHDB").query(redis.deref_mut()).unwrap();
-}
-
 async fn reset_pg() {
     let pg_db = get_pg_connection();
     diesel_migrations::embed_migrations!();
@@ -165,88 +163,4 @@ async fn reset_pg() {
         .execute(&pg_db)
         .unwrap();
     sql_query("TRUNCATE hash_onion").execute(&pg_db).unwrap();
-}
-
-pub async fn reset_rocksdb() {
-    let rocksdb = get_rocksdb();
-    if OPTS.save_state {
-        return;
-    }
-    println!("Resetting RocksDB");
-    rocksdb
-        .iterator(rocksdb::IteratorMode::Start)
-        .filter(|(key, _value)| {
-            !key.starts_with(&db_key(
-                &TOKEN_CONTRACT,
-                &vec![system_contracts::ellipticoin::StorageNamespace::EthereumBalances as u8],
-            ))
-        })
-        .for_each(|(key, _value)| {
-            rocksdb.delete(key).unwrap();
-        });
-    println!("Reset RocksDB");
-}
-
-async fn import_ethereum_balances() {
-    let rocksdb = get_rocksdb();
-    if rocksdb
-        .prefix_iterator(db_key(
-            &TOKEN_CONTRACT,
-            &vec![system_contracts::ellipticoin::StorageNamespace::EthereumBalances as u8],
-        ))
-        .next()
-        .is_some()
-    {
-        println!("Ethereum Balances Already Imported");
-        return;
-    }
-    let file = File::open(ethereum_balances_path()).unwrap();
-    let metadata = std::fs::metadata(ethereum_balances_path()).unwrap();
-    let pb = ProgressBar::new(metadata.len() / 24);
-    println!("Importing Ethereum Balances");
-    pb.set_style(
-        indicatif::ProgressStyle::default_bar()
-            .template("[{elapsed_precise}] [{bar}] {pos}/{len} ({percent}%)")
-            .progress_chars("=> "),
-    );
-    let mut batch = rocksdb::WriteBatch::default();
-    const CAP: usize = 24 * 1000;
-    let mut reader = std::io::BufReader::with_capacity(CAP, file);
-
-    loop {
-        let length = {
-            let buffer = reader.fill_buf().unwrap();
-            for chunk in buffer.chunks(24) {
-                batch.put(
-                    db_key(
-                        &TOKEN_CONTRACT,
-                        &[
-                            vec![
-                                system_contracts::ellipticoin::StorageNamespace::EthereumBalances
-                                    as u8,
-                            ],
-                            chunk[0..20].to_vec(),
-                        ]
-                        .concat(),
-                    ),
-                    (u64::from_le_bytes(
-                        [chunk[20..24].to_vec(), [0; 4].to_vec()].concat()[..]
-                            .try_into()
-                            .unwrap(),
-                    ) * 10)
-                        .to_le_bytes()
-                        .to_vec(),
-                );
-            }
-            pb.inc(1000);
-            rocksdb.write(batch).unwrap();
-            batch = rocksdb::WriteBatch::default();
-            buffer.len()
-        };
-        if length == 0 {
-            break;
-        }
-        reader.consume(length);
-    }
-    pb.finish();
 }

@@ -1,6 +1,6 @@
 use crate::{
     block_broadcaster::broadcast_block,
-    constants::{NEW_BLOCK_CHANNEL, STATE, WEB_SOCKET_BROADCASTER},
+    constants::{NEW_BLOCK_CHANNEL, WEB_SOCKET_BROADCASTER},
 };
 pub use crate::{
     config::{get_pg_connection, verification_key},
@@ -9,7 +9,6 @@ pub use crate::{
     helpers::bytes_to_value,
     models::{self, HashOnion, Transaction},
     schema::{blocks, blocks::dsl, transactions},
-    state::State,
     system_contracts::ellipticoin::{self, Miner},
     transaction,
 };
@@ -55,9 +54,9 @@ impl Block {
         block
     }
 
-    pub async fn apply(self, transactions: Vec<models::Transaction>) -> ellipticoin::State {
+    pub async fn apply(&self, transactions: Vec<models::Transaction>) -> ellipticoin::State {
         insert_into(dsl::blocks)
-            .values(&self)
+            .values(self)
             .execute(&get_pg_connection())
             .unwrap();
         let mut completed_transactions: Vec<Transaction> = vec![];
@@ -77,14 +76,12 @@ impl Block {
             )
             .unwrap()
             .unwrap();
-        *STATE.lock().await = state.clone();
         WEB_SOCKET_BROADCASTER
             .broadcast(
                 state.block_number as u32,
                 state.miners.first().unwrap().host.clone(),
             )
             .await;
-        println!("Applied block #{}", self.number);
         state
     }
 
@@ -120,7 +117,6 @@ impl Block {
             )
             .unwrap()
             .unwrap();
-        *STATE.lock().await = state.clone();
         NEW_BLOCK_CHANNEL.0.send(state.clone()).await;
         self.sealed = true;
         diesel::update(dsl::blocks.filter(dsl::number.eq(self.number.clone())))
