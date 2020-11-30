@@ -85,11 +85,12 @@ export_native! {
         let liquidity_token_supply = token::get_total_supply(api, liquidity_token(token.clone()));
 
         debit_pool_supply_of_base_token(api, token.clone(), base_token_balance * amount / token_balance);
+
         pay!(api, BASE_TOKEN.clone(), api.caller(), base_token_balance * amount / token_balance)?;
         debit_pool_supply_of_token(api, token.clone(), amount);
-        pay!(api, token.clone(), api.caller(), amount)?;
 
-        burn(api, token, liquidity_token_supply * amount / token_balance)?;
+        pay!(api, token.clone(), api.caller(), amount)?;
+        burn(api, token, liquidity_token_supply * amount / token_balance / BASE_FACTOR)?;
 
         Ok(())
     }
