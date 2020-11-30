@@ -7,6 +7,7 @@ use crate::{
 };
 use constants::{BASE_TOKEN, FEE};
 use ellipticoin::{charge, pay, state_accessors, Address, Token};
+use std::cmp::min;
 use std::{boxed::Box, collections::HashSet, str};
 use wasm_rpc::error::Error;
 use wasm_rpc_macros::export_native;
@@ -250,7 +251,7 @@ fn validate_liquidity_amount<API: ellipticoin::API>(
     if claimed_percent_of_pool - EPSILON > percent_of_pool {
         Err(Box::new(token::errors::INSUFFICIENT_FUNDS.clone()))
     } else {
-        Ok((token_supply as f64 * percent_of_pool) as u64)
+        Ok(min(amount, (token_supply as f64 * percent_of_pool) as u64))
     }
 }
 
