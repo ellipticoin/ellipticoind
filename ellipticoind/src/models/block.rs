@@ -110,10 +110,10 @@ impl Block {
             vec![bytes_to_value(skin.clone())],
         );
         let seal_transaction =
-            Transaction::run(&self, seal_transaction_request, transaction_position as i32);
+            Transaction::run(&self, seal_transaction_request, transaction_position as i32).await;
         let state: ellipticoin::State =
             serde_cbor::from_slice::<Result<_, wasm_rpc::error::Error>>(
-                &seal_transaction.await.return_value,
+                &seal_transaction.return_value,
             )
             .unwrap()
             .unwrap();

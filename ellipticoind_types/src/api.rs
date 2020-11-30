@@ -10,10 +10,21 @@ pub use wasm_rpc_macros::{export, export_native};
 pub trait StateAPI {
     fn get(&mut self, key: &[u8]) -> Vec<u8>;
     fn set(&mut self, key: &[u8], value: &[u8]);
+    fn commit(&mut self);
+    fn revert(&mut self);
 }
 
 pub trait API: StateAPI {
     fn caller(&self) -> Address;
+
+    fn commit(&mut self) {
+        StateAPI::commit(self);
+    }
+
+    fn revert(&mut self) {
+        StateAPI::revert(self);
+    }
+
     fn get_state<K: Into<Vec<u8>>, V: DeserializeOwned>(
         &mut self,
         contract: &'static str,
