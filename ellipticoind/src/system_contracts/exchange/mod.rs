@@ -7,10 +7,12 @@ use crate::{
 };
 use constants::{BASE_TOKEN, FEE};
 use ellipticoin::{charge, pay, state_accessors, Address, Token};
+use std::cmp::min;
 use std::{boxed::Box, collections::HashSet, str};
 use wasm_rpc::error::Error;
 use wasm_rpc_macros::export_native;
 
+const EPSILON: f64 = 0.00000001;
 const CONTRACT_NAME: &'static str = "Exchange";
 lazy_static! {
     pub static ref ADDRESS: std::string::String = CONTRACT_NAME.to_string();
@@ -79,17 +81,19 @@ export_native! {
         token: Token,
         amount: u64,
     ) -> Result<(), Box<Error>> {
-        validate_liquidity_amount(api, token.clone(), amount)?;
+        let remove_amount = validate_liquidity_amount(api, token.clone(), amount)?;
+
         let token_balance = get_pool_supply_of_token(api, token.clone());
         let base_token_balance = get_pool_supply_of_base_token(api, token.clone());
         let liquidity_token_supply = token::get_total_supply(api, liquidity_token(token.clone()));
 
-        debit_pool_supply_of_base_token(api, token.clone(), base_token_balance * amount / token_balance);
-        pay!(api, BASE_TOKEN.clone(), api.caller(), base_token_balance * amount / token_balance)?;
-        debit_pool_supply_of_token(api, token.clone(), amount);
-        pay!(api, token.clone(), api.caller(), amount)?;
+        debit_pool_supply_of_base_token(api, token.clone(), base_token_balance * remove_amount / token_balance);
+        pay!(api, BASE_TOKEN.clone(), api.caller(), base_token_balance * remove_amount / token_balance)?;
 
-        burn(api, token, liquidity_token_supply * amount / token_balance)?;
+        debit_pool_supply_of_token(api, token.clone(), remove_amount);
+        pay!(api, token.clone(), api.caller(), remove_amount)?;
+
+        burn(api, token, liquidity_token_supply * remove_amount / token_balance)?;
 
         Ok(())
     }
@@ -230,7 +234,7 @@ fn validate_liquidity_amount<API: ellipticoin::API>(
     api: &mut API,
     token: Token,
     amount: u64,
-) -> Result<(), Box<Error>> {
+) -> Result<u64, Box<Error>> {
     let liquidity_token_supply = token::get_total_supply(api, liquidity_token(token.clone()));
     if liquidity_token_supply == 0 {
         return Err(Box::new(token::errors::INSUFFICIENT_FUNDS.clone()));
@@ -240,10 +244,14 @@ fn validate_liquidity_amount<API: ellipticoin::API>(
     let requester_liquidity_token_balance =
         token::get_balance(api, liquidity_token(token.clone()), api.caller());
 
-    if amount / token_supply > requester_liquidity_token_balance / liquidity_token_supply {
+    let claimed_percent_of_pool: f64 = amount as f64 / token_supply as f64;
+    let percent_of_pool: f64 =
+        requester_liquidity_token_balance as f64 / liquidity_token_supply as f64;
+
+    if claimed_percent_of_pool - EPSILON > percent_of_pool {
         Err(Box::new(token::errors::INSUFFICIENT_FUNDS.clone()))
     } else {
-        Ok(())
+        Ok(min(amount, (token_supply as f64 * percent_of_pool) as u64))
     }
 }
 
