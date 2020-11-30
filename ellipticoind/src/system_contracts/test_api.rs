@@ -6,6 +6,7 @@ pub struct TestAPI<'a> {
     pub state: &'a mut HashMap<Vec<u8>, Vec<u8>>,
     pub contract: String,
     pub transaction: TransactionRequest,
+    pub transaction_state: HashMap<Vec<u8>, Vec<u8>>,
     pub sender: [u8; 32],
     pub caller: Address,
 }
@@ -24,6 +25,7 @@ impl<'a> TestAPI<'a> {
             state,
             contract,
             transaction: transaction.clone(),
+            transaction_state: HashMap::new(),
             caller: Address::PublicKey(transaction.sender),
             sender: transaction.sender.try_into().unwrap(),
         }
@@ -31,11 +33,22 @@ impl<'a> TestAPI<'a> {
 }
 impl<'a> ellipticoin::StateAPI for TestAPI<'a> {
     fn get(&mut self, key: &[u8]) -> Vec<u8> {
-        self.state.get(key).unwrap_or(&vec![]).to_vec()
+        self.transaction_state
+            .get(key)
+            .unwrap_or(self.state.get(key).unwrap_or(&vec![]))
+            .to_vec()
     }
 
     fn set(&mut self, key: &[u8], value: &[u8]) {
-        self.state.insert(key.to_vec(), value.to_vec());
+        self.transaction_state.insert(key.to_vec(), value.to_vec());
+    }
+
+    fn commit(&mut self) {
+        self.state.extend(self.transaction_state.clone());
+    }
+
+    fn revert(&mut self) {
+        self.transaction_state.clear();
     }
 }
 

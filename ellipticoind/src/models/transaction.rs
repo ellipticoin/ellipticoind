@@ -75,32 +75,29 @@ pub struct TransactionWithoutHash {
 impl Transaction {
     pub async fn run(
         current_block: &Block,
-        vm_transaction: TransactionRequest,
+        transaction_request: TransactionRequest,
         position: i32,
     ) -> Self {
         let mut state = IN_MEMORY_STATE.lock().await;
-        let mut api = InMemoryAPI {
-            transaction: vm_transaction.clone(),
-            state: &mut state,
-        };
-        let return_value = system_contracts::run(&mut api, vm_transaction.clone());
-        Transaction::insert(vm_transaction, current_block, position, return_value)
+        let mut api = InMemoryAPI::new(&mut state, Some(transaction_request.clone()));
+        let return_value = system_contracts::run(&mut api, transaction_request.clone());
+        Transaction::insert(transaction_request, current_block, position, return_value)
     }
 
     pub fn insert(
-        vm_transaction: TransactionRequest,
+        transaction_request: TransactionRequest,
         current_block: &Block,
         position: i32,
         return_value: serde_cbor::Value,
     ) -> Self {
         let mut completed_transaction = NewTransaction {
-            network_id: vm_transaction.network_id as i64,
+            network_id: transaction_request.network_id as i64,
             block_number: current_block.number,
-            sender: vm_transaction.sender[..].try_into().unwrap(),
-            arguments: serde_cbor::to_vec(&vm_transaction.arguments).unwrap(),
-            contract: vm_transaction.contract,
-            function: vm_transaction.function,
-            nonce: vm_transaction.nonce as i32,
+            sender: transaction_request.sender[..].try_into().unwrap(),
+            arguments: serde_cbor::to_vec(&transaction_request.arguments).unwrap(),
+            contract: transaction_request.contract,
+            function: transaction_request.function,
+            nonce: transaction_request.nonce as i32,
             return_value: serde_cbor::to_vec(&return_value).unwrap(),
             ..Default::default()
         };
