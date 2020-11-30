@@ -457,7 +457,7 @@ mod tests {
                 TokenBalance::new(BASE_TOKEN.clone(), apple_balance / 2),
             ],
         )];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         assert!(native::create_pool(
@@ -576,7 +576,7 @@ mod tests {
                 TokenBalance::new(BASE_TOKEN.clone(), 3),
             ],
         )];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
@@ -645,7 +645,7 @@ mod tests {
                 TokenBalance::new(BASE_TOKEN.clone(), 2),
             ],
         )];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
@@ -696,7 +696,7 @@ mod tests {
                 vec![TokenBalance::new(ELC.clone(), 100)],
             ),
         ];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
@@ -802,7 +802,7 @@ mod tests {
                 TokenBalance::new(BASE_TOKEN.clone(), 1),
             ],
         )];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, BASE_FACTOR).unwrap();
@@ -865,7 +865,7 @@ mod tests {
                 vec![TokenBalance::new(BASE_TOKEN.clone(), 100)],
             ),
         ];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
@@ -905,7 +905,7 @@ mod tests {
                 vec![TokenBalance::new(APPLES.clone(), 100)],
             ),
         ];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
@@ -945,7 +945,7 @@ mod tests {
                 vec![TokenBalance::new(APPLES.clone(), 100)],
             ),
         ];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
@@ -983,7 +983,7 @@ mod tests {
                 vec![TokenBalance::new(APPLES.clone(), 100)],
             ),
         ];
-        let mut state = TestState::new();
+        let mut state = HashMap::new();
         let mut api = setup(balances, &mut state);
 
         api.caller = Address::PublicKey(BOB.clone());
