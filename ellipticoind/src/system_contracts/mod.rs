@@ -1,4 +1,6 @@
 use crate::{error::CONTRACT_NOT_FOUND, transaction::TransactionRequest};
+use serde_cbor::{value::from_value, Value};
+use wasm_rpc::error::Error;
 
 #[macro_use]
 pub mod macros;
@@ -26,5 +28,14 @@ pub fn run<API: ::ellipticoin::API>(
             .unwrap();
         }
     };
-    f(api, &transaction.function, transaction.clone().arguments)
+    let return_value = f(api, &transaction.function, transaction.clone().arguments);
+    if matches!(
+        from_value::<Result<Value, Box<Error>>>(return_value.clone()),
+        Ok(Err(_))
+    ) {
+        ::ellipticoin::API::revert(api);
+    } else {
+        ::ellipticoin::API::commit(api);
+    };
+    return_value
 }
