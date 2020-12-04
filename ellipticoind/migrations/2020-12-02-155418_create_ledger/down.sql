@@ -1,0 +1,10 @@
+DROP INDEX "ledger_entries_credit_id_idx";
+DROP INDEX "ledger_entries_debit_id_idx";
+DROP INDEX "balances_id_idx";
+DROP MATERIALIZED VIEW "balances";
+DROP VIEW "account_ledgers";
+DROP TRIGGER "trigger_update_balance_ledger_entries" ON "ledger_entries";
+DROP TRIGGER "trigger_update_balance_addresses" on "addresses";
+DROP FUNCTION "update_balances";
+DROP TABLE "ledger_entries";
+DROP TABLE "addresses";

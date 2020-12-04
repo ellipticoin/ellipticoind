@@ -1,4 +1,18 @@
 table! {
+    addresses (id) {
+        id -> Int4,
+        bytes -> Bytea,
+    }
+}
+
+table! {
+    balances (id) {
+        id -> Int4,
+        balance -> Numeric,
+    }
+}
+
+table! {
     blocks (number) {
         number -> Int4,
         memory_changeset_hash -> Bytea,
@@ -11,6 +25,16 @@ table! {
     hash_onion (id) {
         id -> Int4,
         layer -> Bytea,
+    }
+}
+
+table! {
+    ledger_entries (id) {
+        id -> Int4,
+        transaction_id -> Int4,
+        amount -> Numeric,
+        credit_id -> Int4,
+        debit_id -> Int4,
     }
 }
 
@@ -30,6 +54,13 @@ table! {
     }
 }
 
+joinable!(ledger_entries -> transactions (transaction_id));
 joinable!(transactions -> blocks (block_number));
 
-allow_tables_to_appear_in_same_query!(blocks, hash_onion, transactions,);
+allow_tables_to_appear_in_same_query!(
+    addresses,
+    blocks,
+    hash_onion,
+    ledger_entries,
+    transactions,
+);
