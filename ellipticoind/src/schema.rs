@@ -8,7 +8,7 @@ table! {
 table! {
     balances (id) {
         id -> Int4,
-        balance -> Numeric,
+        balance -> BigInt,
     }
 }
 
@@ -32,7 +32,7 @@ table! {
     ledger_entries (id) {
         id -> Int4,
         transaction_id -> Int4,
-        amount -> Numeric,
+        amount -> BigInt,
         credit_id -> Int4,
         debit_id -> Int4,
     }
@@ -57,10 +57,4 @@ table! {
 joinable!(ledger_entries -> transactions (transaction_id));
 joinable!(transactions -> blocks (block_number));
 
-allow_tables_to_appear_in_same_query!(
-    addresses,
-    blocks,
-    hash_onion,
-    ledger_entries,
-    transactions,
-);
+allow_tables_to_appear_in_same_query!(addresses, blocks, hash_onion, ledger_entries, transactions,);

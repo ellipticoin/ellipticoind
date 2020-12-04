@@ -1,6 +1,10 @@
-use crate::models::address::{Credit, Debit};
-use crate::models::transaction::Transaction;
-use crate::schema::ledger_entries;
+use crate::{
+    models::{
+        address::{Credit, Debit},
+        transaction::Transaction,
+    },
+    schema::ledger_entries,
+};
 
 #[derive(Queryable, Associations, Insertable, PartialEq, Default)]
 #[belongs_to(Transaction)]
@@ -9,7 +13,7 @@ use crate::schema::ledger_entries;
 #[table_name = "ledger_entries"]
 pub struct LedgerEntry {
     transaction_id: i32,
-    amount: bigdecimal::BigDecimal,
+    amount: i64,
     credit_id: i32,
     debit_id: i32,
 }
@@ -17,21 +21,20 @@ pub struct LedgerEntry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::diesel::RunQueryDsl;
-    use crate::diesel::QueryDsl;
-    use crate::schema::ledger_entries::dsl::ledger_entries;
+    use crate::{
+        diesel::{QueryDsl, RunQueryDsl},
+        schema::ledger_entries::dsl::ledger_entries,
+    };
 
-    use crate::diesel::ExpressionMethods;
-    use crate::models::address::Address;
-    use crate::models::Block;
-    use crate::schema::addresses::dsl as addresses_dsl;
-    use crate::schema::blocks::dsl as blocks_dsl;
-    use crate::schema::transactions::dsl as transactions_dsl;
-    use crate::schema::balances::dsl as balances_dsl;
-    use diesel::pg::upsert::excluded;
-    use diesel::result::Error;
-    use diesel::Connection;
-    use diesel::PgConnection;
+    use crate::{
+        diesel::ExpressionMethods,
+        models::{address::Address, Block},
+        schema::{
+            addresses::dsl as addresses_dsl, balances::dsl as balances_dsl,
+            blocks::dsl as blocks_dsl, transactions::dsl as transactions_dsl,
+        },
+    };
+    use diesel::{pg::upsert::excluded, result::Error, Connection, PgConnection};
 
     fn get_database_url() -> String {
         dotenv::dotenv().ok();
@@ -87,15 +90,12 @@ mod tests {
                 })
                 .execute(&conn)
                 .unwrap();
-let bobs_balance = balances_dsl::balances
-    .filter(balances_dsl::id.eq(bob))
-    .select(balances_dsl::balance)
-    .get_result::<bigdecimal::BigDecimal>(&conn).expect("boom");
-//     println!("{:?}", bobs_balance);
-    assert!(bobs_balance == 1.into());
+            let bobs_balance = balances_dsl::balances
+                .filter(balances_dsl::id.eq(bob))
+                .select(balances_dsl::balance)
+                .get_result::<i64>(&conn)?;
+            assert!(bobs_balance == 1i64);
             Ok(())
         });
-
-
     }
 }

@@ -7,8 +7,7 @@ use crate::{
 };
 use constants::{BASE_TOKEN, FEE};
 use ellipticoin::{charge, pay, state_accessors, Address, Token};
-use std::cmp::min;
-use std::{boxed::Box, collections::HashSet, str};
+use std::{boxed::Box, cmp::min, collections::HashSet, str};
 use wasm_rpc::error::Error;
 use wasm_rpc_macros::export_native;
 
