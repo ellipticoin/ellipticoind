@@ -7,4 +7,6 @@ DROP TRIGGER "trigger_update_balance_ledger_entries" ON "ledger_entries";
 DROP TRIGGER "trigger_update_balance_addresses" on "addresses";
 DROP FUNCTION "update_balances";
 DROP TABLE "ledger_entries";
+DROP TABLE "tokens";
+DROP TABLE "networks";
 DROP TABLE "addresses";

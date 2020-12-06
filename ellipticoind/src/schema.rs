@@ -6,9 +6,19 @@ table! {
 }
 
 table! {
+    tokens (id) {
+        id -> Int4,
+        name -> Varchar,
+        id_bytes -> Bytea,
+        network_id -> Int4,
+    }
+}
+
+table! {
     balances (id) {
         id -> Int4,
         balance -> BigInt,
+        token_id -> Int4,
     }
 }
 
@@ -32,9 +42,17 @@ table! {
     ledger_entries (id) {
         id -> Int4,
         transaction_id -> Int4,
+        token_id -> Int4,
         amount -> BigInt,
         credit_id -> Int4,
         debit_id -> Int4,
+    }
+}
+
+table! {
+    networks (id) {
+        id -> Int4,
+        name -> Varchar,
     }
 }
 

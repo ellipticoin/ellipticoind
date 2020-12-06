@@ -13,6 +13,7 @@ use crate::{
     system_contracts::{self, api::InMemoryAPI},
     transaction::TransactionRequest,
 };
+use crate::models::ledger_entry::LedgerEntry;
 use diesel::{insert_into, OptionalExtension, QueryDsl};
 use serde::{Deserialize, Serialize};
 use serde_cbor::from_slice;
@@ -81,7 +82,18 @@ impl Transaction {
         let mut state = IN_MEMORY_STATE.lock().await;
         let mut api = InMemoryAPI::new(&mut state, Some(transaction_request.clone()));
         let return_value = system_contracts::run(&mut api, transaction_request.clone());
-        Transaction::insert(transaction_request, current_block, position, return_value)
+        let transaction = Transaction::insert(transaction_request, current_block, position, return_value);
+        
+        if transaction.requires_legder_entry() {
+            LedgerEntry::insert(&transaction)
+        };
+        transaction
+    }
+
+    pub fn requires_legder_entry(
+        &self
+    ) -> bool {
+        true
     }
 
     pub fn insert(
