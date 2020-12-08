@@ -82,18 +82,7 @@ impl Transaction {
         let mut state = IN_MEMORY_STATE.lock().await;
         let mut api = InMemoryAPI::new(&mut state, Some(transaction_request.clone()));
         let return_value = system_contracts::run(&mut api, transaction_request.clone());
-        let transaction = Transaction::insert(transaction_request, current_block, position, return_value);
-        
-        if transaction.requires_legder_entry() {
-            LedgerEntry::insert(&transaction)
-        };
-        transaction
-    }
-
-    pub fn requires_legder_entry(
-        &self
-    ) -> bool {
-        true
+        Transaction::insert(transaction_request, current_block, position, return_value)
     }
 
     pub fn insert(

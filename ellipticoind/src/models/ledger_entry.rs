@@ -5,11 +5,11 @@ use crate::{
         token::Token,
     },
     schema::ledger_entries,
-    schema::ledger_entries::dsl::{ledger_entries as ledger_entries_table},
+    // schema::ledger_entries::dsl::{ledger_entries as ledger_entries_table},
 };
-use crate::config::get_pg_connection;
-use diesel::{insert_into, OptionalExtension, QueryDsl};
-use crate::diesel::RunQueryDsl;
+// use crate::config::get_pg_connection;
+// use diesel::{insert_into, OptionalExtension, QueryDsl};
+// use crate::diesel::RunQueryDsl;
 
 #[derive(Queryable, Associations, Insertable, PartialEq, Default)]
 #[belongs_to(Transaction)]
@@ -25,29 +25,29 @@ pub struct LedgerEntry {
     debit_id: i32,
 }
 
-impl LedgerEntry {
-    pub fn insert(
-        transaction: &Transaction,
-    ) {
-        let id = insert_into(ledger_entries_table)
-            .values(&LedgerEntry::from(transaction))
-            .execute(&get_pg_connection())
-            .unwrap();
-    }    
-}
-impl From<&Transaction> for LedgerEntry {
-    fn from(transaction: &Transaction) -> Self {
-        LedgerEntry{
-            amount: match transaction.function.as_ref() {
-                "transfer" => {
-                    transaction.arguments[1]
-                }
-            },
-            ..Default::default()
-        }
-    }
-}
-
+// impl LedgerEntry {
+//     pub fn insert(
+//         transaction: &Transaction,
+//     ) {
+//         let id = insert_into(ledger_entries_table)
+//             .values(&LedgerEntry::from(transaction))
+//             .execute(&get_pg_connection())
+//             .unwrap();
+//     }    
+// }
+// impl From<&Transaction> for LedgerEntry {
+//     fn from(transaction: &Transaction) -> Self {
+//         LedgerEntry{
+//             amount: match transaction.function.as_ref() {
+//                 "transfer" => {
+//                     transaction.arguments[1]
+//                 }
+//             },
+//             ..Default::default()
+//         }
+//     }
+// }
+//
 #[cfg(test)]
 mod tests {
     use super::*;

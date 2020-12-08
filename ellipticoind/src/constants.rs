@@ -15,6 +15,7 @@ lazy_static! {
         Receiver<(TransactionRequest, oneshot::Sender<Transaction>)>
     ) = channel(*TRANSACTION_QUEUE_SIZE);
     pub static ref NEW_BLOCK_CHANNEL: (Sender<State>, Receiver<State>) = channel(1);
+    pub static ref LEDGER: (Sender<State>, Receiver<State>) = channel(1);
     pub static ref SYNCING: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
     pub static ref WEB_SOCKET_BROADCASTER: BroadcastChannel<(u32, String)> =
         BroadcastChannel::new();
