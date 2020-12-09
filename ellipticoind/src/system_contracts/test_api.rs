@@ -18,8 +18,12 @@ impl<'a> TestAPI<'a> {
         contract: String,
     ) -> Self {
         let transaction = TransactionRequest {
+            network_id: 0,
+            contract: contract.clone(),
+            function: "".to_string(),
+            arguments: vec![],
+            nonce: 0,
             sender,
-            ..Default::default()
         };
         Self {
             state,

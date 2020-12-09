@@ -168,7 +168,7 @@ fn calculate_input_amount_in_base_token<API: ellipticoin::API>(
     if divisor == 0 {
         return Ok(0);
     }
-    let new_base_token_supply = invariant / divisor;
+    let new_base_token_supply = (invariant / divisor as u128) as u64;
     Ok(get_pool_supply_of_base_token(api, token.clone()) - new_base_token_supply)
 }
 
@@ -182,7 +182,7 @@ fn calculate_amount_in_output_token<API: ellipticoin::API>(
     if divisor == 0 {
         return Ok(0);
     }
-    let new_token_supply = invariant / divisor;
+    let new_token_supply = (invariant / divisor as u128) as u64;
     Ok(get_pool_supply_of_token(api, output_token.clone()) - new_token_supply)
 }
 
@@ -246,10 +246,10 @@ pub fn get_price<API: ellipticoin::API>(api: &mut API, token: Token) -> Result<u
     }
 }
 
-fn get_pool_invariant<API: ellipticoin::API>(api: &mut API, token: Token) -> u64 {
+fn get_pool_invariant<API: ellipticoin::API>(api: &mut API, token: Token) -> u128 {
     let base_token_supply = get_pool_supply_of_base_token(api, token.clone());
     let token_supply = get_pool_supply_of_token(api, token);
-    base_token_supply * token_supply
+    base_token_supply as u128 * token_supply as u128
 }
 
 fn credit_pool_supply_of_base_token<API: ellipticoin::API>(
@@ -351,8 +351,8 @@ mod tests {
             hashmap! {
                         ellipticoin::Address::PublicKey(*ALICE) =>
                             vec![
-                                (APPLES.clone(), 1),
-                            (BASE_TOKEN.clone(), 1),
+                                (APPLES.clone(), 1 * BASE_FACTOR),
+                            (BASE_TOKEN.clone(), 1 * BASE_FACTOR),
 
             ]
                     },
@@ -385,8 +385,8 @@ mod tests {
             hashmap! {
                 ellipticoin::Address::PublicKey(*ALICE) =>
                 vec![
-                    (APPLES.clone(), 2),
-                    (BASE_TOKEN.clone(), 2),
+                    (APPLES.clone(), 2 * BASE_FACTOR),
+                    (BASE_TOKEN.clone(), 2 * BASE_FACTOR),
                 ],
             },
             &mut state,
@@ -426,8 +426,8 @@ mod tests {
             hashmap! {
                 ellipticoin::Address::PublicKey(*ALICE) =>
                 vec![
-                    (APPLES.clone(), apple_balance),
-                    (BASE_TOKEN.clone(), apple_balance / 2),
+                    (APPLES.clone(), apple_balance * BASE_FACTOR),
+                    (BASE_TOKEN.clone(), apple_balance * BASE_FACTOR / 2),
                 ]
             },
             &mut state,
@@ -470,8 +470,8 @@ mod tests {
             hashmap! {
                 ellipticoin::Address::PublicKey(*ALICE) =>
                 vec![
-                    (APPLES.clone(), apple_balance),
-                    (BASE_TOKEN.clone(), apple_balance * 2),
+                    (APPLES.clone(), apple_balance * BASE_FACTOR),
+                    (BASE_TOKEN.clone(), apple_balance * BASE_FACTOR * 2),
                 ],
             },
             &mut state,
@@ -517,8 +517,8 @@ mod tests {
             hashmap! {
                 ellipticoin::Address::PublicKey(*ALICE) =>
                 vec![
-                    (APPLES.clone(), 2),
-                    (BASE_TOKEN.clone(), 2),
+                    (APPLES.clone(), 2 * BASE_FACTOR),
+                    (BASE_TOKEN.clone(), 2 * BASE_FACTOR),
                 ],
             },
             &mut state,
@@ -551,8 +551,8 @@ mod tests {
             hashmap! {
                 ellipticoin::Address::PublicKey(*ALICE) =>
                 vec![
-                    (APPLES.clone(), 3),
-                    (BASE_TOKEN.clone(), 3),
+                    (APPLES.clone(), 3 * BASE_FACTOR),
+                    (BASE_TOKEN.clone(), 3 * BASE_FACTOR),
                 ]
             },
             &mut state,
@@ -586,8 +586,8 @@ mod tests {
             hashmap! {
                 ellipticoin::Address::PublicKey(*ALICE) =>
                 vec![
-                    (APPLES.clone(), 2),
-                    (BASE_TOKEN.clone(), 1),
+                    (APPLES.clone(), 2 * BASE_FACTOR),
+                    (BASE_TOKEN.clone(), 1 * BASE_FACTOR),
                 ],
             },
             &mut state,
@@ -624,8 +624,8 @@ mod tests {
             hashmap! {
                 ellipticoin::Address::PublicKey(*ALICE) =>
                 vec![
-                    (APPLES.clone(), 1),
-                    (BASE_TOKEN.clone(), 2),
+                    (APPLES.clone(), 1 * BASE_FACTOR),
+                    (BASE_TOKEN.clone(), 2 * BASE_FACTOR),
                 ]
             },
             &mut state,
@@ -666,14 +666,14 @@ mod tests {
             hashmap! {
                 ellipticoin::Address::PublicKey(*ALICE) =>
                 vec![
-                    (APPLES.clone(), 100),
-                    (BANANAS.clone(), 100),
-                    (BASE_TOKEN.clone(), 200),
+                    (APPLES.clone(), 100 * BASE_FACTOR),
+                    (BANANAS.clone(), 100 * BASE_FACTOR),
+                    (BASE_TOKEN.clone(), 200 * BASE_FACTOR),
                 ],
                 ellipticoin::Address::PublicKey(*BOB) =>
-                vec![(BANANAS.clone(), 100)],
+                vec![(BANANAS.clone(), 100 * BASE_FACTOR)],
                 ellipticoin::Address::Contract(ADDRESS.clone()) =>
-                vec![(ELC.clone(), 100)],
+                vec![(ELC.clone(), 100 * BASE_FACTOR)],
             },
             &mut state,
         );
@@ -721,14 +721,14 @@ mod tests {
             hashmap! {
                     ellipticoin::Address::PublicKey(*ALICE) =>
                     vec![
-                        (APPLES.clone(), 100),
-                        (BANANAS.clone(), 100),
-                        (BASE_TOKEN.clone(), 200),
+                        (APPLES.clone(), 100 * BASE_FACTOR),
+                        (BANANAS.clone(), 100 * BASE_FACTOR),
+                        (BASE_TOKEN.clone(), 200 * BASE_FACTOR),
                     ],
                     ellipticoin::Address::PublicKey(*BOB) =>
-                    vec![(BANANAS.clone(), 100)],
+                    vec![(BANANAS.clone(), 100 * BASE_FACTOR)],
                     ellipticoin::Address::Contract(ADDRESS.clone()) =>
-                    vec![(ELC.clone(), 100)],
+                    vec![(ELC.clone(), 100 * BASE_FACTOR)],
             },
             &mut state,
         );
@@ -775,8 +775,8 @@ mod tests {
             hashmap! {
                 ellipticoin::Address::PublicKey(*ALICE) =>
                 vec![
-                    (APPLES.clone(), 1),
-                    (BASE_TOKEN.clone(), 1),
+                    (APPLES.clone(), 1 * BASE_FACTOR),
+                    (BASE_TOKEN.clone(), 1 * BASE_FACTOR),
                 ],
             },
             &mut state,
@@ -793,12 +793,12 @@ mod tests {
             hashmap! {
                     ellipticoin::Address::PublicKey(*ALICE) =>
                     vec![
-                        (APPLES.clone(), 100),
-                        (BANANAS.clone(), 100),
-                        (BASE_TOKEN.clone(), 200),
+                        (APPLES.clone(), 100 * BASE_FACTOR),
+                        (BANANAS.clone(), 100 * BASE_FACTOR),
+                        (BASE_TOKEN.clone(), 200 * BASE_FACTOR),
                     ],
                     ellipticoin::Address::PublicKey(*BOB) =>
-                    vec![(APPLES.clone(), 100)],
+                    vec![(APPLES.clone(), 100 * BASE_FACTOR)],
             },
             &mut state,
         );
@@ -826,17 +826,71 @@ mod tests {
     }
 
     #[test]
+    fn test_exchange_invariant_overflow() {
+        let mut state = HashMap::new();
+        let mut api = setup(
+            hashmap! {
+                    ellipticoin::Address::PublicKey(*ALICE) =>
+                    vec![
+                        (APPLES.clone(), 100_000 * BASE_FACTOR),
+                        (BASE_TOKEN.clone(), 1_000 * BASE_FACTOR),
+                    ],
+                    ellipticoin::Address::PublicKey(*BOB) =>
+                    vec![(APPLES.clone(), 100_000 * BASE_FACTOR)],
+            },
+            &mut state,
+        );
+
+        native::create_pool(&mut api, APPLES.clone(), 100_000 * BASE_FACTOR, BASE_FACTOR / 100).unwrap();
+
+        api.caller = Address::PublicKey(BOB.clone());
+        native::exchange(
+            &mut api,
+            APPLES.clone(),
+            BASE_TOKEN.clone(),
+            100 * BASE_FACTOR,
+            0,
+        )
+        .unwrap();
+        assert_eq!(
+            token::get_balance(
+                &mut api,
+                BASE_TOKEN.clone(),
+                ellipticoin::Address::PublicKey(*BOB)
+            ),
+            996_007
+        );
+        native::exchange(&mut api, BASE_TOKEN.clone(), APPLES.clone(), 996_007, 0).unwrap();
+        assert_eq!(
+            token::get_balance(
+                &mut api,
+                APPLES.clone(),
+                ellipticoin::Address::PublicKey(*BOB)
+            ),
+            99_999_401_499
+        );
+        assert_eq!(
+            token::get_balance(
+                &mut api,
+                BASE_TOKEN.clone(),
+                ellipticoin::Address::PublicKey(*BOB)
+            ),
+            0
+        );
+    }
+
+    #[test]
     fn test_exchange_base_token() {
         let mut state = HashMap::new();
         let mut api = setup(
             hashmap! {
                      ellipticoin::Address::PublicKey(*ALICE) =>
                      vec![
-                         (APPLES.clone(), 100),
-                         (BASE_TOKEN.clone(), 100),
+                         (APPLES.clone(), 100 * BASE_FACTOR),
+                         (BASE_TOKEN.clone(), 100 * BASE_FACTOR),
                      ],
                      ellipticoin::Address::PublicKey(*BOB) =>
-                     vec![(BASE_TOKEN.clone(), 100)],
+                     vec![(BASE_TOKEN.clone(), 100 * BASE_FACTOR)],
             },
             &mut state,
         );
@@ -870,11 +924,11 @@ mod tests {
             hashmap! {
                     ellipticoin::Address::PublicKey(*ALICE) =>
                     vec![
-                        (APPLES.clone(), 100),
-                        (BASE_TOKEN.clone(), 100),
+                        (APPLES.clone(), 100 * BASE_FACTOR),
+                        (BASE_TOKEN.clone(), 100 * BASE_FACTOR),
                     ],
                     ellipticoin::Address::PublicKey(*BOB) =>
-                    vec![(APPLES.clone(), 100)],
+                    vec![(APPLES.clone(), 100 * BASE_FACTOR)],
             },
             &mut state,
         );
@@ -907,12 +961,12 @@ mod tests {
             hashmap! {
                     ellipticoin::Address::PublicKey(*ALICE) =>
                     vec![
-                        (APPLES.clone(), 100),
-                        (BANANAS.clone(), 100),
-                        (BASE_TOKEN.clone(), 200),
+                        (APPLES.clone(), 100 * BASE_FACTOR),
+                        (BANANAS.clone(), 100 * BASE_FACTOR),
+                        (BASE_TOKEN.clone(), 200 * BASE_FACTOR),
                     ],
                     ellipticoin::Address::PublicKey(*BOB) =>
-                    vec![(APPLES.clone(), 100)],
+                    vec![(APPLES.clone(), 100 * BASE_FACTOR)],
             },
             &mut state,
         );
@@ -943,12 +997,12 @@ mod tests {
             hashmap! {
                 ellipticoin::Address::PublicKey(*ALICE) =>
                 vec![
-                    (APPLES.clone(), 100),
-                    (BANANAS.clone(), 100),
-                    (BASE_TOKEN.clone(), 200),
+                    (APPLES.clone(), 100 * BASE_FACTOR),
+                    (BANANAS.clone(), 100 * BASE_FACTOR),
+                    (BASE_TOKEN.clone(), 200 * BASE_FACTOR),
                 ],
                 ellipticoin::Address::PublicKey(*BOB) =>
-                vec![(APPLES.clone(), 100)],
+                vec![(APPLES.clone(), 100 * BASE_FACTOR)],
             },
             &mut state,
         );
