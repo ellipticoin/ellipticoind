@@ -286,8 +286,8 @@ mod tests {
             hashmap! {
                 ellipticoin::Address::PublicKey(*ALICE) =>
                 vec![
-                    (BTC.clone(), 1),
-                    (BASE_TOKEN.clone(), 2),
+                    (BTC.clone(), 1 * BASE_FACTOR),
+                    (BASE_TOKEN.clone(), 2 * BASE_FACTOR),
                 ]
             },
             &mut state,
@@ -309,8 +309,8 @@ mod tests {
             hashmap! {
                 ellipticoin::Address::PublicKey(*ALICE) =>
                 vec![
-                    (ELC.clone(), 1),
-                    (BASE_TOKEN.clone(), 2),
+                    (ELC.clone(), 1 * BASE_FACTOR),
+                    (BASE_TOKEN.clone(), 2 * BASE_FACTOR),
                 ]
             },
             &mut state,
@@ -332,8 +332,8 @@ mod tests {
             hashmap! {
                 ellipticoin::Address::PublicKey(*ALICE) =>
                 vec![
-                    (ELC.clone(), 1),
-                    (BASE_TOKEN.clone(), 2),
+                    (ELC.clone(), 1 * BASE_FACTOR),
+                    (BASE_TOKEN.clone(), 2 * BASE_FACTOR),
                 ]
             },
             &mut state,

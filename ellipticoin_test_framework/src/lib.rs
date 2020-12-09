@@ -15,7 +15,7 @@ use constants::actors::{ALICE, ALICES_PRIVATE_KEY};
 use ellipticoin::{Token, API};
 use ellipticoind::system_contracts::{
     test_api::TestAPI,
-    token::{self, BASE_FACTOR},
+    token,
 };
 use rand::Rng;
 use sha2::{Digest, Sha256};
@@ -58,7 +58,7 @@ pub fn setup(
                 &mut api,
                 token.clone(),
                 address.clone(),
-                balance * BASE_FACTOR,
+                *balance,
             );
         }
     }
