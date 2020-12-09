@@ -2,6 +2,10 @@ use crate::system_contracts::bridge;
 use ellipticoin::Token;
 
 lazy_static! {
+    pub static ref ELC: Token = Token {
+        id: "ELC".as_bytes().to_vec().into(),
+        issuer: crate::system_contracts::token::Address::Contract("Ellipticoin".to_string())
+    };
     pub static ref DAI: Token = bridge::token(
         hex::decode("6b175474e89094c44da98b954eedeac495271d0f")
             .unwrap()

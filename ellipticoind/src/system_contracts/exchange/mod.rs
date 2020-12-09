@@ -333,73 +333,31 @@ pub fn share_of_pool<API: ellipticoin::API>(api: &mut API, token: Token, address
 #[cfg(test)]
 mod tests {
     use super::{native, *};
-    use crate::system_contracts::{test_api::TestAPI, token};
-    use ellipticoin::{constants::ELC, API};
-    use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB};
-    use std::{collections::HashMap, env};
-
-    lazy_static! {
-        static ref APPLES: Token = Token {
-            issuer: Address::PublicKey(*ALICE),
-            id: vec![0].into()
-        };
-        static ref BANANAS: Token = Token {
-            issuer: Address::PublicKey(*ALICE),
-            id: vec![1].into()
-        };
-    }
-
-    struct TokenBalance {
-        token: Token,
-        balance: u64,
-    }
-    impl TokenBalance {
-        pub fn new(token: Token, balance: u64) -> Self {
-            Self { token, balance }
-        }
-    }
-
-    struct AddressBalance {
-        address: ellipticoin::Address,
-        balances: Vec<TokenBalance>,
-    }
-    impl AddressBalance {
-        pub fn new(address: ellipticoin::Address, balances: Vec<TokenBalance>) -> Self {
-            Self { address, balances }
-        }
-    }
-
-    fn setup(balances: Vec<AddressBalance>, state: &mut HashMap<Vec<u8>, Vec<u8>>) -> TestAPI {
-        env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
-
-        let mut api = TestAPI::new(state, *ALICE, "Token".to_string());
-
-        for person_balance in balances.iter() {
-            for token_balance in person_balance.balances.iter() {
-                token::set_balance(
-                    &mut api,
-                    token_balance.token.clone(),
-                    person_balance.address.clone(),
-                    token_balance.balance * BASE_FACTOR,
-                );
-            }
-        }
-
-        api.commit();
-        api
-    }
+    use crate::system_contracts::token::{self, constants::ELC};
+    use ellipticoin::API;
+    use ellipticoin_test_framework::{
+        constants::{
+            actors::{ALICE, BOB},
+            tokens::{APPLES, BANANAS},
+        },
+        setup,
+    };
+    use std::collections::HashMap;
 
     #[test]
     fn test_create_pool() {
-        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
-            ellipticoin::Address::PublicKey(*ALICE),
-            vec![
-                TokenBalance::new(APPLES.clone(), 1),
-                TokenBalance::new(BASE_TOKEN.clone(), 1),
-            ],
-        )];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                        ellipticoin::Address::PublicKey(*ALICE) =>
+                            vec![
+                                (APPLES.clone(), 1),
+                            (BASE_TOKEN.clone(), 1),
+
+            ]
+                    },
+            &mut state,
+        );
 
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
 
@@ -422,15 +380,17 @@ mod tests {
 
     #[test]
     fn test_recreate_pool() {
-        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
-            ellipticoin::Address::PublicKey(*ALICE),
-            vec![
-                TokenBalance::new(APPLES.clone(), 2),
-                TokenBalance::new(BASE_TOKEN.clone(), 2),
-            ],
-        )];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                ellipticoin::Address::PublicKey(*ALICE) =>
+                vec![
+                    (APPLES.clone(), 2),
+                    (BASE_TOKEN.clone(), 2),
+                ],
+            },
+            &mut state,
+        );
 
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
         match native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR) {
@@ -461,15 +421,17 @@ mod tests {
     #[test]
     fn test_create_pool_insufficient_base_token_funds() {
         let apple_balance = 2;
-        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
-            ellipticoin::Address::PublicKey(*ALICE),
-            vec![
-                TokenBalance::new(APPLES.clone(), apple_balance),
-                TokenBalance::new(BASE_TOKEN.clone(), apple_balance / 2),
-            ],
-        )];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                ellipticoin::Address::PublicKey(*ALICE) =>
+                vec![
+                    (APPLES.clone(), apple_balance),
+                    (BASE_TOKEN.clone(), apple_balance / 2),
+                ]
+            },
+            &mut state,
+        );
 
         assert!(native::create_pool(
             &mut api,
@@ -503,15 +465,17 @@ mod tests {
     #[test]
     fn test_create_pool_insufficient_token_funds() {
         let apple_balance = 1;
-        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
-            ellipticoin::Address::PublicKey(*ALICE),
-            vec![
-                TokenBalance::new(APPLES.clone(), apple_balance),
-                TokenBalance::new(BASE_TOKEN.clone(), apple_balance * 2),
-            ],
-        )];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                ellipticoin::Address::PublicKey(*ALICE) =>
+                vec![
+                    (APPLES.clone(), apple_balance),
+                    (BASE_TOKEN.clone(), apple_balance * 2),
+                ],
+            },
+            &mut state,
+        );
 
         assert!(native::create_pool(
             &mut api,
@@ -548,15 +512,17 @@ mod tests {
 
     #[test]
     fn test_add_liquidity() {
-        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
-            ellipticoin::Address::PublicKey(*ALICE),
-            vec![
-                TokenBalance::new(APPLES.clone(), 2),
-                TokenBalance::new(BASE_TOKEN.clone(), 2),
-            ],
-        )];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                ellipticoin::Address::PublicKey(*ALICE) =>
+                vec![
+                    (APPLES.clone(), 2),
+                    (BASE_TOKEN.clone(), 2),
+                ],
+            },
+            &mut state,
+        );
 
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
         native::add_liquidity(&mut api, APPLES.clone(), 1 * BASE_FACTOR).unwrap();
@@ -580,15 +546,17 @@ mod tests {
 
     #[test]
     fn test_add_to_existing_liquidity() {
-        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
-            ellipticoin::Address::PublicKey(*ALICE),
-            vec![
-                TokenBalance::new(APPLES.clone(), 3),
-                TokenBalance::new(BASE_TOKEN.clone(), 3),
-            ],
-        )];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                ellipticoin::Address::PublicKey(*ALICE) =>
+                vec![
+                    (APPLES.clone(), 3),
+                    (BASE_TOKEN.clone(), 3),
+                ]
+            },
+            &mut state,
+        );
 
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
         native::add_liquidity(&mut api, APPLES.clone(), 1 * BASE_FACTOR).unwrap();
@@ -613,15 +581,17 @@ mod tests {
 
     #[test]
     fn test_add_liquidity_insufficient_base_token_funds() {
-        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
-            ellipticoin::Address::PublicKey(*ALICE),
-            vec![
-                TokenBalance::new(APPLES.clone(), 2),
-                TokenBalance::new(BASE_TOKEN.clone(), 1),
-            ],
-        )];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                ellipticoin::Address::PublicKey(*ALICE) =>
+                vec![
+                    (APPLES.clone(), 2),
+                    (BASE_TOKEN.clone(), 1),
+                ],
+            },
+            &mut state,
+        );
 
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
         assert!(native::add_liquidity(&mut api, APPLES.clone(), 1 * BASE_FACTOR).is_err());
@@ -649,15 +619,17 @@ mod tests {
 
     #[test]
     fn test_add_liquidity_insufficient_token_funds() {
-        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
-            ellipticoin::Address::PublicKey(*ALICE),
-            vec![
-                TokenBalance::new(APPLES.clone(), 1),
-                TokenBalance::new(BASE_TOKEN.clone(), 2),
-            ],
-        )];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                ellipticoin::Address::PublicKey(*ALICE) =>
+                vec![
+                    (APPLES.clone(), 1),
+                    (BASE_TOKEN.clone(), 2),
+                ]
+            },
+            &mut state,
+        );
 
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR).unwrap();
         assert!(native::add_liquidity(&mut api, APPLES.clone(), 1 * BASE_FACTOR).is_err());
@@ -689,26 +661,22 @@ mod tests {
 
     #[test]
     fn test_remove_liquidity() {
-        let balances: Vec<AddressBalance> = vec![
-            AddressBalance::new(
-                ellipticoin::Address::PublicKey(*ALICE),
-                vec![
-                    TokenBalance::new(APPLES.clone(), 100),
-                    TokenBalance::new(BANANAS.clone(), 100),
-                    TokenBalance::new(BASE_TOKEN.clone(), 200),
-                ],
-            ),
-            AddressBalance::new(
-                ellipticoin::Address::PublicKey(*BOB),
-                vec![TokenBalance::new(BANANAS.clone(), 100)],
-            ),
-            AddressBalance::new(
-                ellipticoin::Address::Contract(ADDRESS.clone()),
-                vec![TokenBalance::new(ELC.clone(), 100)],
-            ),
-        ];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                ellipticoin::Address::PublicKey(*ALICE) =>
+                vec![
+                    (APPLES.clone(), 100),
+                    (BANANAS.clone(), 100),
+                    (BASE_TOKEN.clone(), 200),
+                ],
+                ellipticoin::Address::PublicKey(*BOB) =>
+                vec![(BANANAS.clone(), 100)],
+                ellipticoin::Address::Contract(ADDRESS.clone()) =>
+                vec![(ELC.clone(), 100)],
+            },
+            &mut state,
+        );
 
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
         let apples_in_pool = get_pool_supply_of_token(&mut api, APPLES.clone().into());
@@ -748,26 +716,22 @@ mod tests {
 
     #[test]
     fn test_remove_liquidity_after_trade() {
-        let balances: Vec<AddressBalance> = vec![
-            AddressBalance::new(
-                ellipticoin::Address::PublicKey(*ALICE),
-                vec![
-                    TokenBalance::new(APPLES.clone(), 100),
-                    TokenBalance::new(BANANAS.clone(), 100),
-                    TokenBalance::new(BASE_TOKEN.clone(), 200),
-                ],
-            ),
-            AddressBalance::new(
-                ellipticoin::Address::PublicKey(*BOB),
-                vec![TokenBalance::new(BANANAS.clone(), 100)],
-            ),
-            AddressBalance::new(
-                ellipticoin::Address::Contract(ADDRESS.clone()),
-                vec![TokenBalance::new(ELC.clone(), 100)],
-            ),
-        ];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                    ellipticoin::Address::PublicKey(*ALICE) =>
+                    vec![
+                        (APPLES.clone(), 100),
+                        (BANANAS.clone(), 100),
+                        (BASE_TOKEN.clone(), 200),
+                    ],
+                    ellipticoin::Address::PublicKey(*BOB) =>
+                    vec![(BANANAS.clone(), 100)],
+                    ellipticoin::Address::Contract(ADDRESS.clone()) =>
+                    vec![(ELC.clone(), 100)],
+            },
+            &mut state,
+        );
 
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
         native::create_pool(&mut api, BANANAS.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
@@ -806,15 +770,17 @@ mod tests {
 
     #[test]
     fn test_remove_liquidity_insufficient_liquidity() {
-        let balances: Vec<AddressBalance> = vec![AddressBalance::new(
-            ellipticoin::Address::PublicKey(*ALICE),
-            vec![
-                TokenBalance::new(APPLES.clone(), 1),
-                TokenBalance::new(BASE_TOKEN.clone(), 1),
-            ],
-        )];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                ellipticoin::Address::PublicKey(*ALICE) =>
+                vec![
+                    (APPLES.clone(), 1),
+                    (BASE_TOKEN.clone(), 1),
+                ],
+            },
+            &mut state,
+        );
 
         native::create_pool(&mut api, APPLES.clone(), 1 * BASE_FACTOR, BASE_FACTOR).unwrap();
         assert!(native::remove_liquidity(&mut api, APPLES.clone(), 2 * BASE_FACTOR).is_err());
@@ -822,22 +788,20 @@ mod tests {
 
     #[test]
     fn test_exchange() {
-        let balances: Vec<AddressBalance> = vec![
-            AddressBalance::new(
-                ellipticoin::Address::PublicKey(*ALICE),
-                vec![
-                    TokenBalance::new(APPLES.clone(), 100),
-                    TokenBalance::new(BANANAS.clone(), 100),
-                    TokenBalance::new(BASE_TOKEN.clone(), 200),
-                ],
-            ),
-            AddressBalance::new(
-                ellipticoin::Address::PublicKey(*BOB),
-                vec![TokenBalance::new(APPLES.clone(), 100)],
-            ),
-        ];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                    ellipticoin::Address::PublicKey(*ALICE) =>
+                    vec![
+                        (APPLES.clone(), 100),
+                        (BANANAS.clone(), 100),
+                        (BASE_TOKEN.clone(), 200),
+                    ],
+                    ellipticoin::Address::PublicKey(*BOB) =>
+                    vec![(APPLES.clone(), 100)],
+            },
+            &mut state,
+        );
 
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
         native::create_pool(&mut api, BANANAS.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
@@ -863,21 +827,19 @@ mod tests {
 
     #[test]
     fn test_exchange_base_token() {
-        let balances: Vec<AddressBalance> = vec![
-            AddressBalance::new(
-                ellipticoin::Address::PublicKey(*ALICE),
-                vec![
-                    TokenBalance::new(APPLES.clone(), 100),
-                    TokenBalance::new(BASE_TOKEN.clone(), 100),
-                ],
-            ),
-            AddressBalance::new(
-                ellipticoin::Address::PublicKey(*BOB),
-                vec![TokenBalance::new(BASE_TOKEN.clone(), 100)],
-            ),
-        ];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                     ellipticoin::Address::PublicKey(*ALICE) =>
+                     vec![
+                         (APPLES.clone(), 100),
+                         (BASE_TOKEN.clone(), 100),
+                     ],
+                     ellipticoin::Address::PublicKey(*BOB) =>
+                     vec![(BASE_TOKEN.clone(), 100)],
+            },
+            &mut state,
+        );
 
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
         api.caller = Address::PublicKey(BOB.clone());
@@ -903,21 +865,19 @@ mod tests {
 
     #[test]
     fn test_exchange_for_base_token() {
-        let balances: Vec<AddressBalance> = vec![
-            AddressBalance::new(
-                ellipticoin::Address::PublicKey(*ALICE),
-                vec![
-                    TokenBalance::new(APPLES.clone(), 100),
-                    TokenBalance::new(BASE_TOKEN.clone(), 100),
-                ],
-            ),
-            AddressBalance::new(
-                ellipticoin::Address::PublicKey(*BOB),
-                vec![TokenBalance::new(APPLES.clone(), 100)],
-            ),
-        ];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                    ellipticoin::Address::PublicKey(*ALICE) =>
+                    vec![
+                        (APPLES.clone(), 100),
+                        (BASE_TOKEN.clone(), 100),
+                    ],
+                    ellipticoin::Address::PublicKey(*BOB) =>
+                    vec![(APPLES.clone(), 100)],
+            },
+            &mut state,
+        );
 
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
 
@@ -942,22 +902,20 @@ mod tests {
 
     #[test]
     fn test_exchange_max_slippage_exceeded() {
-        let balances: Vec<AddressBalance> = vec![
-            AddressBalance::new(
-                ellipticoin::Address::PublicKey(*ALICE),
-                vec![
-                    TokenBalance::new(APPLES.clone(), 100),
-                    TokenBalance::new(BANANAS.clone(), 100),
-                    TokenBalance::new(BASE_TOKEN.clone(), 200),
-                ],
-            ),
-            AddressBalance::new(
-                ellipticoin::Address::PublicKey(*BOB),
-                vec![TokenBalance::new(APPLES.clone(), 100)],
-            ),
-        ];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                    ellipticoin::Address::PublicKey(*ALICE) =>
+                    vec![
+                        (APPLES.clone(), 100),
+                        (BANANAS.clone(), 100),
+                        (BASE_TOKEN.clone(), 200),
+                    ],
+                    ellipticoin::Address::PublicKey(*BOB) =>
+                    vec![(APPLES.clone(), 100)],
+            },
+            &mut state,
+        );
 
         native::create_pool(&mut api, APPLES.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
         native::create_pool(&mut api, BANANAS.clone(), 100 * BASE_FACTOR, BASE_FACTOR).unwrap();
@@ -980,22 +938,20 @@ mod tests {
 
     #[test]
     fn test_exchange_no_pool_exists() {
-        let balances: Vec<AddressBalance> = vec![
-            AddressBalance::new(
-                ellipticoin::Address::PublicKey(*ALICE),
-                vec![
-                    TokenBalance::new(APPLES.clone(), 100),
-                    TokenBalance::new(BANANAS.clone(), 100),
-                    TokenBalance::new(BASE_TOKEN.clone(), 200),
-                ],
-            ),
-            AddressBalance::new(
-                ellipticoin::Address::PublicKey(*BOB),
-                vec![TokenBalance::new(APPLES.clone(), 100)],
-            ),
-        ];
         let mut state = HashMap::new();
-        let mut api = setup(balances, &mut state);
+        let mut api = setup(
+            hashmap! {
+                ellipticoin::Address::PublicKey(*ALICE) =>
+                vec![
+                    (APPLES.clone(), 100),
+                    (BANANAS.clone(), 100),
+                    (BASE_TOKEN.clone(), 200),
+                ],
+                ellipticoin::Address::PublicKey(*BOB) =>
+                vec![(APPLES.clone(), 100)],
+            },
+            &mut state,
+        );
 
         api.caller = Address::PublicKey(BOB.clone());
         assert_eq!(

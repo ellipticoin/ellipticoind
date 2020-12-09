@@ -880,23 +880,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "ellipticoin"
-version = "0.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "182e3dd68a1daa1238a0475243c8182e27418ca39ce5d04188d5e3f3263c0eb7"
-dependencies = [
- "lazy_static",
- "serde",
- "wasm-rpc",
- "wasm-rpc-macros",
-]
-
-[[package]]
 name = "ellipticoin-test-framework"
 version = "0.1.4"
 dependencies = [
+ "base64 0.13.0",
  "ed25519-dalek",
- "ellipticoin 0.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ellipticoin",
+ "ellipticoind",
  "hex 0.3.2",
  "hex-literal",
  "lazy_static",
@@ -928,7 +918,7 @@ dependencies = [
  "diesel_migrations",
  "dotenv",
  "ed25519-zebra",
- "ellipticoin 0.0.5",
+ "ellipticoin",
  "ellipticoin-test-framework",
  "futures",
  "graphql_client",
@@ -938,6 +928,7 @@ dependencies = [
  "indicatif",
  "juniper",
  "lazy_static",
+ "maplit",
  "num-bigint",
  "num-traits",
  "rand 0.7.3",
@@ -1646,6 +1637,12 @@ checksum = "4fabed175da42fed1fa0746b0ea71f412aa9d35e76e95e59b192c64b9dc2bf8b"
 dependencies = [
  "cfg-if 0.1.10",
 ]
+
+[[package]]
+name = "maplit"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
 
 [[package]]
 name = "matches"

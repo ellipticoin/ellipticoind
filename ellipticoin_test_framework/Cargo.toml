@@ -6,8 +6,10 @@ description = "A framework for testing Ellipticoin smart contracts"
 license = "MIT"
 
 [dependencies]
+base64 = "0.13.0"
 ed25519-dalek = "1.0.0-pre.3"
-ellipticoin = "0.0.5"
+ellipticoin = {path = "../ellipticoind_types"}
+ellipticoind = {path = "../ellipticoind"}
 hex = "0.3.2"
 hex-literal = "0.3.0"
 lazy_static = "1.1.0"
