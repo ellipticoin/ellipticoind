@@ -1,13 +1,10 @@
 use crate::system_contracts::token::{
-    constants::{BTC, ETH},
+    constants::{BTC, ELC, ETH},
     BASE_FACTOR,
 };
 use ellipticoin::Token;
 
-lazy_static! {
-    pub static ref INCENTIVISED_POOLS: Vec<Token> = vec![BTC.clone(), ETH.clone()];
-}
-
+pub const INCENTIVIZE_ELC_POOL_AT_BLOCK: u32 = 787_077;
 const BLOCKS_PER_ERA: u32 = 8_000_000;
 const NUMBER_OF_ERAS: u32 = 8;
 
@@ -27,6 +24,14 @@ pub fn block_reward_at(block: u32) -> u64 {
 
     let era = ((block - LAST_BLOCK_OF_FIRST_ERA) / BLOCKS_PER_ERA) + 1;
     BASE_FACTOR * 128 * 10u64.pow(6) / 2u64.pow(era) / 10u64.pow(8)
+}
+
+pub fn incentivized_pools_at(block: u32) -> Vec<Token> {
+    if block >= INCENTIVIZE_ELC_POOL_AT_BLOCK {
+        vec![BTC.clone(), ETH.clone(), ELC.clone()]
+    } else {
+        vec![BTC.clone(), ETH.clone()]
+    }
 }
 
 #[cfg(test)]
