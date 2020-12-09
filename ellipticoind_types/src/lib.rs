@@ -9,7 +9,6 @@ extern crate wasm_rpc_macros;
 pub use ellipticoin_macros::*;
 pub mod api;
 pub mod bytes;
-pub mod constants;
 pub mod errors;
 pub mod helpers;
 pub mod macros;

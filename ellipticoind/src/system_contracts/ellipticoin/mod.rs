@@ -3,14 +3,12 @@ mod hashing;
 mod issuance;
 
 use super::token;
-use crate::system_contracts::{
-    ellipticoin::issuance::INCENTIVISED_POOLS, exchange, exchange::liquidity_token, token::mint,
-};
-use ellipticoin::{constants::ELC, pay, state_accessors, Address};
+use crate::system_contracts::{exchange, exchange::liquidity_token, token::mint, token::constants::ELC};
+use ellipticoin::{pay, state_accessors, Address};
 
 use errors::Error;
 use hashing::sha256;
-use issuance::block_reward_at;
+use issuance::{block_reward_at, incentivized_pools_at};
 use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
 use serde::{Deserialize, Serialize};
 use serde_cbor::Value;
@@ -128,15 +126,17 @@ export_native! {
 
 }
 fn issue_block_rewards<API: ellipticoin::API>(api: &mut API) -> Result<(), Box<Error>> {
-    let block_reward = block_reward_at(get_block_number(api));
+    let block_number = get_block_number(api);
+    let block_reward = block_reward_at(block_number);
     mint(
         api,
         ELC.clone(),
         Address::Contract(ADDRESS.clone()),
         block_reward,
     )?;
-    let reward_per_pool = block_reward / INCENTIVISED_POOLS.len() as u64;
-    for token in INCENTIVISED_POOLS.clone() {
+    let incentivized_pools = incentivized_pools_at(block_number);
+    let reward_per_pool = block_reward / incentivized_pools.len() as u64;
+    for token in incentivized_pools.clone() {
         let share_holders = exchange::get_share_holders(api, token.clone());
         let (addresses, balances): (Vec<_>, Vec<_>) = share_holders
             .iter()
@@ -250,19 +250,24 @@ mod tests {
         config::HOST,
         helpers::generate_hash_onion,
         system_contracts::{
+            ellipticoin::issuance::INCENTIVIZE_ELC_POOL_AT_BLOCK,
             exchange::constants::BASE_TOKEN,
             test_api::TestAPI,
-            token::{constants::ETH, get_balance, BASE_FACTOR},
+            token::{
+                constants::{BTC, ETH},
+                get_balance, BASE_FACTOR,
+            },
         },
     };
+    use ellipticoin_test_framework::{
+        constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB, CAROL},
+        setup,
+    };
     use std::{collections::HashMap, env};
-
-    use ellipticoin_test_framework::constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB, CAROL};
 
     #[test]
     fn test_harvest() {
         env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
-        env::set_var("HOST", "localhost");
         let mut state = HashMap::new();
         let mut api = TestAPI::new(&mut state, *ALICE, "Ellipticoin".to_string());
         mint(&mut api, ELC.clone(), Address::Contract(ADDRESS.clone()), 1).unwrap();
@@ -271,6 +276,76 @@ mod tests {
         assert_eq!(
             get_balance(&mut api, ELC.clone(), Address::PublicKey(*ALICE)),
             1
+        );
+    }
+
+    #[test]
+    fn test_issue_block_rewards_btc() {
+        let mut state = HashMap::new();
+        let mut api = setup(
+            hashmap! {
+                ellipticoin::Address::PublicKey(*ALICE) =>
+                vec![
+                    (BTC.clone(), 1),
+                    (BASE_TOKEN.clone(), 2),
+                ]
+            },
+            &mut state,
+        );
+
+        exchange::native::create_pool(&mut api, BTC.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR)
+            .unwrap();
+        issue_block_rewards(&mut api).unwrap();
+        assert_eq!(
+            get_issuance_rewards(&mut api, Address::PublicKey(*ALICE)),
+            64 * BASE_FACTOR / 100
+        );
+    }
+
+    #[test]
+    fn test_issue_block_rewards_elc_prefork() {
+        let mut state = HashMap::new();
+        let mut api = setup(
+            hashmap! {
+                ellipticoin::Address::PublicKey(*ALICE) =>
+                vec![
+                    (ELC.clone(), 1),
+                    (BASE_TOKEN.clone(), 2),
+                ]
+            },
+            &mut state,
+        );
+
+        exchange::native::create_pool(&mut api, ELC.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR)
+            .unwrap();
+        issue_block_rewards(&mut api).unwrap();
+        assert_eq!(
+            get_issuance_rewards(&mut api, Address::PublicKey(*ALICE)),
+            0
+        );
+    }
+
+    #[test]
+    fn test_issue_block_rewards_elc_postfork() {
+        let mut state = HashMap::new();
+        let mut api = setup(
+            hashmap! {
+                ellipticoin::Address::PublicKey(*ALICE) =>
+                vec![
+                    (ELC.clone(), 1),
+                    (BASE_TOKEN.clone(), 2),
+                ]
+            },
+            &mut state,
+        );
+
+        exchange::native::create_pool(&mut api, ELC.clone(), 1 * BASE_FACTOR, 1 * BASE_FACTOR)
+            .unwrap();
+        set_block_number(&mut api, INCENTIVIZE_ELC_POOL_AT_BLOCK + 1);
+        issue_block_rewards(&mut api).unwrap();
+        assert_eq!(
+            get_issuance_rewards(&mut api, Address::PublicKey(*ALICE)),
+            128 * BASE_FACTOR / 3 / 100
         );
     }
 

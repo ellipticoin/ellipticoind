@@ -8,7 +8,6 @@ pub mod api;
 pub mod bridge;
 pub mod ellipticoin;
 pub mod exchange;
-#[cfg(test)]
 pub mod test_api;
 pub mod token;
 

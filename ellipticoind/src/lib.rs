@@ -1,3 +1,4 @@
+extern crate ellipticoin;
 extern crate hex;
 extern crate rand;
 extern crate serde;
@@ -9,6 +10,9 @@ extern crate diesel;
 extern crate diesel_migrations;
 #[macro_use]
 extern crate lazy_static;
+#[cfg(test)]
+#[macro_use]
+extern crate maplit;
 
 mod api;
 mod block_broadcaster;
@@ -25,5 +29,5 @@ mod start_up;
 mod state;
 mod static_files;
 pub mod sub_commands;
-mod system_contracts;
+pub mod system_contracts;
 pub mod transaction;

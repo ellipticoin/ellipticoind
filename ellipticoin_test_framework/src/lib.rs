@@ -2,15 +2,25 @@
 extern crate hex_literal;
 #[macro_use]
 extern crate lazy_static;
+
 extern crate ed25519_dalek;
+extern crate ellipticoin;
+extern crate ellipticoind;
 extern crate hex;
 extern crate rand;
 extern crate secp256k1;
 extern crate sha2;
 
-use self::secp256k1::Message;
-use rand::{rngs::OsRng, Rng};
+use constants::actors::{ALICE, ALICES_PRIVATE_KEY};
+use ellipticoin::{Token, API};
+use ellipticoind::system_contracts::{
+    test_api::TestAPI,
+    token::{self, BASE_FACTOR},
+};
+use rand::Rng;
 use sha2::{Digest, Sha256};
+use std::{collections::HashMap, env};
+
 pub mod constants;
 
 pub fn sha256(value: Vec<u8>) -> Vec<u8> {
@@ -34,18 +44,25 @@ pub fn generate_hash_onion(layers: usize, center: Vec<u8>) -> Vec<Vec<u8>> {
     onion
 }
 
-pub fn generate_keypair() -> (Vec<u8>, Vec<u8>) {
-    let signer = secp256k1::Secp256k1::new();
-    let mut rng = OsRng::new().unwrap();
-    let (private_key, public_key) = signer.generate_keypair(&mut rng);
+pub fn setup(
+    balances: HashMap<ellipticoin::Address, Vec<(Token, u64)>>,
+    state: &mut HashMap<Vec<u8>, Vec<u8>>,
+) -> TestAPI {
+    env::set_var("PRIVATE_KEY", base64::encode(&ALICES_PRIVATE_KEY[..]));
 
-    (private_key[..].to_vec(), public_key.serialize().to_vec())
-}
+    let mut api = TestAPI::new(state, *ALICE, "Token".to_string());
 
-pub fn secp256k1_sign_recoverable(message_vec: Vec<u8>, private_key_vec: Vec<u8>) -> Vec<u8> {
-    let signer = secp256k1::Secp256k1::new();
-    let message = Message::from_slice(&message_vec).unwrap();
-    let private_key = secp256k1::SecretKey::from_slice(&private_key_vec).unwrap();
-    let signature = signer.sign(&message, &private_key).serialize_compact();
-    signature.to_vec()
+    for (address, balances) in balances.iter() {
+        for (token, balance) in balances.iter() {
+            token::set_balance(
+                &mut api,
+                token.clone(),
+                address.clone(),
+                balance * BASE_FACTOR,
+            );
+        }
+    }
+
+    api.commit();
+    api
 }

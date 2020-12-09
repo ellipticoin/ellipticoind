@@ -42,7 +42,7 @@ wasm-rpc-macros = "0.2.17"
 
 [dev-dependencies]
 ellipticoin-test-framework = {path = "../ellipticoin_test_framework"}
-
+maplit = "1.0.2"
 
 # [profile.dev]
 # panic = 'unwind'
