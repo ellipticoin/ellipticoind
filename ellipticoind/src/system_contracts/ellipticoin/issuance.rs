@@ -4,7 +4,7 @@ use crate::system_contracts::token::{
 };
 use ellipticoin::Token;
 
-pub const INCENTIVIZE_ELC_POOL_AT_BLOCK: u32 = 787_077;
+pub const INCENTIVIZE_ELC_POOL_AT_BLOCK: u32 = 793_620;
 const BLOCKS_PER_ERA: u32 = 8_000_000;
 const NUMBER_OF_ERAS: u32 = 8;
 
