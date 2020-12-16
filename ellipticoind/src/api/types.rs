@@ -37,9 +37,8 @@ impl Token {
 pub struct LiquidityToken {
     pub id: Bytes,
     pub issuer: String,
-    pub price: U64,
     pub balance: U64,
-    pub share_of_pool: U32,
+    pub price: U64,
     pub total_supply: U64,
     pub pool_supply_of_token: U64,
     pub pool_supply_of_base_token: U64,
@@ -55,16 +54,12 @@ impl LiquidityToken {
         self.issuer.clone()
     }
 
-    fn price(&self) -> U64 {
-        self.price.clone()
-    }
-
     fn balance(&self) -> U64 {
         self.balance.clone()
     }
 
-    fn share_of_pool(&self) -> U32 {
-        self.share_of_pool.clone()
+    fn price(&self) -> U64 {
+        self.price.clone()
     }
 
     fn total_supply(&self) -> U64 {

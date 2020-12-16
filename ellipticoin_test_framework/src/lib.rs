@@ -13,10 +13,7 @@ extern crate sha2;
 
 use constants::actors::{ALICE, ALICES_PRIVATE_KEY};
 use ellipticoin::{Token, API};
-use ellipticoind::system_contracts::{
-    test_api::TestAPI,
-    token,
-};
+use ellipticoind::system_contracts::{test_api::TestAPI, token};
 use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::{collections::HashMap, env};
@@ -54,12 +51,7 @@ pub fn setup(
 
     for (address, balances) in balances.iter() {
         for (token, balance) in balances.iter() {
-            token::set_balance(
-                &mut api,
-                token.clone(),
-                address.clone(),
-                *balance,
-            );
+            token::set_balance(&mut api, token.clone(), address.clone(), *balance);
         }
     }
 
