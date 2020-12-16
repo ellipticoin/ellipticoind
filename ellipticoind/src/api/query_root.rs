@@ -51,13 +51,14 @@ impl QueryRoot {
                         id: id.0.clone().into(),
                     },
                 );
-                let price = exchange::price(
+                let price = exchange::get_price(
                     &mut api,
                     ellipticoin::Token {
                         issuer: issuer.as_str().into(),
                         id: id.0.clone().into(),
                     },
-                );
+                )
+                .unwrap_or(0);
 
                 Token {
                     issuer: issuer.as_str().into(),
@@ -93,8 +94,6 @@ impl QueryRoot {
                 let balance =
                     token::get_balance(&mut api, liquidity_token.clone(), address.clone());
                 let price = exchange::get_price(&mut api, token.clone()).unwrap_or(0);
-                let share_of_pool =
-                    exchange::share_of_pool(&mut api, token.clone(), address.clone());
                 let total_supply = token::get_total_supply(&mut api, liquidity_token.clone());
                 let pool_supply_of_token =
                     exchange::get_pool_supply_of_token(&mut api, token.clone());
@@ -106,8 +105,6 @@ impl QueryRoot {
                     id,
                     balance: U64(balance),
                     price: U64(price),
-
-                    share_of_pool: U32(share_of_pool),
                     total_supply: U64(total_supply),
                     pool_supply_of_token: U64(pool_supply_of_token),
                     pool_supply_of_base_token: U64(pool_supply_of_base_token),

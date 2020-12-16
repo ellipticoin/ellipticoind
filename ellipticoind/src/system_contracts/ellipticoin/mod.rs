@@ -3,7 +3,11 @@ mod hashing;
 mod issuance;
 
 use super::token;
-use crate::system_contracts::{exchange, exchange::liquidity_token, token::mint, token::constants::ELC};
+use crate::system_contracts::{
+    exchange,
+    exchange::liquidity_token,
+    token::{constants::ELC, mint},
+};
 use ellipticoin::{pay, state_accessors, Address};
 
 use errors::Error;
