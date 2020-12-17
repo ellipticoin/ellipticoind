@@ -4,14 +4,13 @@ use crate::{
     constants::TOKEN_CONTRACT,
     diesel::{ExpressionMethods, QueryDsl, RunQueryDsl},
     helpers::{bytes_to_value, run_transaction},
-    models,
+    legacy, models,
     models::{Block, HashOnion, Transaction},
     schema::{blocks::dsl as blocks_dsl, transactions::dsl as transactions_dsl},
     serde_cbor::Deserializer,
     state::{is_mining, IN_MEMORY_STATE},
     static_files::STATIC_FILES,
-    system_contracts,
-    system_contracts::api::InMemoryAPI,
+    system_contracts::{api::InMemoryAPI},
     transaction::TransactionRequest,
 };
 use diesel::{
@@ -123,11 +122,8 @@ pub async fn run_transactions_in_db() {
         .unwrap();
     let mut state = IN_MEMORY_STATE.lock().await;
     for mut transaction in transactions {
-        if (0..343866_i32).contains(&transaction.block_number) {
-            transaction = fix_spelling_errors(transaction.clone())
-        }
         let mut api = InMemoryAPI::new(&mut state, Some(transaction.clone().into()));
-        system_contracts::run(&mut api, TransactionRequest::from(transaction.clone()));
+        legacy::run(&mut api, &mut transaction).await;
         if transaction.id % 10000 == 0 && transaction.id != 0 {
             println!(
                 "Applied transactions #{}-#{}",
@@ -144,15 +140,6 @@ pub async fn run_transactions_in_db() {
         )))
         .execute(&pg_db)
         .unwrap();
-}
-
-pub fn fix_spelling_errors(mut transaction: Transaction) -> Transaction {
-    transaction.function = match transaction.function.as_str() {
-        "add_liqidity" => "add_liquidity".to_string(),
-        "remove_liqidity" => "remove_liquidity".to_string(),
-        function => function.to_string(),
-    };
-    transaction
 }
 
 async fn reset_pg() {

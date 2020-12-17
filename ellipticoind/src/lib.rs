@@ -21,6 +21,7 @@ pub mod config;
 mod constants;
 mod error;
 mod helpers;
+mod legacy;
 mod miner;
 pub mod models;
 mod pg;
