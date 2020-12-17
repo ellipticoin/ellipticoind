@@ -2987,9 +2987,9 @@ checksum = "1d649a3145108d7d3fbcde896a468d1bd636791823c9921135218ad89be08307"
 
 [[package]]
 name = "wasm-rpc"
-version = "0.2.17"
+version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6eadf0cefcbc6e6e51f59b852c51ac3db5e5ef58891c1280c12f853bf0dc25e4"
+checksum = "c0fb89f0d84a1bbb80f975d4f0045c089f40906074eafb8db4713018cf3a3fbe"
 dependencies = [
  "serde",
  "serde_bytes",
@@ -2998,9 +2998,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-rpc-macros"
-version = "0.2.17"
+version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe48a8e8b91942ba0d48488be14c960933668241efc7b48c3fc0e9972da0789b"
+checksum = "152d0b8d3bbc6aced7f76295975a26a1b1908f4a73fa7134b62f7929a7f79659"
 dependencies = [
  "proc-macro2",
  "quote",

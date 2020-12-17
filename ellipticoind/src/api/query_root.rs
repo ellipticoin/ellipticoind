@@ -9,7 +9,10 @@ use crate::{
     models::transaction::next_nonce,
     schema::{blocks, blocks::columns::number, transactions},
     state::IN_MEMORY_STATE,
-    system_contracts::{api::InMemoryAPI, ellipticoin::get_issuance_rewards, exchange, token},
+    system_contracts::{
+        api::InMemoryAPI, ellipticoin::get_issuance_rewards, exchange,
+        exchange::constants::BASE_TOKEN, token, token::BASE_FACTOR,
+    },
 };
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl};
 use ellipticoin::Address;
@@ -51,14 +54,18 @@ impl QueryRoot {
                         id: id.0.clone().into(),
                     },
                 );
-                let price = exchange::get_price(
-                    &mut api,
-                    ellipticoin::Token {
-                        issuer: issuer.as_str().into(),
-                        id: id.0.clone().into(),
-                    },
-                )
-                .unwrap_or(0);
+                let price = if Vec::from(id.clone()) == BASE_TOKEN.clone().id.into_vec() {
+                    BASE_FACTOR
+                } else {
+                    exchange::get_price(
+                        &mut api,
+                        ellipticoin::Token {
+                            issuer: issuer.as_str().into(),
+                            id: id.0.clone().into(),
+                        },
+                    )
+                    .unwrap_or(0)
+                };
 
                 Token {
                     issuer: issuer.as_str().into(),
