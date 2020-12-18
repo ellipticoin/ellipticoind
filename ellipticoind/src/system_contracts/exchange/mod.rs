@@ -75,8 +75,8 @@ export_native! {
     ) -> Result<(), Box<Error>> {
         let pool_supply_of_token = get_pool_supply_of_token(api, token.clone());
         let pool_supply_of_base_token = get_pool_supply_of_base_token(api, token.clone());
-        let liquidity_token_supply = token::get_total_supply(api, liquidity_token(token.clone()));
-        burn(api, token.clone(), liquidity_token_supply * amount / pool_supply_of_token)?;
+        let total_suply_of_liquidity_token = token::get_total_supply(api, liquidity_token(token.clone()));
+        burn(api, token.clone(), (total_suply_of_liquidity_token as u128 * amount as u128/ pool_supply_of_token as u128) as u64)?;
         debit_pool_supply_of_base_token(api, token.clone(), pool_supply_of_base_token * amount / pool_supply_of_token)?;
         pay!(api, BASE_TOKEN.clone(), api.caller(), pool_supply_of_base_token * amount / pool_supply_of_token)?;
 
