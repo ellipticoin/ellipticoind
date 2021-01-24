@@ -9,20 +9,20 @@ use crate::{
         },
         token,
     },
-    transaction::TransactionRequest,
 };
 use ellipticoin::{pay, Address, Token};
 use serde_cbor::Value;
-use system_contracts::exchange::CONTRACT_NAME;
+// use system_contracts::exchange::CONTRACT_NAME;
 use wasm_rpc::error::Error;
 
 pub async fn run<API: ellipticoin::API>(api: &mut API, transaction: &mut Transaction) {
     fix_spelling_errors(transaction);
-    if (0..1_718_816_i32).contains(&transaction.block_number)
-        && transaction.function == "remove_liquidity" {
+    if (0..1_721_122_i32).contains(&transaction.block_number)
+        && transaction.function == "remove_liquidity"
+    {
         run_remove_liquidity(api, transaction);
     } else {
-        system_contracts::run(api, TransactionRequest::from(transaction.clone()));
+        // system_contracts::run(api, TransactionRequest::from(transaction.clone()));
     }
 }
 
@@ -37,15 +37,14 @@ pub fn fix_spelling_errors(mut transaction: &mut Transaction) {
 }
 
 pub fn run_remove_liquidity<API: ellipticoin::API>(api: &mut API, transaction: &mut Transaction) {
-        let arguments = serde_cbor::from_slice::<Vec<Value>>(&transaction.arguments).unwrap();
-        let token = serde_cbor::value::from_value::<Token>(arguments[0].clone()).unwrap();
-        let amount = serde_cbor::value::from_value(arguments[1].clone()).unwrap();
-        if remove_liquidity(api, token, amount).is_ok() {
-            ellipticoin::API::commit(api);
-        } else {
-            ellipticoin::API::revert(api);
-        }
-    
+    let arguments = serde_cbor::from_slice::<Vec<Value>>(&transaction.arguments).unwrap();
+    let token = serde_cbor::value::from_value::<Token>(arguments[0].clone()).unwrap();
+    let amount = serde_cbor::value::from_value(arguments[1].clone()).unwrap();
+    if remove_liquidity(api, token, amount).is_ok() {
+        ellipticoin::API::commit(api);
+    } else {
+        ellipticoin::API::revert(api);
+    }
 }
 
 pub fn remove_liquidity<API: ellipticoin::API>(
@@ -68,15 +67,15 @@ pub fn remove_liquidity<API: ellipticoin::API>(
         token.clone(),
         pool_supply_of_base_token * amount / pool_supply_of_token,
     )?;
-    pay!(
-        api,
-        BASE_TOKEN.clone(),
-        api.caller(),
-        pool_supply_of_base_token * amount / pool_supply_of_token
-    )?;
+    // pay!(
+    //     api,
+    //     BASE_TOKEN.clone(),
+    //     api.caller(),
+    //     pool_supply_of_base_token * amount / pool_supply_of_token
+    // )?;
 
     debit_pool_supply_of_token(api, token.clone(), amount)?;
-    pay!(api, token, api.caller(), amount)?;
+    // pay!(api, token, api.caller(), amount)?;
 
     Ok(())
 }

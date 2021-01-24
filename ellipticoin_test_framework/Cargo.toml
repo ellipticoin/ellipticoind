@@ -7,13 +7,10 @@ license = "MIT"
 
 [dependencies]
 base64 = "0.13.0"
-ed25519-dalek = "1.0.0-pre.3"
-ellipticoin = {path = "../ellipticoind_types"}
-ellipticoind = {path = "../ellipticoind"}
+ellipticoin_contracts = {path = "../ellipticoin_contracts"}
+ellipticoin_types = {path = "../ellipticoin_types"}
 hex = "0.3.2"
 hex-literal = "0.3.0"
 lazy_static = "1.1.0"
 rand = "0.6.5"
-secp256k1 = {version = "0.17.2", features = ["rand"]}
 sha2 = "0.8.1"
-wasm-rpc = "0.2.16"

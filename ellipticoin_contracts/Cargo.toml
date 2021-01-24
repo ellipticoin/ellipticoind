@@ -1,0 +1,26 @@
+[package]
+name = "ellipticoin_contracts"
+version = "0.1.0"
+authors = ["Mason Fischer <mason@kissr.co>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "*"
+async-std = {version = "1.9.0", features = ["unstable", "attributes"]}
+base64 = "*"
+ed25519-zebra = "2.2.0"
+ellipticoin_macros = {path = "../ellipticoin_macros"}
+ellipticoin_types = {path = "../ellipticoin_types"}
+hex = "*"
+hex-literal = "0.3.0"
+lazy_static = "*"
+rand = {version = "0.8.3", features = ["small_rng"]}
+serde = { version = "1.0.120", features = ["derive"] }
+serde_cbor = "0.11.1"
+sha2 = "0.9.1"
+
+[dev-dependencies]
+ellipticoin-test-framework = {path = "../ellipticoin_test_framework"}
+maplit = "1.0.2"

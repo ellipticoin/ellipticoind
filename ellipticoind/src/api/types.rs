@@ -1,10 +1,26 @@
-use crate::models;
 use juniper::{ParseScalarResult, ParseScalarValue, Value};
+use std::convert::TryInto;
+
+#[derive(Clone, Debug)]
+pub struct Bridge {
+    pub address: Address,
+    pub signers: Vec<Bytes>,
+}
+
+#[juniper::graphql_object]
+impl Bridge {
+    fn address(&self) -> Address {
+        self.address.clone()
+    }
+
+    fn signers(&self) -> Vec<Bytes> {
+        self.signers.clone()
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Token {
-    pub id: Bytes,
-    pub issuer: String,
+    pub address: Address,
     pub price: U64,
     pub balance: U64,
     pub total_supply: U64,
@@ -12,12 +28,8 @@ pub struct Token {
 
 #[juniper::graphql_object]
 impl Token {
-    fn id(&self) -> Bytes {
-        self.id.clone()
-    }
-
-    fn issuer(&self) -> String {
-        self.issuer.clone()
+    fn address(&self) -> Address {
+        self.address.clone()
     }
 
     fn price(&self) -> U64 {
@@ -35,10 +47,8 @@ impl Token {
 
 #[derive(Clone, Debug)]
 pub struct LiquidityToken {
-    pub id: Bytes,
-    pub issuer: String,
+    pub token_address: Address,
     pub balance: U64,
-    pub price: U64,
     pub total_supply: U64,
     pub pool_supply_of_token: U64,
     pub pool_supply_of_base_token: U64,
@@ -46,20 +56,12 @@ pub struct LiquidityToken {
 
 #[juniper::graphql_object]
 impl LiquidityToken {
-    fn id(&self) -> Bytes {
-        self.id.clone()
-    }
-
-    fn issuer(&self) -> String {
-        self.issuer.clone()
+    fn token_address(&self) -> Address {
+        self.token_address.clone()
     }
 
     fn balance(&self) -> U64 {
         self.balance.clone()
-    }
-
-    fn price(&self) -> U64 {
-        self.price.clone()
     }
 
     fn total_supply(&self) -> U64 {
@@ -72,6 +74,42 @@ impl LiquidityToken {
 
     fn pool_supply_of_base_token(&self) -> U64 {
         self.pool_supply_of_base_token.clone()
+    }
+}
+
+pub struct RedeemRequest {
+    pub id: U64,
+    pub sender: Address,
+    pub token: Address,
+    pub amount: U64,
+    pub expiration_block_number: U64,
+    pub signature: Bytes,
+}
+
+#[juniper::graphql_object]
+impl RedeemRequest {
+    fn id(&self) -> U64 {
+        self.id.clone()
+    }
+
+    fn sender(&self) -> Address {
+        self.sender.clone()
+    }
+
+    fn token(&self) -> Address {
+        self.token.clone()
+    }
+
+    fn amount(&self) -> U64 {
+        self.amount.clone()
+    }
+
+    fn expiration_block_number(&self) -> U64 {
+        self.expiration_block_number.clone()
+    }
+
+    fn signature(&self) -> Bytes {
+        self.signature.clone()
     }
 }
 
@@ -115,7 +153,7 @@ pub struct Transaction {
     pub position: U32,
     pub contract: String,
     pub sender: Bytes,
-    pub nonce: U32,
+    pub transaction_number: U32,
     pub function: String,
     pub arguments: Bytes,
     pub return_value: Bytes,
@@ -148,8 +186,8 @@ impl Transaction {
         self.sender.clone()
     }
 
-    fn nonce(&self) -> U32 {
-        self.nonce.clone()
+    fn transaction_number(&self) -> U32 {
+        self.transaction_number.clone()
     }
 
     fn function(&self) -> String {
@@ -166,39 +204,6 @@ impl Transaction {
 
     fn raw(&self) -> Bytes {
         self.raw.clone()
-    }
-}
-
-impl From<models::Transaction> for Transaction {
-    fn from(transaction: models::Transaction) -> Self {
-        Self {
-            id: U32(transaction.id as u32),
-            network_id: U64(transaction.network_id as u64),
-            nonce: U32(transaction.nonce as u32),
-            position: U32(transaction.position as u32),
-            block_number: U32(transaction.block_number as u32),
-            function: transaction.function,
-            sender: Bytes(transaction.sender),
-            contract: transaction.contract,
-            arguments: transaction.arguments.into(),
-            return_value: Bytes(transaction.return_value),
-            raw: Bytes(transaction.raw),
-        }
-    }
-}
-impl From<(models::Block, Vec<models::Transaction>)> for Block {
-    fn from(block: (models::Block, Vec<models::Transaction>)) -> Block {
-        Self {
-            number: U32(block.0.number as u32),
-            sealed: block.0.sealed,
-            memory_changeset_hash: Bytes(block.0.memory_changeset_hash),
-            storage_changeset_hash: Bytes(block.0.storage_changeset_hash),
-            transactions: block
-                .1
-                .into_iter()
-                .map(Transaction::from)
-                .collect::<Vec<Transaction>>(),
-        }
     }
 }
 
@@ -228,21 +233,6 @@ impl From<U32> for String {
 impl From<u32> for U32 {
     fn from(n: u32) -> Self {
         U32(n)
-    }
-}
-
-#[derive(Clone, juniper::GraphQLInputObject)]
-pub struct TokenId {
-    pub id: Bytes,
-    pub issuer: String,
-}
-
-impl From<TokenId> for ellipticoin::Token {
-    fn from(token_id: TokenId) -> Self {
-        Self {
-            id: token_id.id.0.into(),
-            issuer: ellipticoin::Address::Contract(token_id.issuer),
-        }
     }
 }
 
@@ -279,6 +269,44 @@ where
 impl From<Vec<u8>> for Bytes {
     fn from(vec: Vec<u8>) -> Self {
         Bytes(vec)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Address(pub [u8; 20]);
+
+impl From<Address> for [u8; 20] {
+    fn from(address: Address) -> Self {
+        address.0
+    }
+}
+#[juniper::graphql_scalar(description = "Address")]
+impl<S> GraphQLScalar for Address
+where
+    S: ScalarValue,
+{
+    fn resolve(&self) -> Value {
+        Value::scalar(base64::encode(&self.0))
+    }
+
+    fn from_input_value(v: &InputValue) -> Option<Address> {
+        v.as_scalar_value()
+            .and_then(|v| v.as_str())
+            .map(|v| base64::decode(v))
+            .and_then(Result::ok)
+            .map(|inner| inner[..20].try_into())
+            .and_then(Result::ok)
+            .map(|inner| Address(inner))
+    }
+
+    fn from_str<'a>(value: ScalarToken<'a>) -> ParseScalarResult<'a, S> {
+        <String as ParseScalarValue<S>>::from_str(value)
+    }
+}
+
+impl From<[u8; 20]> for Address {
+    fn from(bytes: [u8; 20]) -> Self {
+        Self(bytes)
     }
 }
 

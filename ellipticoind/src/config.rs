@@ -1,15 +1,10 @@
-use crate::pg;
 use clap::Clap;
-use diesel::{
-    pg::PgConnection,
-    r2d2::{ConnectionManager, Pool},
-};
 use dotenv::dotenv;
-use ed25519_zebra::{SigningKey, VerificationKey};
-use rand::seq::SliceRandom;
+
+use k256::ecdsa::SigningKey;
 use serde::{Deserialize, Deserializer};
 use std::{
-    convert::TryFrom,
+    convert::TryInto,
     env,
     net::{IpAddr, SocketAddr},
 };
@@ -18,8 +13,6 @@ use std::{
 pub struct Opts {
     #[clap(short = 'a', long = "bind-address", default_value = "0.0.0.0")]
     pub bind_address: String,
-    #[clap(short = 'b', long = "bootnodes")]
-    pub bootnodes: Option<String>,
     #[clap(short = 'd', long = "database-url")]
     pub database_url: Option<String>,
     #[clap(short = 'n', long = "network-id", default_value = "3750925312")]
@@ -54,13 +47,6 @@ pub struct Opts {
 pub enum SubCommand {
     #[clap(name = "generate-keypair")]
     GenerateKeypair,
-    #[clap(name = "dump-blocks")]
-    DumpBlocks {
-        #[clap(long = "at-block")]
-        block_number: Option<u32>,
-        #[clap(long = "file", default_value = "genesis-blocks.cbor")]
-        file: String,
-    },
 }
 
 lazy_static! {
@@ -69,6 +55,10 @@ lazy_static! {
         Opts::parse()
     };
     pub static ref HOST: String = env::var("HOST").unwrap();
+    pub static ref HASH_ONION_SIZE: usize = env::var("HASH_ONION_SIZE")
+        .unwrap()
+        .parse()
+        .unwrap_or(7889400);
     pub static ref GENESIS_NODE: bool = env::var("GENESIS_NODE").is_ok();
     pub static ref ENABLE_MINER: bool = env::var("ENABLE_MINER").is_ok();
     pub static ref BURN_PER_BLOCK: u64 = {
@@ -81,10 +71,14 @@ lazy_static! {
             0
         }
     };
-    pub static ref PG_POOL: pg::Pool = {
-        let manager = ConnectionManager::<PgConnection>::new(&database_url());
-        Pool::new(manager).unwrap()
+    pub static ref PRIVATE_KEY: [u8; 32] = {
+        hex::decode(&env::var("PRIVATE_KEY").expect("PRIVATE_KEY not set"))
+            .expect("Invalid PRIVATE_KEY")
+            .try_into()
+            .expect("Invalid PRIVATE_KEY")
     };
+    pub static ref SIGNER: SigningKey =
+        SigningKey::from_bytes(&*PRIVATE_KEY).expect("Invalid PRIVATE_KEY");
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -103,38 +97,13 @@ where
         .and_then(|string| base64::decode(&string).map_err(|err| Error::custom(err.to_string())))
 }
 
-pub fn bootnodes() -> Vec<Bootnode> {
-    let path = OPTS
-        .bootnodes
-        .clone()
-        .unwrap_or("./ellipticoind/dist/bootnodes.yaml".to_string());
-
-    let string = std::fs::read_to_string(path).unwrap();
-    serde_yaml::from_str(&string).unwrap()
-}
-
-pub fn database_url() -> String {
-    OPTS.database_url
-        .clone()
-        .unwrap_or(env::var("DATABASE_URL").expect("DATABASE_URL must be set"))
-}
-
 pub fn socket() -> SocketAddr {
     (OPTS.bind_address.parse::<IpAddr>().unwrap(), OPTS.port).into()
 }
 
-pub fn signing_key() -> SigningKey {
-    SigningKey::try_from(
-        <[u8; 32]>::try_from(
-            &base64::decode(&env::var("PRIVATE_KEY").expect("PRIVATE_KEY not set")).unwrap()[..32],
-        )
-        .unwrap(),
-    )
-    .unwrap()
-}
-
-pub fn verification_key() -> [u8; 32] {
-    VerificationKey::from(&signing_key()).into()
+pub fn verification_key() -> [u8; 20] {
+    [0; 20]
+    // VerificationKey::from(&signing_key()).into()
 }
 
 pub fn network_id() -> u32 {
@@ -143,15 +112,6 @@ pub fn network_id() -> u32 {
     } else {
         OPTS.network_id
     }
-}
-
-pub fn random_bootnode() -> Bootnode {
-    let mut rng = rand::thread_rng();
-    (*bootnodes().choose(&mut rng).unwrap()).clone()
-}
-
-pub fn get_pg_connection() -> pg::Connection {
-    PG_POOL.get().unwrap()
 }
 
 pub fn host_uri(host: &str) -> String {

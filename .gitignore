@@ -1,6 +1,5 @@
 .env
 **/*.rs.bk
-**/db*
 **/node_modules
 **/target
 ellipticoind/static/*
