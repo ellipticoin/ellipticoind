@@ -1,14 +1,14 @@
 use crate::{
     api::{
         graphql::{Context, Error},
-        helpers::validate_signature,
-        types::{Bytes, Transaction},
+        types::Bytes,
     },
-    constants::NEW_BLOCK_CHANNEL,
-    helpers::run_transaction,
-    models,
-    state::current_miner,
+    transaction,
 };
+use ellipticoin_peerchain_ethereum::SignedTransaction;
+
+use juniper::FieldError;
+use std::string::ToString;
 
 pub struct Mutations;
 
@@ -19,30 +19,16 @@ impl Mutations {
     pub async fn post_transaction(
         _context: &Context,
         transaction: Bytes,
-    ) -> Result<Transaction, Error> {
-        let transaction_request = validate_signature(&transaction.0)?;
-        let transaction = run_transaction(transaction_request).await;
-        Ok(Transaction::from(transaction))
+    ) -> Result<Option<String>, FieldError> {
+        let signed_transaction: SignedTransaction =
+            serde_cbor::from_slice(&transaction.0).map_err(|err| Error(err.to_string()))?;
+        Ok(transaction::dispatch(signed_transaction)
+            .await
+            .map_err(|err| err.to_string())
+            .err())
     }
 
-    pub async fn post_block(_context: &Context, block: Bytes) -> Result<bool, Error> {
-        let block: (models::block::Block, Vec<models::transaction::Transaction>) =
-            validate_signature(&block.0)?;
-        let state = block.clone().0.apply(block.1).await;
-        println!("Applied block #{}", block.0.number);
-        NEW_BLOCK_CHANNEL.0.send(state).await;
-
-        Ok(true)
-    }
-
-    pub async fn slash_winner(_context: &Context, block: Bytes) -> Result<bool, Error> {
-        let (message, winner): (String, [u8; 32]) = validate_signature(&block.0)?;
-        if message != "Slash" {
-            return Err(Error("Message didn't start with \"Slash\"".to_string()));
-        }
-        if current_miner().await.address == winner {
-            println!("Slash winner")
-        }
+    pub async fn post_block(_context: &Context, _block: Bytes) -> Result<bool, FieldError> {
         Ok(true)
     }
 }

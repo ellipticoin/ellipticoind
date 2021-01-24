@@ -1,57 +1,90 @@
+use crate::config::verification_key;
 use crate::{
-    config::{network_id, verification_key},
-    constants::TOKEN_CONTRACT,
-    models::transaction::next_nonce,
+    constants::{NETWORK_ID, TRANSACTION_QUEUE},
+    crypto::{recover, sign, sign_eth},
+    db::MemoryDB,
+    state::IN_MEMORY_STATE,
 };
+use anyhow::Result;
+use ellipticoin_contracts::{Action, Run, Transaction};
+use ellipticoin_contracts::{Bridge, System};
+use ellipticoin_peerchain_ethereum::{
+    constants::{BRIDGE_ADDRESS, REDEEM_TIMEOUT},
+    Signed, SignedTransaction,
+};
+use ellipticoin_types::DB;
 use serde::{Deserialize, Serialize};
-use serde_cbor::{from_slice, Value};
-use std::convert::TryInto;
 
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
-pub struct TransactionRequest {
-    pub nonce: u32,
-    pub sender: [u8; 32],
-    pub contract: String,
-    pub function: String,
-    pub arguments: Vec<serde_cbor::Value>,
-    pub network_id: u32,
-}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SignedSystemTransaction(Transaction<Action>, Vec<u8>);
 
-impl Default for TransactionRequest {
-    fn default() -> Self {
-        Self {
-            network_id: network_id(),
-            contract: TOKEN_CONTRACT.clone(),
-            sender: verification_key(),
-            nonce: 0,
-            function: "".to_string(),
-            arguments: vec![],
-        }
+impl Signed for SignedSystemTransaction {
+    fn sender(&self) -> Result<[u8; 20]> {
+        recover(&serde_cbor::to_vec(&self.0)?, &self.1)
     }
 }
 
-impl TransactionRequest {
-    pub fn new(contract: String, function: &str, arguments: Vec<Value>) -> Self {
-        let transaction = Self {
-            contract,
-            nonce: next_nonce(verification_key().to_vec()),
-            function: function.to_string(),
-            arguments,
-            ..Default::default()
+impl SignedSystemTransaction {
+    pub fn new<D: DB>(db: &mut D, action: Action) -> SignedSystemTransaction {
+        let transaction = Transaction {
+            network_id: NETWORK_ID,
+            transaction_number: System::get_next_transaction_number(db, verification_key()),
+            action,
         };
-        transaction
+        let signature = sign(&transaction);
+        SignedSystemTransaction(transaction, signature.to_vec())
+    }
+
+    pub async fn run<D: DB>(&self, db: &mut D) -> Result<()> {
+        let result = self.0.action.run(db, self.sender()?);
+        if result.is_ok() {
+            db.commit();
+        } else {
+            db.revert();
+        }
+        result
     }
 }
 
-impl From<crate::models::Transaction> for TransactionRequest {
-    fn from(transaction: crate::models::Transaction) -> TransactionRequest {
-        TransactionRequest {
-            network_id: transaction.network_id as u32,
-            sender: transaction.sender[..].try_into().unwrap(),
-            arguments: from_slice(&transaction.arguments).unwrap(),
-            contract: transaction.contract,
-            function: transaction.function,
-            nonce: transaction.nonce as u32,
-        }
+pub async fn dispatch(signed_transaction: SignedTransaction) -> Result<()> {
+    let receiver = TRANSACTION_QUEUE.push(signed_transaction).await;
+    receiver.await.unwrap()
+}
+
+pub async fn run(signed_transaction: SignedTransaction) -> Result<()> {
+    let mut state = IN_MEMORY_STATE.lock().await;
+    let mut db = MemoryDB::new(&mut state);
+    let result = signed_transaction.run(&mut db).await;
+    println!("{:?}", result);
+    if matches!(signed_transaction.0.action, Action::CreateRedeemRequest(_, _)) && result.is_ok() {
+        sign_last_redeem_request(&mut db).await.unwrap();
     }
+    result
+}
+
+pub async fn sign_last_redeem_request<D: DB>(db: &mut D) -> Result<()> {
+    let pending_redeem_request = Bridge::get_pending_redeem_requests(db)
+        .last()
+        .unwrap()
+        .clone();
+    let ethereum_block_number = Bridge::get_ethereum_block_number(db);
+    let experation_block_number = ethereum_block_number + REDEEM_TIMEOUT;
+    let signature = sign_eth(&(
+        serde_eth::Address(pending_redeem_request.sender),
+        pending_redeem_request.amount,
+        serde_eth::Address(pending_redeem_request.token),
+        experation_block_number,
+        pending_redeem_request.id,
+        serde_eth::Address(BRIDGE_ADDRESS),
+    ));
+
+    let redeem_transaction = SignedSystemTransaction::new(
+        db,
+        Action::SignRedeemRequest(
+            pending_redeem_request.id,
+            experation_block_number,
+            signature.to_vec(),
+        ),
+    );
+    redeem_transaction.run(db).await
 }

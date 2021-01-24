@@ -1,7 +1,9 @@
 [workspace]
 
 members = [
+    "ellipticoin_contracts",
+    "ellipticoin_macros",
+    "ellipticoin_peerchain_ethereum",
+    "ellipticoin_types",
     "ellipticoind",
-    "ellipticoind_macros",
-    "ellipticoind_types",
 ]

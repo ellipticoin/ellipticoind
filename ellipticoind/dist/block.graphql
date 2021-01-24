@@ -9,7 +9,7 @@ query block($blockNumber: U32!) {
       position
       contract
       sender
-      nonce
+      transactionNumber
       function
       arguments
       returnValue

@@ -24,16 +24,15 @@ cd ellipticoind
 3. Install the required dependencies
 
 ```
-sudo apt-get update && sudo apt-get install certbot nginx build-essential libpq-dev pkg-config libssl-dev postgresql postgresql-contrib redis-server llvm clang redis git-lfs
+sudo apt-get update && sudo apt-get install certbot nginx build-essential pkg-config libssl-dev
 ```
 4. Build  ellipticoind
 ```
-cd ellipticoind
-C_INCLUDE_PATH=/usr/lib/gcc/x86_64-linux-gnu/7/include cargo build --release
+cargo build --release
 ```
 5. Generate a key pair:
 ```
-./target/release/ellipticoind generate-keypair
+cargo run generate-keypair
 Public Key (Address): cwZitLN90FXTaOovm0ygsGNJ+nDJgFXg0Angzz7Lsbw=
 Private Key: gNCgX1Jfs3gXHDEvd7ano6bflJR0oNscgBI1O4JEN2N06SFQL1isJysk3/ix35gkwG7MztBrGv2iO/q2Th7SnQ==
 ```
@@ -47,33 +46,11 @@ cp .env.sample .env
 ```
 # .env
 DATABASE_URL=postgres://root:@/ellipticoind
-PRIVATE_KEY=<Your Base 64 Encoded Private Key>
+PRIVATE_KEY=<Your Private Key>
 ENABLE_MINER=true
 BURN_PER_BLOCK=100
 ```
 
-7. Create the postgres user and database
-
-```
-cd /
-su postgres -c"createuser root"
-su postgres -c"createdb ellipticoind"
-cd /root/ellipticoind 
-```
-
-8. Pull down the Ethereum Balances file from GitHub
-```
-git lfs install
-git lfs pull
-```
-9 Install snapd, [certbot](https://certbot.eff.org/), and nginx
-```
-sudo apt install nginx
-sudo apt install snapd
-sudo snap install core; sudo snap refresh core
-sudo snap install --classic certbot
-sudo ln -s /snap/bin/certbot /usr/bin/certbot
-```
 10. Run certbot
 ```
 certbot --nginx -d yourhost.yourdomain.com
