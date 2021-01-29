@@ -19,6 +19,7 @@ mod block_broadcaster;
 pub mod client;
 pub mod config;
 mod constants;
+pub mod dump_v2_genesis;
 mod error;
 mod helpers;
 mod legacy;

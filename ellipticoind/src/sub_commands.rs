@@ -1,3 +1,4 @@
+use crate::state::IN_MEMORY_STATE;
 use crate::{
     api,
     config::{get_pg_connection, socket, ENABLE_MINER, GENESIS_NODE},

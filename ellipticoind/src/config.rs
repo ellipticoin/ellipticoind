@@ -54,6 +54,8 @@ pub struct Opts {
 pub enum SubCommand {
     #[clap(name = "generate-keypair")]
     GenerateKeypair,
+    #[clap(name = "dump-v2-genesis")]
+    DumpV2Genesis,
     #[clap(name = "dump-blocks")]
     DumpBlocks {
         #[clap(long = "at-block")]

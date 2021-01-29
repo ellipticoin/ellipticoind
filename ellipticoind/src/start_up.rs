@@ -10,7 +10,7 @@ use crate::{
     serde_cbor::Deserializer,
     state::{is_mining, IN_MEMORY_STATE},
     static_files::STATIC_FILES,
-    system_contracts::{api::InMemoryAPI},
+    system_contracts::api::InMemoryAPI,
     transaction::TransactionRequest,
 };
 use diesel::{
