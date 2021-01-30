@@ -1,7 +1,7 @@
 use ellipticoind::{
     config::{SubCommand, OPTS},
-    sub_commands::{self, dump_blocks, generate_keypair},
     dump_v2_genesis,
+    sub_commands::{self, dump_blocks, generate_keypair},
 };
 
 #[async_std::main]

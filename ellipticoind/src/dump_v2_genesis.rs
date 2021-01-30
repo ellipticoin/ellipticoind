@@ -1,24 +1,27 @@
-use crate::state::IN_MEMORY_STATE;
-use std::fs::File;
-use crate::models::Block;
-use crate::models::get_pg_connection;
-use crate::start_up;
-use crate::schema::blocks::dsl as blocks_dsl;
-use crate::diesel::ExpressionMethods;
-use crate::diesel::QueryDsl;
-use crate::diesel::RunQueryDsl;
-use ellipticoin::helpers::db_key;
-use std::convert::TryInto;
-use crate::helpers::sha256;
-use std::collections::HashMap;
-use std::convert::TryFrom;
+use crate::{
+    diesel::{ExpressionMethods, QueryDsl, RunQueryDsl},
+    helpers::sha256,
+    models::{get_pg_connection, Block},
+    schema::blocks::dsl as blocks_dsl,
+    start_up,
+    state::IN_MEMORY_STATE,
+};
+
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+    fs::File,
+};
 
 #[repr(u16)]
 pub enum V2Contracts {
-    Token,
     Bridge,
+    Ellipticoin,
     Exchange,
+    Token,
 }
+
+const ELC: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
 
 pub async fn dump_v2_genesis() {
     let pg_db = get_pg_connection();
@@ -30,26 +33,31 @@ pub async fn dump_v2_genesis() {
     start_up::load_genesis_state().await;
     start_up::run_transactions_in_db().await;
     let state = IN_MEMORY_STATE.lock().await;
-    let mut v2_genesis_state =  HashMap::new();
+    let mut v2_genesis_state = HashMap::new();
     for (key, value) in state.iter() {
         match key.clone() {
-            mut key if key.starts_with(&[&sha256("Token".as_bytes().to_vec()).to_vec(), &vec![0][..]].concat()) => {
+            mut key
+                if key.starts_with(
+                    &[&sha256("Token".as_bytes().to_vec()).to_vec(), &vec![0][..]].concat(),
+                ) =>
+            {
                 key.drain(..33);
-                let (token, address) = if key.starts_with(b"EllipticoinELC") {
-                    let mut elc_address = [0; 20];
-                    elc_address[19] = 1;
-                    let token = key[14..].to_vec();
-                    if token == b"Ellipticoin" {
-                        elc_address
+                let (address, token): ([u8; 20], [u8; 20]) = if key.starts_with(b"EllipticoinELC") {
+                    key.drain(..14);
+                    let address = if key == b"Ellipticoin" {
+                        ELC    
                     } else {
-                        <[u8; 20]>::try_from(&key[14..34][..]).unwrap()
+                        key[..20][..].try_into().unwrap()
                     };
-                    (elc_address, token) 
+                    println!("{}", base64::encode(&address));
+                    (address, ELC)
                 } else {
-                    (key[6..26].try_into().unwrap(), key[26..46].to_vec())
-                    };
-                println!("token: {}", hex::encode(token));
+                    key.drain(..6);
+                    (key[20..40][..].try_into().unwrap(), key[..20].try_into().unwrap())
+                };
+                // println!("key[0]: {}", key[0]);
                 println!("address: {}", base64::encode(&address));
+                println!("token: {}", base64::encode(&token));
                 // let address = key.split_off(key.len()-32);
                 // let token = key.clone();
                 // // println!("{}", base64::encode(&adddres));
@@ -57,8 +65,21 @@ pub async fn dump_v2_genesis() {
                 // println!("address: {}", base64::encode(&address));
                 //
                 // // println!("{}", base64::encode(&key[key.len()-32.. key.len()]));
-                // println!("{}", base64::encode(v2_db_key(V2Contracts::Token, key[0] as u16, &[&address[..], &token[..]].concat())));
-                v2_genesis_state.insert(v2_db_key(V2Contracts::Token, key[0] as u16, &[&address[..], &token[..]].concat()), value);
+                println!("{}", 
+                    base64::encode(v2_db_key(
+                        V2Contracts::Token,
+                        0u16,
+                        &[&address[..], &token[..]].concat(),
+                    )));
+
+                v2_genesis_state.insert(
+                    v2_db_key(
+                        V2Contracts::Token,
+                        0u16,
+                        &[&address[..], &token[..]].concat(),
+                    ),
+                    value,
+                );
             }
             _ => {
                 println!("unknown key");
@@ -68,16 +89,19 @@ pub async fn dump_v2_genesis() {
     let file = File::create("/Users/masonf/tmp/genesis.cbor").unwrap();
     for (key, value) in v2_genesis_state.iter() {
         serde_cbor::to_writer(&file, &(key, value)).unwrap();
-    };
+    }
 }
 
 fn v2_db_key(contract: V2Contracts, index: u16, key: &[u8]) -> Vec<u8> {
-    [&(contract as u16).to_le_bytes()[..], &index.to_le_bytes().to_vec()[..], key].concat()
-    
+    [
+        &(contract as u16).to_le_bytes()[..],
+        &index.to_le_bytes().to_vec()[..],
+        key,
+    ]
+    .concat()
 }
 
-
-fn token_bytes_v2_token_bytes(token: &[u8]) -> [u8; 20] { 
+fn token_bytes_v2_token_bytes(token: &[u8]) -> [u8; 20] {
     if token == b"EllipticoinELC" {
         [0; 20]
     } else {
