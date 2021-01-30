@@ -11,6 +11,7 @@ use ellipticoin::helpers::db_key;
 use std::convert::TryInto;
 use crate::helpers::sha256;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
 #[repr(u16)]
 pub enum V2Contracts {
@@ -36,12 +37,18 @@ pub async fn dump_v2_genesis() {
                 key.drain(..33);
                 let (token, address) = if key.starts_with(b"EllipticoinELC") {
                     let mut elc_address = [0; 20];
-                    elc_address[19] = 1; 
-                    (elc_address, key[14..34].to_vec()) 
+                    elc_address[19] = 1;
+                    let token = key[14..].to_vec();
+                    if token == b"Ellipticoin" {
+                        elc_address
+                    } else {
+                        <[u8; 20]>::try_from(&key[14..34][..]).unwrap()
+                    };
+                    (elc_address, token) 
                 } else {
                     (key[6..26].try_into().unwrap(), key[26..46].to_vec())
                     };
-                // println!("token: {}", hex::encode(token));
+                println!("token: {}", hex::encode(token));
                 println!("address: {}", base64::encode(&address));
                 // let address = key.split_off(key.len()-32);
                 // let token = key.clone();
@@ -50,6 +57,7 @@ pub async fn dump_v2_genesis() {
                 // println!("address: {}", base64::encode(&address));
                 //
                 // // println!("{}", base64::encode(&key[key.len()-32.. key.len()]));
+                // println!("{}", base64::encode(v2_db_key(V2Contracts::Token, key[0] as u16, &[&address[..], &token[..]].concat())));
                 v2_genesis_state.insert(v2_db_key(V2Contracts::Token, key[0] as u16, &[&address[..], &token[..]].concat()), value);
             }
             _ => {
