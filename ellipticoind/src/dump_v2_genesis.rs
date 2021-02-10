@@ -18,10 +18,14 @@ pub enum V2Contracts {
     Bridge,
     Ellipticoin,
     Exchange,
+    System,
     Token,
 }
+struct V2Key(V2Contracts, u16, Vec<u8>);
 
 const ELC: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+const EXCHANGE: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2];
+const BRIDGE: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2];
 
 pub async fn dump_v2_genesis() {
     let pg_db = get_pg_connection();
@@ -34,82 +38,83 @@ pub async fn dump_v2_genesis() {
     start_up::run_transactions_in_db().await;
     let state = IN_MEMORY_STATE.lock().await;
     let mut v2_genesis_state = HashMap::new();
-    for (key, value) in state.iter() {
+    state.iter().map(|(key, value)| {
+        // println!("{}", base64::encode(&key));
         match key.clone() {
             mut key
                 if key.starts_with(
                     &[&sha256("Token".as_bytes().to_vec()).to_vec(), &vec![0][..]].concat(),
                 ) =>
             {
+                // println!("{:?}", serde_cbor::from_slice::<serde_cbor::Value>(&value));
                 key.drain(..33);
-                let (address, token): ([u8; 20], [u8; 20]) = if key.starts_with(b"EllipticoinELC") {
-                    key.drain(..14);
-                    let address = if key == b"Ellipticoin" {
-                        ELC    
-                    } else {
-                        key[..20][..].try_into().unwrap()
-                    };
-                    println!("{}", base64::encode(&address));
-                    (address, ELC)
-                } else {
-                    key.drain(..6);
-                    (key[20..40][..].try_into().unwrap(), key[..20].try_into().unwrap())
-                };
-                // println!("key[0]: {}", key[0]);
-                println!("address: {}", base64::encode(&address));
-                println!("token: {}", base64::encode(&token));
-                // let address = key.split_off(key.len()-32);
-                // let token = key.clone();
-                // // println!("{}", base64::encode(&adddres));
-                // println!("token: {}", base64::encode(token_bytes_v2_token_bytes(&token)));
-                // println!("address: {}", base64::encode(&address));
-                //
-                // // println!("{}", base64::encode(&key[key.len()-32.. key.len()]));
-                println!("{}", 
-                    base64::encode(v2_db_key(
-                        V2Contracts::Token,
-                        0u16,
-                        &[&address[..], &token[..]].concat(),
-                    )));
-
-                v2_genesis_state.insert(
-                    v2_db_key(
-                        V2Contracts::Token,
-                        0u16,
-                        &[&address[..], &token[..]].concat(),
-                    ),
-                    value,
-                );
+                (V2Key(V2Contracts::Token, 0, convert_balance(key)), value)
             }
             _ => {
-                println!("unknown key");
+                (V2Key(V2Contracts::Token, 0, vec![]), value)
+                // panic!("unknown key");
             }
-        };
-    }
+        }
+    }).for_each(|(key,value)| {
+                v2_genesis_state.insert(
+                    v2_db_key(
+                        key,
+                    ),
+                    value
+                );
+    });
     let file = File::create("/Users/masonf/tmp/genesis.cbor").unwrap();
     for (key, value) in v2_genesis_state.iter() {
         serde_cbor::to_writer(&file, &(key, value)).unwrap();
     }
 }
 
-fn v2_db_key(contract: V2Contracts, index: u16, key: &[u8]) -> Vec<u8> {
+
+fn convert_balance(mut key: Vec<u8>) -> Vec<u8> {
+    let (address, token): ([u8; 20], [u8; 20]) = if key.starts_with(b"EllipticoinELC") {
+        let address = if key == b"Ellipticoin" {
+            ELC    
+        } else if key == b"Exchange" {
+            EXCHANGE 
+        } else {
+            key[..20][..].try_into().unwrap()
+        };
+        (address, ELC)
+    } else if key.starts_with(b"Exchange"){
+        key.drain(..8);
+        (key[20..40][..].try_into().unwrap(), key[..20].try_into().unwrap())
+    } else if key.starts_with(b"Bridge"){
+        key.drain(..6);
+        let token = key.drain(0..20).collect::<Vec<u8>>().try_into().unwrap();
+        let address = if key == b"Exchange" {
+            pad_left(vec![V2Contracts::Exchange as u8], 20).try_into().unwrap()
+        } else {
+             key.drain(..20).collect::<Vec<u8>>().try_into().unwrap()
+        };
+        (token, address)
+    } else {
+        panic!("unknown key")
+    };
+    [token, address].concat()
+}
+
+
+fn v2_db_key(key: V2Key) -> Vec<u8> {
     [
-        &(contract as u16).to_le_bytes()[..],
-        &index.to_le_bytes().to_vec()[..],
-        key,
+        &(key.0 as u16).to_le_bytes()[..],
+        &key.1.to_le_bytes().to_vec()[..],
+        &key.2,
     ]
     .concat()
 }
 
-fn token_bytes_v2_token_bytes(token: &[u8]) -> [u8; 20] {
-    if token == b"EllipticoinELC" {
-        [0; 20]
-    } else {
-        token[6..26].try_into().unwrap()
-    }
-    // println!("{}", base64::encode(token));
-    // match std::str::from_utf8(token).unwrap().as_ref() {
-    //     "EllipticoinELC" => [0; 20],
-    //     a => panic!("{}", a)
-    // }
+pub fn pad_left(value: Vec<u8>, padding_size: usize) -> Vec<u8> {
+    let mut new_vec = vec![0; padding_size - value.len()];
+
+    new_vec.splice(new_vec.len()..new_vec.len(), value.iter().cloned());
+    new_vec
 }
+
+// fn convert_total_supply(key: &[u8], value: &[u8]) -> (Vec<u8>, Vec<u8>) {
+//
+// }
