@@ -54,7 +54,7 @@ pub async fn dump_v2_genesis() {
                 ) =>
             {
                 key.drain(..33);
-                (V2Key(V2Contracts::Token, 0, convert_token_key(key)), value)
+                (V2Key(V2Contracts::Token, 1, convert_token_key(key)), value)
             }
             mut key
                 if key.starts_with(
