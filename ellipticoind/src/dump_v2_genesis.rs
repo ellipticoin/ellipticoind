@@ -6,12 +6,12 @@ use crate::{
     start_up,
     state::IN_MEMORY_STATE,
 };
-
 use std::{
     collections::HashMap,
     convert::{TryFrom, TryInto},
     fs::File,
 };
+use hex_literal::hex;
 
 #[repr(u16)]
 pub enum V2Contracts {
@@ -23,6 +23,7 @@ pub enum V2Contracts {
 }
 struct V2Key(V2Contracts, u16, Vec<u8>);
 
+const V1_ETH: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
 const ELC: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
 const EXCHANGE: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2];
 
@@ -71,13 +72,17 @@ pub async fn dump_v2_genesis() {
 
 fn convert_balance_key(mut key: Vec<u8>) -> Vec<u8> {
     let (token, address): ([u8; 20], [u8; 20]) = if key.starts_with(b"EllipticoinELC") {
+        key.drain(..14);
         let address = if key == b"Ellipticoin" {
-            ELC    
+            pad_left(vec![V2Contracts::Ellipticoin as u8], 20).try_into().unwrap()   
         } else if key == b"Exchange" {
-            EXCHANGE 
+            pad_left(vec![V2Contracts::Exchange as u8], 20).try_into().unwrap()   
         } else {
             key[..20][..].try_into().unwrap()
         };
+        // println!("{}", std::str::from_utf8(address).unwrap());
+        println!("{}", hex::encode(address));
+        println!("{}", base64::encode(address));
         (ELC, address)
     } else if key.starts_with(b"Exchange"){
         key.drain(..8);
@@ -90,7 +95,8 @@ fn convert_balance_key(mut key: Vec<u8>) -> Vec<u8> {
         } else {
             address[..20].try_into().unwrap()
         };
-        (token.try_into().unwrap(), address)
+        // println!("{} {}", hex::encode(&v2_token(token.try_into().unwrap())), base64::encode(&address));
+        (v2_token(token.try_into().unwrap()), address)
     } else {
         panic!("unknown key")
     };
@@ -98,6 +104,13 @@ fn convert_balance_key(mut key: Vec<u8>) -> Vec<u8> {
 }
 
 
+fn v2_token(address: [u8; 20]) -> [u8; 20] {
+    if address == V1_ETH {
+        pad_left(vec![0u8], 20).try_into().unwrap()
+    } else {
+        address
+    }
+}
 fn v2_db_key(key: V2Key) -> Vec<u8> {
     [
         &(key.0 as u16).to_le_bytes()[..],
