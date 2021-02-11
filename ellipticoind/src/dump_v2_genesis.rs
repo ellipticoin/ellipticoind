@@ -104,7 +104,7 @@ fn convert_address_token_key(mut key: Vec<u8>) -> Vec<u8> {
         (pad_left(vec![V2Contracts::Ellipticoin as u8], 20).try_into().unwrap(), address)
     } else if key.starts_with(b"Exchange"){
         key.drain(..8);
-        (key[..20].try_into().unwrap(), key[20..40][..].try_into().unwrap())
+        (convert_liquidity_token(&key[..32]), key[32..52][..].try_into().unwrap())
     } else if key.starts_with(b"Bridge"){
         key.drain(..6);
         let (token, address) = key.split_at(20);
@@ -137,6 +137,15 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
         key[6..].to_vec()
     } else {
         panic!("failed to convert token key")
+    }
+}
+
+fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
+    if sha256(["Bridge".as_bytes(), &V1_BTC[..]].concat()).to_vec() == key[..32].to_vec() {
+        println!("{}", base64::encode(&key));
+        sha256([pad_left(vec![V2Contracts::Exchange as u8], 20).try_into().unwrap(), V2_BTC].concat())[..20].try_into().unwrap()
+    } else {
+        key[..20].try_into().unwrap()
     }
 }
 
