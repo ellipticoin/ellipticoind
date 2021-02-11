@@ -25,7 +25,6 @@ struct V2Key(V2Contracts, u16, Vec<u8>);
 
 const ELC: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
 const EXCHANGE: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2];
-const BRIDGE: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2];
 
 pub async fn dump_v2_genesis() {
     let pg_db = get_pg_connection();
@@ -48,7 +47,7 @@ pub async fn dump_v2_genesis() {
             {
                 // println!("{:?}", serde_cbor::from_slice::<serde_cbor::Value>(&value));
                 key.drain(..33);
-                (V2Key(V2Contracts::Token, 0, convert_balance(key)), value)
+                (V2Key(V2Contracts::Token, 0, convert_balance_key(key)), value)
             }
             _ => {
                 (V2Key(V2Contracts::Token, 0, vec![]), value)
@@ -70,8 +69,8 @@ pub async fn dump_v2_genesis() {
 }
 
 
-fn convert_balance(mut key: Vec<u8>) -> Vec<u8> {
-    let (address, token): ([u8; 20], [u8; 20]) = if key.starts_with(b"EllipticoinELC") {
+fn convert_balance_key(mut key: Vec<u8>) -> Vec<u8> {
+    let (token, address): ([u8; 20], [u8; 20]) = if key.starts_with(b"EllipticoinELC") {
         let address = if key == b"Ellipticoin" {
             ELC    
         } else if key == b"Exchange" {
@@ -79,23 +78,23 @@ fn convert_balance(mut key: Vec<u8>) -> Vec<u8> {
         } else {
             key[..20][..].try_into().unwrap()
         };
-        (address, ELC)
+        (ELC, address)
     } else if key.starts_with(b"Exchange"){
         key.drain(..8);
-        (key[20..40][..].try_into().unwrap(), key[..20].try_into().unwrap())
+        (key[..20].try_into().unwrap(), key[20..40][..].try_into().unwrap())
     } else if key.starts_with(b"Bridge"){
         key.drain(..6);
-        let token = key.drain(0..20).collect::<Vec<u8>>().try_into().unwrap();
-        let address = if key == b"Exchange" {
+        let (token, address) = key.split_at(20);
+        let address = if address == b"Exchange" {
             pad_left(vec![V2Contracts::Exchange as u8], 20).try_into().unwrap()
         } else {
-             key.drain(..20).collect::<Vec<u8>>().try_into().unwrap()
+            address[..20].try_into().unwrap()
         };
-        (token, address)
+        (token.try_into().unwrap(), address)
     } else {
         panic!("unknown key")
     };
-    [token, address].concat()
+    [address, token].concat()
 }
 
 
