@@ -39,20 +39,41 @@ pub async fn dump_v2_genesis() {
     let state = IN_MEMORY_STATE.lock().await;
     let mut v2_genesis_state = HashMap::new();
     state.iter().map(|(key, value)| {
-        // println!("{}", base64::encode(&key));
         match key.clone() {
             mut key
                 if key.starts_with(
                     &[&sha256("Token".as_bytes().to_vec()).to_vec(), &vec![0][..]].concat(),
                 ) =>
             {
-                // println!("{:?}", serde_cbor::from_slice::<serde_cbor::Value>(&value));
                 key.drain(..33);
-                (V2Key(V2Contracts::Token, 0, convert_balance_key(key)), value)
+                (V2Key(V2Contracts::Token, 0, convert_address_token_key(key)), value)
+            }
+            mut key
+                if key.starts_with(
+                    &[&sha256("Token".as_bytes().to_vec()).to_vec(), &vec![1][..]].concat(),
+                ) =>
+            {
+                key.drain(..33);
+                (V2Key(V2Contracts::Token, 0, convert_token_key(key)), value)
+            }
+            mut key
+                if key.starts_with(
+                    &[&sha256("Exchange".as_bytes().to_vec()).to_vec(), &vec![0][..]].concat(),
+                ) =>
+            {
+                key.drain(..33);
+                (V2Key(V2Contracts::Exchange, 0, convert_token_key(key)), value)
+            }
+            mut key
+                if key.starts_with(
+                    &[&sha256("Exchange".as_bytes().to_vec()).to_vec(), &vec![1][..]].concat(),
+                ) =>
+            {
+                key.drain(..33);
+                (V2Key(V2Contracts::Exchange, 1, convert_token_key(key)), value)
             }
             _ => {
                 (V2Key(V2Contracts::Token, 0, vec![]), value)
-                // panic!("unknown key");
             }
         }
     }).for_each(|(key,value)| {
@@ -70,7 +91,7 @@ pub async fn dump_v2_genesis() {
 }
 
 
-fn convert_balance_key(mut key: Vec<u8>) -> Vec<u8> {
+fn convert_address_token_key(mut key: Vec<u8>) -> Vec<u8> {
     let (token, address): ([u8; 20], [u8; 20]) = if key.starts_with(b"EllipticoinELC") {
         key.drain(..14);
         let address = if key == b"Ellipticoin" {
@@ -80,9 +101,6 @@ fn convert_balance_key(mut key: Vec<u8>) -> Vec<u8> {
         } else {
             key[..20][..].try_into().unwrap()
         };
-        // println!("{}", std::str::from_utf8(address).unwrap());
-        println!("{}", hex::encode(address));
-        println!("{}", base64::encode(address));
         (pad_left(vec![V2Contracts::Ellipticoin as u8], 20).try_into().unwrap(), address)
     } else if key.starts_with(b"Exchange"){
         key.drain(..8);
@@ -95,7 +113,6 @@ fn convert_balance_key(mut key: Vec<u8>) -> Vec<u8> {
         } else {
             address[..20].try_into().unwrap()
         };
-        // println!("{} {}", hex::encode(&v2_token(token.try_into().unwrap())), base64::encode(&address));
         (v2_token(token.try_into().unwrap()), address)
     } else {
         panic!("unknown key")
@@ -103,6 +120,17 @@ fn convert_balance_key(mut key: Vec<u8>) -> Vec<u8> {
     [address, token].concat()
 }
 
+fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
+    if key == b"EllipticoinELC" {
+        pad_left(vec![V2Contracts::Ellipticoin as u8], 20).try_into().unwrap()
+    } else if key.starts_with(b"Exchange") {
+        key[8..].to_vec()
+    } else if key.starts_with(b"Bridge") {
+        key[6..].to_vec()
+    } else {
+        panic!("failed to convert token key")
+    }
+}
 
 fn v2_token(address: [u8; 20]) -> [u8; 20] {
     match address {
