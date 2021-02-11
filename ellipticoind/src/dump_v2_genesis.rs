@@ -55,6 +55,7 @@ pub async fn dump_v2_genesis() {
             {
                 key.drain(..33);
                 println!("{}", hex::encode(convert_token_key(key.clone())));
+                println!("{:?}", serde_cbor::from_slice::<serde_cbor::Value>(&value).unwrap());
                 (V2Key(V2Contracts::Token, 1, convert_token_key(key)), value)
             }
             mut key
