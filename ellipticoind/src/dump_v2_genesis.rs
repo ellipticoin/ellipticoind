@@ -24,8 +24,8 @@ pub enum V2Contracts {
 struct V2Key(V2Contracts, u16, Vec<u8>);
 
 const V1_ETH: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
-const ELC: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
-const EXCHANGE: [u8; 20] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2];
+const V1_BTC: [u8; 20] = hex!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
+const V2_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
 
 pub async fn dump_v2_genesis() {
     let pg_db = get_pg_connection();
@@ -83,7 +83,7 @@ fn convert_balance_key(mut key: Vec<u8>) -> Vec<u8> {
         // println!("{}", std::str::from_utf8(address).unwrap());
         println!("{}", hex::encode(address));
         println!("{}", base64::encode(address));
-        (ELC, address)
+        (pad_left(vec![V2Contracts::Ellipticoin as u8], 20).try_into().unwrap(), address)
     } else if key.starts_with(b"Exchange"){
         key.drain(..8);
         (key[..20].try_into().unwrap(), key[20..40][..].try_into().unwrap())
@@ -105,10 +105,10 @@ fn convert_balance_key(mut key: Vec<u8>) -> Vec<u8> {
 
 
 fn v2_token(address: [u8; 20]) -> [u8; 20] {
-    if address == V1_ETH {
-        pad_left(vec![0u8], 20).try_into().unwrap()
-    } else {
-        address
+    match address {
+        V1_ETH => pad_left(vec![0u8], 20).try_into().unwrap(),
+        V1_BTC => V2_BTC,
+        address => address
     }
 }
 fn v2_db_key(key: V2Key) -> Vec<u8> {
