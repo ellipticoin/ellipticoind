@@ -104,9 +104,10 @@ pub async fn dump_v2_genesis() {
                 ) =>
             {
                 key.drain(..33);
+                println!("{}", base64::encode(&convert_liquidity_providers(value)));
                 Some((
-                    V2Key(V2Contracts::Exchange, 1, convert_token_key(key)),
-                    convert_liquidity_provider(value),
+                    V2Key(V2Contracts::Exchange, 2, convert_token_key(key)),
+                    convert_liquidity_providers(value),
                 ))
             }
             mut key
@@ -312,9 +313,9 @@ fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
     }
 }
 
-fn convert_liquidity_provider(v1_liquidity_provider: &[u8]) -> Vec<u8> {
-    println!("{}", hex::encode(v1_liquidity_provider));
-    let liquidity_providers: Vec<Address> = serde_cbor::from_slice(v1_liquidity_provider).unwrap();
+fn convert_liquidity_providers(v1_liquidity_providers: &[u8]) -> Vec<u8> {
+    // println!("{}", hex::encode(v1_liquidity_provider));
+    let liquidity_providers: Vec<Address> = serde_cbor::from_slice(v1_liquidity_providers).unwrap();
     serde_cbor::to_vec(&liquidity_providers.iter().map(|address| if let PublicKey(public_key) = address{
     public_key[..20].try_into().unwrap()
 } else {
