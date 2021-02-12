@@ -6,12 +6,13 @@ use crate::{
     start_up,
     state::IN_MEMORY_STATE,
 };
+use hex_literal::hex;
 use std::{
     collections::HashMap,
-    convert::{TryFrom, TryInto},
+    convert::{TryInto},
     fs::File,
 };
-use hex_literal::hex;
+use crate::system_contracts::token::constants::DAI;
 
 #[repr(u16)]
 pub enum V2Contracts {
@@ -38,15 +39,19 @@ pub async fn dump_v2_genesis() {
     start_up::run_transactions_in_db().await;
     let state = IN_MEMORY_STATE.lock().await;
     let mut v2_genesis_state = HashMap::new();
-    state.iter().map(|(key, value)| {
-        match key.clone() {
+    state
+        .iter()
+        .map(|(key, value)| match key.clone() {
             mut key
                 if key.starts_with(
                     &[&sha256("Token".as_bytes().to_vec()).to_vec(), &vec![0][..]].concat(),
                 ) =>
             {
                 key.drain(..33);
-                (V2Key(V2Contracts::Token, 0, convert_address_token_key(key)), value)
+                (
+                    V2Key(V2Contracts::Token, 0, convert_address_token_key(key)),
+                    value,
+                )
             }
             mut key
                 if key.starts_with(
@@ -54,64 +59,82 @@ pub async fn dump_v2_genesis() {
                 ) =>
             {
                 key.drain(..33);
-                println!("{}", hex::encode(convert_token_key(key.clone())));
-                println!("{:?}", serde_cbor::from_slice::<serde_cbor::Value>(&value).unwrap());
                 (V2Key(V2Contracts::Token, 1, convert_token_key(key)), value)
             }
             mut key
                 if key.starts_with(
-                    &[&sha256("Exchange".as_bytes().to_vec()).to_vec(), &vec![0][..]].concat(),
+                    &[
+                        &sha256("Exchange".as_bytes().to_vec()).to_vec(),
+                        &vec![0][..],
+                    ]
+                    .concat(),
                 ) =>
             {
                 key.drain(..33);
-                (V2Key(V2Contracts::Exchange, 0, convert_token_key(key)), value)
+                (
+                    V2Key(V2Contracts::Exchange, 0, convert_token_key(key)),
+                    value,
+                )
             }
             mut key
                 if key.starts_with(
-                    &[&sha256("Exchange".as_bytes().to_vec()).to_vec(), &vec![1][..]].concat(),
+                    &[
+                        &sha256("Exchange".as_bytes().to_vec()).to_vec(),
+                        &vec![1][..],
+                    ]
+                    .concat(),
                 ) =>
             {
                 key.drain(..33);
-                (V2Key(V2Contracts::Exchange, 1, convert_token_key(key)), value)
+                (
+                    V2Key(V2Contracts::Exchange, 1, convert_token_key(key)),
+                    value,
+                )
             }
-            _ => {
-                (V2Key(V2Contracts::Token, 0, vec![]), value)
-            }
-        }
-    }).for_each(|(key,value)| {
-                v2_genesis_state.insert(
-                    v2_db_key(
-                        key,
-                    ),
-                    value
-                );
-    });
+            _ => (V2Key(V2Contracts::Token, 0, vec![]), value),
+        })
+        .for_each(|(key, value)| {
+            v2_genesis_state.insert(v2_db_key(key), value);
+        });
     let file = File::create("/Users/masonf/tmp/genesis.cbor").unwrap();
     for (key, value) in v2_genesis_state.iter() {
         serde_cbor::to_writer(&file, &(key, value)).unwrap();
     }
 }
 
-
 fn convert_address_token_key(mut key: Vec<u8>) -> Vec<u8> {
     let (token, address): ([u8; 20], [u8; 20]) = if key.starts_with(b"EllipticoinELC") {
         key.drain(..14);
         let address = if key == b"Ellipticoin" {
-            pad_left(vec![V2Contracts::Ellipticoin as u8], 20).try_into().unwrap()   
+            pad_left(vec![V2Contracts::Ellipticoin as u8], 20)
+                .try_into()
+                .unwrap()
         } else if key == b"Exchange" {
-            pad_left(vec![V2Contracts::Exchange as u8], 20).try_into().unwrap()   
+            pad_left(vec![V2Contracts::Exchange as u8], 20)
+                .try_into()
+                .unwrap()
         } else {
             key[..20][..].try_into().unwrap()
         };
-        (pad_left(vec![V2Contracts::Ellipticoin as u8], 20).try_into().unwrap(), address)
-    } else if key.starts_with(b"Exchange"){
+        (
+            pad_left(vec![V2Contracts::Ellipticoin as u8], 20)
+                .try_into()
+                .unwrap(),
+            address,
+        )
+    } else if key.starts_with(b"Exchange") {
         key.drain(..8);
-        (convert_liquidity_token(&key[..32]), key[32..52][..].try_into().unwrap())
-    } else if key.starts_with(b"Bridge"){
+        (
+            convert_liquidity_token(&key[..32]),
+            key[32..52][..].try_into().unwrap(),
+        )
+    } else if key.starts_with(b"Bridge") {
         key.drain(..6);
         let (token, address) = key.split_at(20);
         let address = if address == b"Exchange" {
-            pad_left(vec![V2Contracts::Exchange as u8], 20).try_into().unwrap()
+            pad_left(vec![V2Contracts::Exchange as u8], 20)
+                .try_into()
+                .unwrap()
         } else {
             address[..20].try_into().unwrap()
         };
@@ -124,14 +147,45 @@ fn convert_address_token_key(mut key: Vec<u8>) -> Vec<u8> {
 
 fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
     if key == b"EllipticoinELC" {
-        pad_left(vec![V2Contracts::Ellipticoin as u8], 20).try_into().unwrap()
+        pad_left(vec![V2Contracts::Ellipticoin as u8], 20)
+            .try_into()
+            .unwrap()
     } else if key.starts_with(b"Exchange") {
         if sha256(["Bridge".as_bytes(), &V1_BTC[..]].concat()).to_vec() == key[8..].to_vec() {
-            // println!("{}", hex::encode(
-            // sha256([pad_left(vec![V2Contracts::Exchange as u8], 20).try_into().unwrap(), V2_BTC].concat())[..20].to_vec()));
-            sha256([pad_left(vec![V2Contracts::Exchange as u8], 20).try_into().unwrap(), V2_BTC].concat())[..20].to_vec()
-        }else if sha256(["Bridge".as_bytes(), &V1_ETH[..]].concat()).to_vec() == key[8..].to_vec() {
-            sha256([pad_left(vec![V2Contracts::Exchange as u8], 20).try_into().unwrap(), [0; 20].to_vec()].concat())[..20].to_vec()
+            sha256(
+                [
+                    pad_left(vec![V2Contracts::Exchange as u8], 20)
+                        .try_into()
+                        .unwrap(),
+                    V2_BTC,
+                ]
+                .concat(),
+            )[..20]
+                .to_vec()
+        } else if sha256(["Bridge".as_bytes(), &V1_ETH[..]].concat()).to_vec() == key[8..].to_vec()
+        {
+            sha256(
+                [
+                    pad_left(vec![V2Contracts::Exchange as u8], 20)
+                        .try_into()
+                        .unwrap(),
+                    [0; 20].to_vec(),
+                ]
+                .concat(),
+            )[..20]
+                .to_vec()
+        } else if sha256(b"EllipticoinELC".to_vec()).to_vec() == key[8..].to_vec()
+        {
+            sha256(
+                [
+                    pad_left(vec![V2Contracts::Exchange as u8], 20)
+                        .try_into()
+                        .unwrap(),
+                    [0; 20].to_vec(),
+                ]
+                .concat(),
+            )[..20]
+                .to_vec()
         } else {
             key[8..].to_vec()
         }
@@ -144,8 +198,37 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
 
 fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
     if sha256(["Bridge".as_bytes(), &V1_BTC[..]].concat()).to_vec() == key[..32].to_vec() {
-        // println!("{}", base64::encode(&key));
-        sha256([pad_left(vec![V2Contracts::Exchange as u8], 20).try_into().unwrap(), V2_BTC].concat())[..20].try_into().unwrap()
+        sha256(
+            [
+                pad_left(vec![V2Contracts::Exchange as u8], 20)
+                    .try_into()
+                    .unwrap(),
+                V2_BTC,
+            ]
+            .concat(),
+        )[..20]
+            .try_into()
+            .unwrap()
+    } else if sha256(["Bridge".as_bytes(), &V1_ETH[..]].concat()).to_vec() == key[..32].to_vec() {
+        sha256(
+            [
+                pad_left(vec![V2Contracts::Exchange as u8], 20),
+                pad_left(vec![0], 20)
+            ]
+            .concat(),
+        )[..20]
+            .try_into()
+            .unwrap()
+    } else if sha256(b"EllipticoinELC".to_vec()).to_vec() == key[..32].to_vec() {
+        sha256(
+            [
+                pad_left(vec![V2Contracts::Exchange as u8], 20),
+                pad_left(vec![1], 20)
+            ]
+            .concat(),
+        )[..20]
+            .try_into()
+            .unwrap()
     } else {
         key[..20].try_into().unwrap()
     }
@@ -155,7 +238,7 @@ fn v2_token(address: [u8; 20]) -> [u8; 20] {
     match address {
         V1_ETH => pad_left(vec![0u8], 20).try_into().unwrap(),
         V1_BTC => V2_BTC,
-        address => address
+        address => address,
     }
 }
 fn v2_db_key(key: V2Key) -> Vec<u8> {

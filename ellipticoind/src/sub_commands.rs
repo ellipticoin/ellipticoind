@@ -7,7 +7,7 @@ use crate::{
     models::{verification_key, Block, Transaction},
     schema::{blocks::dsl as blocks_dsl, transactions::dsl as transactions_dsl},
     start_up,
-    state::{get_state},
+    state::get_state,
 };
 use async_std::task::spawn;
 use ed25519_zebra::{SigningKey, VerificationKey};

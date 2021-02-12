@@ -872,6 +872,7 @@ name = "ellipticoin"
 version = "0.0.5"
 dependencies = [
  "ellipticoin_macros",
+ "hex 0.3.2",
  "lazy_static",
  "serde",
  "sha2 0.9.1",

@@ -23,5 +23,6 @@ lazy_static = "*"
 sha2 = "0.9.1"
 serde = { version = "*", features = ["derive"] }
 ellipticoin_macros = { path = "../ellipticoind_macros"}
+hex = "*"
 wasm-rpc = "0.2.15"
 wasm-rpc-macros = "0.2.15"
