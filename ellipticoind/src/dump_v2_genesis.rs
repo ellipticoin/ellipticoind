@@ -12,7 +12,6 @@ use std::{
     convert::{TryInto},
     fs::File,
 };
-use crate::system_contracts::token::constants::DAI;
 
 #[repr(u16)]
 pub enum V2Contracts {
@@ -43,17 +42,17 @@ pub async fn dump_v2_genesis() {
     let mut v2_genesis_state = HashMap::new();
     state
         .iter()
-        .map(|(key, value)| match key.clone() {
+        .filter_map(|(key, value)| match key.clone() {
             mut key
                 if key.starts_with(
                     &[&sha256("Token".as_bytes().to_vec()).to_vec(), &vec![0][..]].concat(),
                 ) =>
             {
                 key.drain(..33);
-                (
+                Some((
                     V2Key(V2Contracts::Token, 0, convert_address_token_key(key)),
                     value,
-                )
+                ))
             }
             mut key
                 if key.starts_with(
@@ -61,7 +60,7 @@ pub async fn dump_v2_genesis() {
                 ) =>
             {
                 key.drain(..33);
-                (V2Key(V2Contracts::Token, 1, convert_token_key(key)), value)
+                Some((V2Key(V2Contracts::Token, 1, convert_token_key(key)), value))
             }
             mut key
                 if key.starts_with(
@@ -73,10 +72,10 @@ pub async fn dump_v2_genesis() {
                 ) =>
             {
                 key.drain(..33);
-                (
+                Some((
                     V2Key(V2Contracts::Exchange, 0, convert_token_key(key)),
                     value,
-                )
+                ))
             }
             mut key
                 if key.starts_with(
@@ -88,13 +87,75 @@ pub async fn dump_v2_genesis() {
                 ) =>
             {
                 key.drain(..33);
-                println!("{:?} {:?}", hex::encode(&convert_token_key(key.clone())), serde_cbor::from_slice::<serde_cbor::Value>(value));
-                (
+                Some((
                     V2Key(V2Contracts::Exchange, 1, convert_token_key(key)),
                     value,
-                )
+                ))
             }
-            _ => (V2Key(V2Contracts::Token, 0, vec![]), value),
+            mut key
+                if key.starts_with(
+                    &[
+                        &sha256("Exchange".as_bytes().to_vec()).to_vec(),
+                        &vec![2][..],
+                    ]
+                    .concat(),
+                ) =>
+            {
+                key.drain(..33);
+                Some((
+                    V2Key(V2Contracts::Exchange, 1, convert_token_key(key)),
+                    value,
+                ))
+            }
+            mut key
+                if key.starts_with(
+                    &[
+                        &sha256("Ellipticoin".as_bytes().to_vec()).to_vec(),
+                        &vec![0][..],
+                    ]
+                    .concat(),
+                ) =>
+            {
+                key.drain(..33);
+                Some((
+                    V2Key(V2Contracts::System, 0, key),
+                    value,
+                ))
+            }
+            mut key
+                if key.starts_with(
+                    &[
+                        &sha256("Ellipticoin".as_bytes().to_vec()).to_vec(),
+                        &vec![1][..],
+                    ]
+                    .concat(),
+                ) =>
+            {
+                key.drain(..33);
+                Some((
+                    V2Key(V2Contracts::Ellipticoin, 0, key),
+                    value,
+                ))
+            }
+            key
+                if key.starts_with(
+                    &[
+                        &sha256("Ellipticoin".as_bytes().to_vec()).to_vec(),
+                        &vec![2][..],
+                    ]
+                    .concat(),
+                ) => None,
+            key
+                if key.starts_with(
+                    &[
+                        &sha256("Ellipticoin".as_bytes().to_vec()).to_vec(),
+                        &vec![3][..],
+                    ]
+                    .concat(),
+                ) => None,
+            _ => {
+                None
+            },
         })
         .for_each(|(key, value)| {
             v2_genesis_state.insert(v2_db_key(key), value);
@@ -155,7 +216,6 @@ fn convert_address_token_key(mut key: Vec<u8>) -> Vec<u8> {
 }
 
 fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
-    // println!("convert_token_key: {}", hex::encode(&key));
     if key == b"EllipticoinELC" {
         pad_left(vec![V2Contracts::Ellipticoin as u8], 20)
             .try_into()
@@ -174,17 +234,6 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
                 .to_vec()
         } else if sha256(["Bridge".as_bytes(), &V1_ETH[..]].concat()).to_vec() == key[8..].to_vec()
         {
-            // println!("v1 eth!");
-            // println!("{}", hex::encode(&sha256(
-            //     [
-            //         pad_left(vec![V2Contracts::Exchange as u8], 20)
-            //             .try_into()
-            //             .unwrap(),
-            //         V2_ETH.to_vec(),
-            //     ]
-            //     .concat(),
-            // )[..20]
-            //     .to_vec()));
             sha256(
                 [
                     pad_left(vec![V2Contracts::Exchange as u8], 20)
@@ -208,7 +257,6 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
             )[..20]
                 .to_vec()
         } else {
-            // println!("other: {}", hex::encode(&key[8..]));
             key[8..].to_vec()
         }
     } else if key.starts_with(b"Bridge") {
@@ -258,7 +306,6 @@ fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
             .try_into()
             .unwrap()
     } else {
-        // println!("oops");
         key[..20].try_into().unwrap()
     }
 }
