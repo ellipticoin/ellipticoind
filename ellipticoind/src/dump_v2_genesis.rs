@@ -12,6 +12,8 @@ use std::{
     convert::{TryInto},
     fs::File,
 };
+use ellipticoin::Address;
+use ellipticoin::Address::PublicKey;
 
 #[repr(u16)]
 pub enum V2Contracts {
@@ -51,7 +53,7 @@ pub async fn dump_v2_genesis() {
                 key.drain(..33);
                 Some((
                     V2Key(V2Contracts::Token, 0, convert_address_token_key(key)),
-                    value,
+                    value.clone(),
                 ))
             }
             mut key
@@ -60,7 +62,7 @@ pub async fn dump_v2_genesis() {
                 ) =>
             {
                 key.drain(..33);
-                Some((V2Key(V2Contracts::Token, 1, convert_token_key(key)), value))
+                Some((V2Key(V2Contracts::Token, 1, convert_token_key(key)), value.clone()))
             }
             mut key
                 if key.starts_with(
@@ -74,7 +76,7 @@ pub async fn dump_v2_genesis() {
                 key.drain(..33);
                 Some((
                     V2Key(V2Contracts::Exchange, 0, convert_token_key(key)),
-                    value,
+                    value.clone(),
                 ))
             }
             mut key
@@ -89,7 +91,7 @@ pub async fn dump_v2_genesis() {
                 key.drain(..33);
                 Some((
                     V2Key(V2Contracts::Exchange, 1, convert_token_key(key)),
-                    value,
+                    value.clone(),
                 ))
             }
             mut key
@@ -104,7 +106,7 @@ pub async fn dump_v2_genesis() {
                 key.drain(..33);
                 Some((
                     V2Key(V2Contracts::Exchange, 1, convert_token_key(key)),
-                    value,
+                    convert_liquidity_provider(value),
                 ))
             }
             mut key
@@ -119,7 +121,7 @@ pub async fn dump_v2_genesis() {
                 key.drain(..33);
                 Some((
                     V2Key(V2Contracts::System, 0, key),
-                    value,
+                    value.clone(),
                 ))
             }
             mut key
@@ -134,7 +136,7 @@ pub async fn dump_v2_genesis() {
                 key.drain(..33);
                 Some((
                     V2Key(V2Contracts::Ellipticoin, 0, key),
-                    value,
+                    value.clone(),
                 ))
             }
             key
@@ -308,6 +310,16 @@ fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
     } else {
         key[..20].try_into().unwrap()
     }
+}
+
+fn convert_liquidity_provider(v1_liquidity_provider: &[u8]) -> Vec<u8> {
+    println!("{}", hex::encode(v1_liquidity_provider));
+    let liquidity_providers: Vec<Address> = serde_cbor::from_slice(v1_liquidity_provider).unwrap();
+    serde_cbor::to_vec(&liquidity_providers.iter().map(|address| if let PublicKey(public_key) = address{
+    public_key[..20].try_into().unwrap()
+} else {
+    panic!("")
+}).collect::<Vec<[u8;20]>>()).unwrap()
 }
 
 fn v2_token(address: [u8; 20]) -> [u8; 20] {
