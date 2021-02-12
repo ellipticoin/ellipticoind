@@ -27,6 +27,8 @@ struct V2Key(V2Contracts, u16, Vec<u8>);
 const V1_ETH: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
 const V1_BTC: [u8; 20] = hex!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
 const V2_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
+const V2_ETH: [u8; 20] = hex!("0000000000000000000000000000000000000000");
+const V2_ELC: [u8; 20] = hex!("0000000000000000000000000000000000000001");
 
 pub async fn dump_v2_genesis() {
     let pg_db = get_pg_connection();
@@ -169,7 +171,7 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
                     pad_left(vec![V2Contracts::Exchange as u8], 20)
                         .try_into()
                         .unwrap(),
-                    [0; 20].to_vec(),
+                    V2_ETH.to_vec(),
                 ]
                 .concat(),
             )[..20]
@@ -181,7 +183,7 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
                     pad_left(vec![V2Contracts::Exchange as u8], 20)
                         .try_into()
                         .unwrap(),
-                    [0; 20].to_vec(),
+                    V2_ELC
                 ]
                 .concat(),
             )[..20]
@@ -213,7 +215,7 @@ fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
         sha256(
             [
                 pad_left(vec![V2Contracts::Exchange as u8], 20),
-                pad_left(vec![0], 20)
+                V2_ETH.to_vec(),
             ]
             .concat(),
         )[..20]
@@ -223,13 +225,14 @@ fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
         sha256(
             [
                 pad_left(vec![V2Contracts::Exchange as u8], 20),
-                pad_left(vec![1], 20)
+                V2_ELC.to_vec()
             ]
             .concat(),
         )[..20]
             .try_into()
             .unwrap()
     } else {
+        println!("oops");
         key[..20].try_into().unwrap()
     }
 }
