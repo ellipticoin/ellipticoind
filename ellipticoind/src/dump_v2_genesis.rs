@@ -166,6 +166,16 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
                 .to_vec()
         } else if sha256(["Bridge".as_bytes(), &V1_ETH[..]].concat()).to_vec() == key[8..].to_vec()
         {
+            println!("{}", hex::encode(&sha256(
+                [
+                    pad_left(vec![V2Contracts::Exchange as u8], 20)
+                        .try_into()
+                        .unwrap(),
+                    V2_ETH.to_vec(),
+                ]
+                .concat(),
+            )[..20]
+                .to_vec()));
             sha256(
                 [
                     pad_left(vec![V2Contracts::Exchange as u8], 20)
