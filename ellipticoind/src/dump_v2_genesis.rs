@@ -88,6 +88,7 @@ pub async fn dump_v2_genesis() {
                 ) =>
             {
                 key.drain(..33);
+                println!("{:?} {:?}", hex::encode(&convert_token_key(key.clone())), serde_cbor::from_slice::<serde_cbor::Value>(value));
                 (
                     V2Key(V2Contracts::Exchange, 1, convert_token_key(key)),
                     value,
@@ -138,7 +139,11 @@ fn convert_address_token_key(mut key: Vec<u8>) -> Vec<u8> {
                 .try_into()
                 .unwrap()
         } else {
-            address[..20].try_into().unwrap()
+            if address[..20] == V1_ETH {
+                V2_ETH
+            } else {
+                address[..20].try_into().unwrap()
+            }
         };
         (v2_token(token.try_into().unwrap()), address)
     } else {
@@ -148,6 +153,7 @@ fn convert_address_token_key(mut key: Vec<u8>) -> Vec<u8> {
 }
 
 fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
+    // println!("convert_token_key: {}", hex::encode(&key));
     if key == b"EllipticoinELC" {
         pad_left(vec![V2Contracts::Ellipticoin as u8], 20)
             .try_into()
@@ -166,16 +172,17 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
                 .to_vec()
         } else if sha256(["Bridge".as_bytes(), &V1_ETH[..]].concat()).to_vec() == key[8..].to_vec()
         {
-            println!("{}", hex::encode(&sha256(
-                [
-                    pad_left(vec![V2Contracts::Exchange as u8], 20)
-                        .try_into()
-                        .unwrap(),
-                    V2_ETH.to_vec(),
-                ]
-                .concat(),
-            )[..20]
-                .to_vec()));
+            // println!("v1 eth!");
+            // println!("{}", hex::encode(&sha256(
+            //     [
+            //         pad_left(vec![V2Contracts::Exchange as u8], 20)
+            //             .try_into()
+            //             .unwrap(),
+            //         V2_ETH.to_vec(),
+            //     ]
+            //     .concat(),
+            // )[..20]
+            //     .to_vec()));
             sha256(
                 [
                     pad_left(vec![V2Contracts::Exchange as u8], 20)
@@ -199,10 +206,15 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
             )[..20]
                 .to_vec()
         } else {
+            // println!("other: {}", hex::encode(&key[8..]));
             key[8..].to_vec()
         }
     } else if key.starts_with(b"Bridge") {
-        key[6..].to_vec()
+        if key[6..].to_vec() == V1_ETH {
+            V2_ETH.to_vec()
+        } else {
+            key[6..].to_vec()
+        }
     } else {
         panic!("failed to convert token key")
     }
@@ -242,7 +254,7 @@ fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
             .try_into()
             .unwrap()
     } else {
-        println!("oops");
+        // println!("oops");
         key[..20].try_into().unwrap()
     }
 }
