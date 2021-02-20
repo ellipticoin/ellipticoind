@@ -39,7 +39,7 @@ pub trait VerificationString {
 
 impl VerificationString for Action {
     fn verification_string(&self) -> Result<String> {
-        match &self {
+        let s = match &self {
             Action::CreatePool(amount, token, intial_price) => Ok(format!(
                 "Create a pool of {} {} at an initial price of ${} USD",
                 amount_to_string(*amount),
@@ -83,7 +83,9 @@ impl VerificationString for Action {
                 ))
             }
             _ => bail!("Unknown transaction type"),
-        }
+        };
+        println!("{}", s.as_ref().unwrap());
+        s
     }
 }
 
