@@ -10,7 +10,8 @@ lazy_static! {
         let mut decimals = HashMap::new();
         decimals.insert(BTC, 8);
         decimals.insert(ETH_ADDRESS, 18);
-        decimals.insert(USD, 18);
+        // decimals.insert(USD, 18);
+        decimals.insert(USD, 8);
         decimals
     };
     pub static ref WEB3_URL: String = env::var("WEB3_URL").expect("WEB3_URL not set");
@@ -25,5 +26,6 @@ pub const RECEIVED_ETH_TOPIC: [u8; 32] =
     hex!("4103257eaac983ca79a70d28f90dfc4fa16b619bb0c17ee7cab0d4034c279624");
 
 pub const TOKENS: [[u8; 20]; 3] = [BTC, ETH, USD];
-pub const BRIDGE_ADDRESS: [u8; 20] = hex!("E55faDE7825Ad88581507C51c9f1b33827AaE5E8");
+// pub const BRIDGE_ADDRESS: [u8; 20] = hex!("E55faDE7825Ad88581507C51c9f1b33827AaE5E8");
+pub const BRIDGE_ADDRESS: [u8; 20] = hex!("6f246D6B8C0cca9298C685D02dFDA3A666e6e067");
 pub const ETH_ADDRESS: [u8; 20] = hex!("0000000000000000000000000000000000000000");
