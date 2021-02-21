@@ -89,14 +89,9 @@ pub async fn dump_v2_genesis() {
                 ) =>
             {
                 key.drain(..33);
-                let value = if is_usd(key.clone()) {
-                    scale_usd_amount(value)
-                } else {
-                    value.to_vec()
-                };
                 Some((
                     V2Key(V2Contracts::Exchange, 0, convert_token_key(key)),
-                    value.clone(),
+                    scale_usd_amount(value)
                 ))
             }
             mut key
