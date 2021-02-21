@@ -14,6 +14,8 @@ use std::{
 };
 use ellipticoin::Address;
 use ellipticoin::Address::PublicKey;
+use num_bigint::BigInt;
+use num_traits::cast::ToPrimitive;
 
 #[repr(u16)]
 pub enum V2Contracts {
@@ -30,6 +32,9 @@ const V1_ETH: [u8; 20] = hex!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
 const V2_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
 const V2_ETH: [u8; 20] = hex!("0000000000000000000000000000000000000000");
 const V2_ELC: [u8; 20] = hex!("0000000000000000000000000000000000000001");
+const V1_USD: [u8; 20] = hex!("6b175474e89094c44da98b954eedeac495271d0f");
+const V2_USD: [u8; 20] = hex!("5d3a536e4d6dbd6114cc1ead35777bab948e3643");
+const USD_EXCHANGE_RATE: u128 = 211307959697339474693535328;
 
 pub async fn dump_v2_genesis() {
     let pg_db = get_pg_connection();
@@ -51,6 +56,11 @@ pub async fn dump_v2_genesis() {
                 ) =>
             {
                 key.drain(..33);
+                let value = if is_usd(key.clone()) {
+                    scale_usd_amount(value)
+                } else {
+                    value.to_vec()
+                };
                 Some((
                     V2Key(V2Contracts::Token, 0, convert_address_token_key(key)),
                     value.clone(),
@@ -62,6 +72,11 @@ pub async fn dump_v2_genesis() {
                 ) =>
             {
                 key.drain(..33);
+                let value = if is_usd(key.clone()) {
+                    scale_usd_amount(value)
+                } else {
+                    value.to_vec()
+                };
                 Some((V2Key(V2Contracts::Token, 1, convert_token_key(key)), value.clone()))
             }
             mut key
@@ -74,6 +89,11 @@ pub async fn dump_v2_genesis() {
                 ) =>
             {
                 key.drain(..33);
+                let value = if is_usd(key.clone()) {
+                    scale_usd_amount(value)
+                } else {
+                    value.to_vec()
+                };
                 Some((
                     V2Key(V2Contracts::Exchange, 0, convert_token_key(key)),
                     value.clone(),
@@ -104,7 +124,6 @@ pub async fn dump_v2_genesis() {
                 ) =>
             {
                 key.drain(..33);
-                println!("{}", base64::encode(&convert_liquidity_providers(value)));
                 Some((
                     V2Key(V2Contracts::Exchange, 2, convert_token_key(key)),
                     convert_liquidity_providers(value),
@@ -167,6 +186,21 @@ pub async fn dump_v2_genesis() {
     for (key, value) in v2_genesis_state.iter() {
         serde_cbor::to_writer(&file, &(key, value)).unwrap();
     }
+}
+
+fn is_usd(mut key: Vec<u8>) -> bool {
+   if key.starts_with(b"Bridge") {
+        key.drain(..6);
+        let (token, _address) = key.split_at(20);
+        return token == V1_USD
+    }
+    false
+}
+
+fn scale_usd_amount(value: &[u8]) ->  Vec<u8> {
+    let amount: u64 = serde_cbor::from_slice(value).unwrap();
+    let scaled_amount = (BigInt::from(amount)* BigInt::from(USD_EXCHANGE_RATE)/BigInt::from(10u128.pow(28))).to_u64();
+    serde_cbor::to_vec(&scaled_amount).unwrap()
 }
 
 fn convert_address_token_key(mut key: Vec<u8>) -> Vec<u8> {
@@ -247,6 +281,18 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
                 .concat(),
             )[..20]
                 .to_vec()
+        } else if sha256(["Bridge".as_bytes(), &V1_USD[..]].concat()).to_vec() == key[8..].to_vec()
+        {
+            sha256(
+                [
+                    pad_left(vec![V2Contracts::Exchange as u8], 20)
+                        .try_into()
+                        .unwrap(),
+                    V2_USD.to_vec(),
+                ]
+                .concat(),
+            )[..20]
+                .to_vec()
         } else if sha256(b"EllipticoinELC".to_vec()).to_vec() == key[8..].to_vec()
         {
             sha256(
@@ -314,7 +360,6 @@ fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
 }
 
 fn convert_liquidity_providers(v1_liquidity_providers: &[u8]) -> Vec<u8> {
-    // println!("{}", hex::encode(v1_liquidity_provider));
     let liquidity_providers: Vec<Address> = serde_cbor::from_slice(v1_liquidity_providers).unwrap();
     serde_cbor::to_vec(&liquidity_providers.iter().map(|address| if let PublicKey(public_key) = address{
     public_key[..20].try_into().unwrap()
@@ -327,6 +372,7 @@ fn v2_token(address: [u8; 20]) -> [u8; 20] {
     match address {
         V1_ETH => pad_left(vec![0u8], 20).try_into().unwrap(),
         V1_BTC => V2_BTC,
+        V1_USD => V2_USD,
         address => address,
     }
 }
