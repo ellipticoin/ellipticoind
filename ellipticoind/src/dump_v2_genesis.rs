@@ -89,6 +89,7 @@ pub async fn dump_v2_genesis() {
                 ) =>
             {
                 key.drain(..33);
+                println!("{:?}", serde_cbor::from_slice::<serde_cbor::Value>(&scale_usd_amount(value)).unwrap());
                 Some((
                     V2Key(V2Contracts::Exchange, 0, convert_token_key(key)),
                     scale_usd_amount(value)
