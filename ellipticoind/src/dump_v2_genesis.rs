@@ -235,13 +235,14 @@ fn convert_address_token_key(mut key: Vec<u8>) -> Vec<u8> {
                 .try_into()
                 .unwrap()
         } else {
-            if address[..20] == V1_ETH {
-                V2_ETH
-            } else if address[..20] == V2_BTC {
-                V2_BTC
-            } else {
-                address[..20].try_into().unwrap()
-            }
+            v2_token(address[..20].try_into().unwrap())
+            // if address[..20] == V1_ETH {
+            //     V2_ETH
+            // } else if address[..20] == V2_BTC {
+            //     V2_BTC
+            // } else {
+            //     address[..20].try_into().unwrap()
+            // }
         };
         (v2_token(token.try_into().unwrap()), address)
     } else {
