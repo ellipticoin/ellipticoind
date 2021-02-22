@@ -34,7 +34,7 @@ const V2_ETH: [u8; 20] = hex!("0000000000000000000000000000000000000000");
 const V2_ELC: [u8; 20] = hex!("0000000000000000000000000000000000000001");
 const V1_USD: [u8; 20] = hex!("6b175474e89094c44da98b954eedeac495271d0f");
 const V2_USD: [u8; 20] = hex!("5d3a536e4d6dbd6114cc1ead35777bab948e3643");
-const USD_EXCHANGE_RATE: u128 = 211307959697339474693535328;
+const USD_EXCHANGE_RATE: u128 = 221749876100104184409550242;
 
 pub async fn dump_v2_genesis() {
     let pg_db = get_pg_connection();
@@ -89,7 +89,6 @@ pub async fn dump_v2_genesis() {
                 ) =>
             {
                 key.drain(..33);
-                println!("{:?}", serde_cbor::from_slice::<serde_cbor::Value>(&scale_usd_amount(value)).unwrap());
                 Some((
                     V2Key(V2Contracts::Exchange, 0, convert_token_key(key)),
                     scale_usd_amount(value)
