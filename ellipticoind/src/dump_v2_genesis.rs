@@ -194,7 +194,10 @@ fn is_usd(mut key: Vec<u8>) -> bool {
 
 fn scale_usd_amount(value: &[u8]) ->  Vec<u8> {
     let amount: u64 = serde_cbor::from_slice(value).unwrap();
-    let scaled_amount = (BigInt::from(amount)/ BigInt::from(USD_EXCHANGE_RATE)/BigInt::from(10u128.pow(28))).to_u64();
+    println!("amount: {}", amount);
+    println!("USD_EXCHANGE_RATE: {}", USD_EXCHANGE_RATE);
+    let scaled_amount = ((BigInt::from(amount)* BigInt::from(10u128.pow(28))/USD_EXCHANGE_RATE)).to_u64().unwrap();
+    println!("scaled_amount: {}", scaled_amount);
     serde_cbor::to_vec(&scaled_amount).unwrap()
 }
 
