@@ -100,10 +100,6 @@ impl QueryRoot {
                 let pool_supply_of_base_token =
                     Exchange::get_pool_supply_of_base_token(&mut db, token.clone().into());
 
-                println!("total_supply:{}", total_supply);
-                println!("balance:{}", balance);
-                println!("pool_supply_of_token:{}", pool_supply_of_token);
-                println!("pool_supply_of_base_token:{}", pool_supply_of_base_token);
                 LiquidityToken {
                     token_address: token,
                     balance: U64(balance),
