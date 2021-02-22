@@ -33,8 +33,9 @@ const V2_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
 const V2_ETH: [u8; 20] = hex!("0000000000000000000000000000000000000000");
 const V2_ELC: [u8; 20] = hex!("0000000000000000000000000000000000000001");
 const V1_USD: [u8; 20] = hex!("6b175474e89094c44da98b954eedeac495271d0f");
-const V2_USD: [u8; 20] = hex!("6d7f0754ffeb405d23c51ce938289d4835be3b14");
-const USD_EXCHANGE_RATE: u128 = 221749876100104184409550242;
+const V2_USD: [u8; 20] = hex!("5d3a536e4d6dbd6114cc1ead35777bab948e3643");
+// const V2_USD: [u8; 20] = hex!("6d7f0754ffeb405d23c51ce938289d4835be3b14");
+const USD_EXCHANGE_RATE: u128 = 211367456115200165329965416;
 
 pub async fn dump_v2_genesis() {
     let pg_db = get_pg_connection();
