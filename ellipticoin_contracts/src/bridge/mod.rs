@@ -48,9 +48,6 @@ impl Bridge {
         amount: u64,
         token: Address,
     ) -> Result<()> {
-        println!("sender: {}", hex::encode(sender));
-        println!("token: {}", hex::encode(token));
-        println!("balance: {}", Token::get_balance(db, sender, token));
         charge!(db, sender, token, amount)?;
         let mut pending_redeem_requests = Self::get_pending_redeem_requests(db);
         pending_redeem_requests.push(RedeemRequest {

@@ -55,7 +55,6 @@ pub async fn run(signed_transaction: SignedTransaction) -> Result<()> {
     let mut state = IN_MEMORY_STATE.lock().await;
     let mut db = MemoryDB::new(&mut state);
     let result = signed_transaction.run(&mut db).await;
-    println!("{:?}", result);
     if matches!(signed_transaction.0.action, Action::CreateRedeemRequest(_, _)) && result.is_ok() {
         sign_last_redeem_request(&mut db).await.unwrap();
     }
