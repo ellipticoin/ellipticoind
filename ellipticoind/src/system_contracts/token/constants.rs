@@ -12,12 +12,12 @@ lazy_static! {
             .into()
     );
     pub static ref BTC: Token = bridge::token(
-        hex::decode("eb4c2781e4eba804ce9a9803c67d0893436bb27d")
+        hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
             .unwrap()
             .into()
     );
     pub static ref ETH: Token = bridge::token(
-        hex::decode("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
+        hex::decode("eb4c2781e4eba804ce9a9803c67d0893436bb27d")
             .unwrap()
             .into()
     );
