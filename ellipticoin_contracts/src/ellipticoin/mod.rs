@@ -89,6 +89,7 @@ impl Ellipticoin {
 
     pub fn harvest<D: DB>(db: &mut D, sender: [u8; 20]) -> Result<()> {
         let issuance_rewards = Self::get_issuance_rewards(db, sender);
+        println!("harvesting: {}", issuance_rewards);
         Self::debit_issuance_rewards(db, sender, issuance_rewards);
         pay!(db, sender, Self::address(), issuance_rewards)?;
         Ok(())
