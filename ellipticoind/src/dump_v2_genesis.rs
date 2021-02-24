@@ -62,7 +62,6 @@ pub async fn dump_v2_genesis() {
                 } else {
                     value.to_vec()
                 };
-                // println!("{}", serde_cbor::from_slice::<u64>(&value).unwrap());
                 Some((
                     V2Key(V2Contracts::Token, 0, convert_address_token_key(key)),
                     value.clone(),
@@ -152,7 +151,7 @@ pub async fn dump_v2_genesis() {
             {
                 key.drain(..33);
                 Some((
-                    V2Key(V2Contracts::Ellipticoin, 0, key),
+                    V2Key(V2Contracts::Ellipticoin, 0, key[0..20].to_vec()),
                     value.clone(),
                 ))
             }
@@ -196,10 +195,7 @@ fn is_usd(mut key: Vec<u8>) -> bool {
 
 fn scale_usd_amount(value: &[u8]) ->  Vec<u8> {
     let amount: u64 = serde_cbor::from_slice(value).unwrap();
-    // println!("amount: {}", amount);
-    // println!("USD_EXCHANGE_RATE: {}", USD_EXCHANGE_RATE);
     let scaled_amount = ((BigInt::from(amount)* BigInt::from(10u128.pow(28))/USD_EXCHANGE_RATE)).to_u64().unwrap();
-    // println!("scaled_amount: {}", scaled_amount);
     serde_cbor::to_vec(&scaled_amount).unwrap()
 }
 
@@ -239,7 +235,6 @@ fn convert_address_token_key(mut key: Vec<u8>) -> Vec<u8> {
         } else {
             address[..20].try_into().unwrap()
         };
-        // println!("v2 token {:?}", hex::encode(&v2_token(token.try_into().unwrap())));
         (v2_token(token.try_into().unwrap()), address)
     } else {
         panic!("unknown key")
@@ -317,7 +312,6 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
 }
 
 fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
-    println!("lt");
     if sha256(["Bridge".as_bytes(), &V1_BTC[..]].concat()).to_vec() == key[..32].to_vec() {
         sha256(
             [
@@ -341,7 +335,6 @@ fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
             .try_into()
             .unwrap()
     } else if sha256(b"EllipticoinELC".to_vec()).to_vec() == key[..32].to_vec() {
-        println!("v2 elc");
         sha256(
             [
                 pad_left(vec![V2Contracts::Exchange as u8], 20),
