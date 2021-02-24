@@ -27,8 +27,8 @@ pub enum V2Contracts {
 }
 struct V2Key(V2Contracts, u16, Vec<u8>);
 
-const V1_BTC: [u8; 20] = hex!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
-const V1_ETH: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
+const V1_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
+const V1_ETH: [u8; 20] = hex!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
 const V2_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
 const V2_ETH: [u8; 20] = hex!("0000000000000000000000000000000000000000");
 const V2_ELC: [u8; 20] = hex!("0000000000000000000000000000000000000001");
