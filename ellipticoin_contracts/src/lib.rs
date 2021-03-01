@@ -13,7 +13,7 @@ pub mod constants;
 mod contract;
 mod crypto;
 mod ellipticoin;
-mod exchange;
+mod amm;
 pub mod hash_onion;
 mod helpers;
 mod system;
@@ -23,7 +23,7 @@ mod types;
 
 pub use bridge::Bridge;
 pub use ellipticoin::{Ellipticoin, Miner};
-pub use exchange::Exchange;
+pub use amm::AMM;
 pub use hash_onion::*;
 pub use system::System;
 pub use token::Token;

@@ -4,7 +4,7 @@ use crate::{
     constants::TOKENS,
     contract::{self, Contract},
     crypto::ed25519_verify,
-    Ellipticoin, Exchange,
+    Ellipticoin, AMM,
 };
 use anyhow::{bail, Result};
 use ellipticoin_macros::db_accessors;
@@ -37,7 +37,7 @@ impl Token {
             TOKENS.to_vec(),
             TOKENS
                 .iter()
-                .map(|token| Exchange::liquidity_token(*token))
+                .map(|token| AMM::liquidity_token(*token))
                 .collect::<Vec<Address>>(),
         ]
         .concat()
@@ -54,10 +54,10 @@ impl Token {
         }
         for token in TOKENS.iter() {
             let legacy_address: [u8; 20] = legacy_address[..20].try_into().unwrap();
-            if Exchange::get_liquidity_providers(db, *token).contains(&legacy_address) {
-                let mut liquidity_providers = Exchange::get_liquidity_providers(db, *token);
+            if AMM::get_liquidity_providers(db, *token).contains(&legacy_address) {
+                let mut liquidity_providers = AMM::get_liquidity_providers(db, *token);
                 liquidity_providers.insert(sender);
-                Exchange::set_liquidity_providers(db, *token, liquidity_providers);
+                AMM::set_liquidity_providers(db, *token, liquidity_providers);
             }
         }
 

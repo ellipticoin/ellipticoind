@@ -27,7 +27,7 @@ pub trait Contract {
 pub enum Name {
     Bridge,
     Ellipticoin,
-    Exchange,
+    AMM,
     System,
     Token,
 }
