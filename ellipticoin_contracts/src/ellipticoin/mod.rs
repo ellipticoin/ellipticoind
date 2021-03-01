@@ -4,7 +4,7 @@ use crate::{
     constants::{INCENTIVISED_POOLS, MINER_ALLOW_LIST},
     contract::{self, Contract},
     crypto::sha256,
-    pay, Exchange, System, Token,
+    pay, AMM, System, Token,
 };
 use anyhow::{anyhow, bail, Result};
 use ellipticoin_macros::db_accessors;
@@ -101,14 +101,14 @@ impl Ellipticoin {
         Self::mint(db, block_reward);
         let reward_per_pool = block_reward / INCENTIVISED_POOLS.len() as u64;
         for token in INCENTIVISED_POOLS.iter() {
-            let liquidity_providers = Exchange::get_liquidity_providers(db, token.clone());
+            let liquidity_providers = AMM::get_liquidity_providers(db, token.clone());
             let (addresses, balances): (Vec<_>, Vec<_>) = liquidity_providers
                 .iter()
                 .cloned()
                 .map(|address| {
                     (
                         address,
-                        Token::get_balance(db, address, Exchange::liquidity_token(*token)),
+                        Token::get_balance(db, address, AMM::liquidity_token(*token)),
                     )
                 })
                 .collect::<Vec<(Address, u64)>>()

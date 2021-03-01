@@ -1,4 +1,4 @@
-use crate::{Bridge, Ellipticoin, Exchange, System, Token};
+use crate::{Bridge, Ellipticoin, AMM, System, Token};
 use anyhow::{bail, Result};
 use ellipticoin_types::{Address, DB};
 use serde::{Deserialize, Serialize};
@@ -59,16 +59,16 @@ impl Run for Action {
                 Token::transfer(db, sender, *amount, *token, *recipient)
             }
             Action::CreatePool(amount, token, starting_price) => {
-                Exchange::create_pool(db, sender, *amount, *token, *starting_price)
+                AMM::create_pool(db, sender, *amount, *token, *starting_price)
             }
             Action::AddLiquidity(amount, token) => {
-                Exchange::add_liquidity(db, sender, *amount, *token)
+                AMM::add_liquidity(db, sender, *amount, *token)
             }
             Action::RemoveLiquidity(percentage, token) => {
-                Exchange::remove_liquidity(db, sender, *percentage, *token)
+                AMM::remove_liquidity(db, sender, *percentage, *token)
             }
             Action::Trade(input_amount, input_token, minimum_output_token_amount, output_token) => {
-                Exchange::trade(
+                AMM::trade(
                     db,
                     sender,
                     *input_amount,
