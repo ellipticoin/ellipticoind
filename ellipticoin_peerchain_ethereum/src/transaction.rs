@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, Result};
 use core::array::TryFromSliceError;
 use ellipticoin_contracts::{
-    constants::{BASE_FACTOR, BTC, ELC, ETH, USD},
+    constants::{BASE_FACTOR, BTC, MS, ETH, USD},
     Action, Transaction,
 };
 use ellipticoin_types::{Address, ADDRESS_LENGTH, DB};
@@ -112,7 +112,7 @@ fn amount_to_string(n: u64) -> String {
 pub fn address_to_string(address: Address) -> String {
     match address {
         BTC => return "BTC".to_string(),
-        ELC => return "ELC".to_string(),
+        MS => return "MS".to_string(),
         ETH => return "ETH".to_string(),
         USD => return "USD".to_string(),
         _ => (),

@@ -120,7 +120,13 @@ impl Token {
         if amount <= balance {
             Ok(Self::set_balance(db, address, token, balance - amount))
         } else {
-            bail!("{} has insufficient balance of {} have {} need {}", hex::encode(address), hex::encode(token), balance, amount)
+            bail!(
+                "{} has insufficient balance of {} have {} need {}",
+                hex::encode(address),
+                hex::encode(token),
+                balance,
+                amount
+            )
         }
     }
 }

@@ -23,11 +23,13 @@ pub trait Contract {
             .unwrap()
     }
 }
+
 #[repr(u16)]
 pub enum Name {
+    AMM,
     Bridge,
     Ellipticoin,
-    AMM,
+    Governance,
     OrderBook,
     System,
     Token,

@@ -1,4 +1,4 @@
-use crate::{Bridge, Ellipticoin, AMM, System, Token};
+use crate::{Bridge, Ellipticoin, System, Token, AMM};
 use anyhow::{bail, Result};
 use ellipticoin_types::{Address, DB};
 use serde::{Deserialize, Serialize};
@@ -21,7 +21,7 @@ pub trait Run {
     fn run<D: DB>(&self, db: &mut D, address: Address) -> Result<()>;
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Action {
     StartMining(String, [u8; 32]),
     Seal([u8; 32]),
@@ -61,9 +61,7 @@ impl Run for Action {
             Action::CreatePool(amount, token, starting_price) => {
                 AMM::create_pool(db, sender, *amount, *token, *starting_price)
             }
-            Action::AddLiquidity(amount, token) => {
-                AMM::add_liquidity(db, sender, *amount, *token)
-            }
+            Action::AddLiquidity(amount, token) => AMM::add_liquidity(db, sender, *amount, *token),
             Action::RemoveLiquidity(percentage, token) => {
                 AMM::remove_liquidity(db, sender, *percentage, *token)
             }

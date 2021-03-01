@@ -4,7 +4,7 @@ use crate::{
     constants::{INCENTIVISED_POOLS, MINER_ALLOW_LIST},
     contract::{self, Contract},
     crypto::sha256,
-    pay, AMM, System, Token,
+    pay, System, Token, AMM,
 };
 use anyhow::{anyhow, bail, Result};
 use ellipticoin_macros::db_accessors;

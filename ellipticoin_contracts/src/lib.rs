@@ -8,15 +8,16 @@ extern crate hex_literal;
 #[cfg(test)]
 extern crate ellipticoin_test_framework;
 
+mod amm;
 pub mod bridge;
 pub mod constants;
 mod contract;
 mod crypto;
 mod ellipticoin;
-mod amm;
-mod order_book;
+mod governance;
 pub mod hash_onion;
 mod helpers;
+mod order_book;
 mod system;
 mod token;
 mod transaction;
@@ -25,6 +26,7 @@ mod types;
 pub use amm::AMM;
 pub use bridge::Bridge;
 pub use ellipticoin::{Ellipticoin, Miner};
+pub use governance::Governance;
 pub use hash_onion::*;
 pub use order_book::OrderBook;
 pub use system::System;

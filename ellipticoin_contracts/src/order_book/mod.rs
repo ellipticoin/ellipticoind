@@ -1,10 +1,10 @@
 use crate::{
     charge,
+    constants::USD,
     contract::{self, Contract},
     pay,
     token::Token,
 };
-use crate::constants::USD;
 use anyhow::{anyhow, bail, Result};
 use ellipticoin_macros::db_accessors;
 use ellipticoin_types::{Address, DB};
@@ -54,7 +54,7 @@ impl OrderBook {
             price,
         };
         match order.order_type {
-            OrderType::Sell =>  {
+            OrderType::Sell => {
                 charge!(db, sender, token, amount)?;
             }
         }
@@ -64,11 +64,7 @@ impl OrderBook {
         Ok(())
     }
 
-    pub fn cancel<D: DB>(
-        db: &mut D,
-        sender: Address,
-        order_id: u64,
-    ) -> Result<()> {
+    pub fn cancel<D: DB>(db: &mut D, sender: Address, order_id: u64) -> Result<()> {
         let mut orders = Self::get_orders(db);
         let index = orders
             .iter()
@@ -83,12 +79,8 @@ impl OrderBook {
         Ok(())
     }
 
-    pub fn fill<D: DB>(
-        db: &mut D,
-        sender: Address,
-        order_id: u64,
-    ) -> Result<()>{
-        let mut orders = Self::get_orders(db);
+    pub fn fill<D: DB>(db: &mut D, sender: Address, order_id: u64) -> Result<()> {
+        let orders = Self::get_orders(db);
         let index = orders
             .iter()
             .cloned()
@@ -96,7 +88,7 @@ impl OrderBook {
             .ok_or(anyhow!("Order {} not found", order_id))?;
         let order = orders[index].clone();
         match order.order_type {
-            OrderType::Sell =>  { 
+            OrderType::Sell => {
                 Token::transfer(db, sender, order.amount, USD, order.sender)?;
                 pay!(db, sender, order.token, order.amount)?;
             }
@@ -111,15 +103,15 @@ impl OrderBook {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::{OrderBook, Order, OrderType};
-    use std::convert::TryInto;
-    use crate::order_book::USD;
-    use crate::{constants::BASE_FACTOR, Token};
+    use super::{Order, OrderBook, OrderType};
+    use crate::{order_book::USD, Token};
     use ellipticoin_test_framework::{
-        constants::{actors::{ALICE, BOB}, tokens::APPLES},
+        constants::{
+            actors::{ALICE, BOB},
+            tokens::APPLES,
+        },
         test_db::TestDB,
     };
 
@@ -128,7 +120,17 @@ mod tests {
         let mut db = TestDB::new();
         Token::set_balance(&mut db, ALICE, APPLES, 1);
         OrderBook::create_order(&mut db, ALICE, OrderType::Sell, 1, APPLES, 1).unwrap();
-        assert_eq!(OrderBook::get_orders(&mut db)[0], Order{id: 0, order_type: OrderType::Sell, token: APPLES, amount: 1, sender: ALICE, price: 1});
+        assert_eq!(
+            OrderBook::get_orders(&mut db)[0],
+            Order {
+                id: 0,
+                order_type: OrderType::Sell,
+                token: APPLES,
+                amount: 1,
+                sender: ALICE,
+                price: 1
+            }
+        );
     }
 
     #[test]
