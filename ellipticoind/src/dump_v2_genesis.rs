@@ -19,9 +19,11 @@ use num_traits::cast::ToPrimitive;
 
 #[repr(u16)]
 pub enum V2Contracts {
+    AMM,
     Bridge,
     Ellipticoin,
-    Exchange,
+    Governance,
+    OrderBook,
     System,
     Token,
 }
@@ -91,7 +93,7 @@ pub async fn dump_v2_genesis() {
             {
                 key.drain(..33);
                 Some((
-                    V2Key(V2Contracts::Exchange, 0, convert_token_key(key)),
+                    V2Key(V2Contracts::AMM, 0, convert_token_key(key)),
                     scale_usd_amount(value)
                 ))
             }
@@ -106,7 +108,7 @@ pub async fn dump_v2_genesis() {
             {
                 key.drain(..33);
                 Some((
-                    V2Key(V2Contracts::Exchange, 1, convert_token_key(key)),
+                    V2Key(V2Contracts::AMM, 1, convert_token_key(key)),
                     value.clone(),
                 ))
             }
@@ -121,7 +123,7 @@ pub async fn dump_v2_genesis() {
             {
                 key.drain(..33);
                 Some((
-                    V2Key(V2Contracts::Exchange, 2, convert_token_key(key)),
+                    V2Key(V2Contracts::AMM, 2, convert_token_key(key)),
                     convert_liquidity_providers(value),
                 ))
             }
@@ -207,7 +209,7 @@ fn convert_address_token_key(mut key: Vec<u8>) -> Vec<u8> {
                 .try_into()
                 .unwrap()
         } else if key == b"Exchange" {
-            pad_left(vec![V2Contracts::Exchange as u8], 20)
+            pad_left(vec![V2Contracts::AMM as u8], 20)
                 .try_into()
                 .unwrap()
         } else {
@@ -229,7 +231,7 @@ fn convert_address_token_key(mut key: Vec<u8>) -> Vec<u8> {
         key.drain(..6);
         let (token, address) = key.split_at(20);
         let address = if address == b"Exchange" {
-            pad_left(vec![V2Contracts::Exchange as u8], 20)
+            pad_left(vec![V2Contracts::AMM as u8], 20)
                 .try_into()
                 .unwrap()
         } else {
@@ -251,7 +253,7 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
         if sha256(["Bridge".as_bytes(), &V1_BTC[..]].concat()).to_vec() == key[8..].to_vec() {
             sha256(
                 [
-                    pad_left(vec![V2Contracts::Exchange as u8], 20)
+                    pad_left(vec![V2Contracts::AMM as u8], 20)
                         .try_into()
                         .unwrap(),
                     V2_BTC,
@@ -263,7 +265,7 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
         {
             sha256(
                 [
-                    pad_left(vec![V2Contracts::Exchange as u8], 20)
+                    pad_left(vec![V2Contracts::AMM as u8], 20)
                         .try_into()
                         .unwrap(),
                     V2_ETH.to_vec(),
@@ -275,7 +277,7 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
         {
             sha256(
                 [
-                    pad_left(vec![V2Contracts::Exchange as u8], 20)
+                    pad_left(vec![V2Contracts::AMM as u8], 20)
                         .try_into()
                         .unwrap(),
                     V2_USD.to_vec(),
@@ -287,7 +289,7 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
         {
             sha256(
                 [
-                    pad_left(vec![V2Contracts::Exchange as u8], 20)
+                    pad_left(vec![V2Contracts::AMM as u8], 20)
                         .try_into()
                         .unwrap(),
                     V2_ELC
@@ -315,7 +317,7 @@ fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
     if sha256(["Bridge".as_bytes(), &V1_BTC[..]].concat()).to_vec() == key[..32].to_vec() {
         sha256(
             [
-                pad_left(vec![V2Contracts::Exchange as u8], 20)
+                pad_left(vec![V2Contracts::AMM as u8], 20)
                     .try_into()
                     .unwrap(),
                 V2_BTC,
@@ -327,7 +329,7 @@ fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
     } else if sha256(["Bridge".as_bytes(), &V1_ETH[..]].concat()).to_vec() == key[..32].to_vec() {
         sha256(
             [
-                pad_left(vec![V2Contracts::Exchange as u8], 20),
+                pad_left(vec![V2Contracts::AMM as u8], 20),
                 V2_ETH.to_vec(),
             ]
             .concat(),
@@ -337,7 +339,7 @@ fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
     } else if sha256(b"EllipticoinELC".to_vec()).to_vec() == key[..32].to_vec() {
         sha256(
             [
-                pad_left(vec![V2Contracts::Exchange as u8], 20),
+                pad_left(vec![V2Contracts::AMM as u8], 20),
                 V2_ELC.to_vec()
             ]
             .concat(),
