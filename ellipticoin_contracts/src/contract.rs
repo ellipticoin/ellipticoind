@@ -28,6 +28,7 @@ pub enum Name {
     Bridge,
     Ellipticoin,
     AMM,
+    OrderBook,
     System,
     Token,
 }
