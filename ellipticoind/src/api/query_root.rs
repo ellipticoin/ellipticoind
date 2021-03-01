@@ -10,7 +10,7 @@ use anyhow::anyhow;
 use ellipticoin_contracts::{
     bridge,
     constants::{BASE_FACTOR, USD},
-    Bridge, Ellipticoin, Exchange, System,
+    Bridge, Ellipticoin, AMM, System,
 };
 use ellipticoin_peerchain_ethereum::constants::BRIDGE_ADDRESS;
 use juniper::FieldError;
@@ -50,12 +50,12 @@ impl QueryRoot {
                 let price = if token.0 == USD {
                     BASE_FACTOR
                 } else {
-                    let token_supply = ellipticoin_contracts::Exchange::get_pool_supply_of_token(
+                    let token_supply = ellipticoin_contracts::AMM::get_pool_supply_of_token(
                         &mut db,
                         token.clone().into(),
                     );
                     let base_token_supply =
-                        ellipticoin_contracts::Exchange::get_pool_supply_of_base_token(
+                        ellipticoin_contracts::AMM::get_pool_supply_of_base_token(
                             &mut db,
                             token.clone().into(),
                         );
@@ -87,7 +87,7 @@ impl QueryRoot {
             .iter()
             .cloned()
             .map(|token| {
-                let liquidity_token = Exchange::liquidity_token(token.clone().into());
+                let liquidity_token = AMM::liquidity_token(token.clone().into());
                 let balance = ellipticoin_contracts::Token::get_balance(
                     &mut db,
                     address.clone().into(),
@@ -96,9 +96,9 @@ impl QueryRoot {
                 let total_supply =
                     ellipticoin_contracts::Token::get_total_supply(&mut db, liquidity_token);
                 let pool_supply_of_token =
-                    Exchange::get_pool_supply_of_token(&mut db, token.clone().into());
+                    AMM::get_pool_supply_of_token(&mut db, token.clone().into());
                 let pool_supply_of_base_token =
-                    Exchange::get_pool_supply_of_base_token(&mut db, token.clone().into());
+                    AMM::get_pool_supply_of_base_token(&mut db, token.clone().into());
 
                 LiquidityToken {
                     token_address: token,
