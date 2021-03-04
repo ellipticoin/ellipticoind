@@ -141,8 +141,10 @@ pub async fn get_current_block() -> Result<u64, surf::Error> {
                 .clone(),
         )
         .unwrap();
-        if !(res_hex == "0x0") { break; }
-    };
+        if !(res_hex == "0x0") {
+            break;
+        }
+    }
     Ok(
         BigInt::parse_bytes(res_hex.trim_start_matches("0x").as_bytes(), 16)
             .unwrap()
@@ -170,13 +172,14 @@ async fn get_logs(
             }
         ))
         .await?;
-    let body_json = res.body_json::<HashMap<String, serde_json::Value>>()
-            .await?;
+    let body_json = res
+        .body_json::<HashMap<String, serde_json::Value>>()
+        .await?;
     Ok(serde_json::from_value(
-            body_json
+        body_json
             .get("result")
             .expect(&format!("{:?}", body_json))
-            .clone()
+            .clone(),
     )
     .unwrap())
 }

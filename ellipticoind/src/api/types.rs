@@ -77,6 +77,68 @@ impl LiquidityToken {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct Proposal {
+    pub id: U64,
+    pub proposer: Address,
+    pub title: String,
+    pub subtitle: String,
+    pub content: String,
+    pub actions: Vec<Bytes>,
+    pub votes: Vec<Vote>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Vote {
+    pub yes: bool,
+    pub address: Address,
+    pub balance: U64,
+}
+
+#[juniper::graphql_object]
+impl Vote {
+    fn yes(&self) -> bool {
+        self.yes
+    }
+
+    fn address(&self) -> Address {
+        self.address.clone()
+    }
+
+    fn balance(&self) -> U64 {
+        self.balance.clone()
+    }
+}
+#[juniper::graphql_object]
+impl Proposal {
+    fn id(&self) -> U64 {
+        self.id.clone()
+    }
+
+    fn token_address(&self) -> Address {
+        self.proposer.clone()
+    }
+
+    fn title(&self) -> String {
+        self.title.clone()
+    }
+
+    fn subtitle(&self) -> String {
+        self.subtitle.clone()
+    }
+
+    fn content(&self) -> String {
+        self.content.clone()
+    }
+
+    fn actions(&self) -> Vec<Bytes> {
+        self.actions.clone()
+    }
+
+    fn votes(&self) -> Vec<Vote> {
+        self.votes.clone()
+    }
+}
 pub struct RedeemRequest {
     pub id: U64,
     pub sender: Address,
@@ -272,7 +334,7 @@ impl From<Vec<u8>> for Bytes {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Address(pub [u8; 20]);
 
 impl From<Address> for [u8; 20] {

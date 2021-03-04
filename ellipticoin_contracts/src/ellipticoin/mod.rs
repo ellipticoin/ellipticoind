@@ -52,7 +52,6 @@ impl Ellipticoin {
 
     pub fn seal<D: DB>(db: &mut D, sender: [u8; 20], hash_onion_skin: [u8; 32]) -> Result<()> {
         let mut miners = Self::get_miners(db);
-
         if sender
             != miners
                 .first()
@@ -65,7 +64,8 @@ impl Ellipticoin {
                 hex::encode(sender)
             )
         };
-        if !miners
+        if !
+miners
             .first()
             .unwrap()
             .hash_onion_skin
@@ -89,7 +89,6 @@ impl Ellipticoin {
 
     pub fn harvest<D: DB>(db: &mut D, sender: [u8; 20]) -> Result<()> {
         let issuance_rewards = Self::get_issuance_rewards(db, sender);
-        println!("harvesting: {}", issuance_rewards);
         Self::debit_issuance_rewards(db, sender, issuance_rewards);
         pay!(db, sender, Self::address(), issuance_rewards)?;
         Ok(())

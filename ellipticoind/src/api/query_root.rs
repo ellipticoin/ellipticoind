@@ -9,8 +9,8 @@ use crate::{
 use anyhow::anyhow;
 use ellipticoin_contracts::{
     bridge,
-    constants::{BASE_FACTOR, USD},
-    Bridge, Ellipticoin, AMM, System,
+    constants::{BASE_FACTOR, MS, USD},
+    governance, Bridge, Ellipticoin, Governance, System, AMM,
 };
 use ellipticoin_peerchain_ethereum::constants::BRIDGE_ADDRESS;
 use juniper::FieldError;
@@ -111,23 +111,45 @@ impl QueryRoot {
             .collect())
     }
 
-    // async fn block(_context: &Context, block_number: U32) -> Option<Block> {
-    //     let con = get_pg_connection();
-    //     blocks::dsl::blocks
-    //         .filter(number.eq(block_number.0 as i32))
-    //         .first::<models::Block>(&con)
-    //         .optional()
-    //         .ok()
-    //         .flatten()
-    //         .map(|block| {
-    //             let transactions = (models::Transaction::belonging_to(&block)
-    //                 .order(transactions::dsl::position.asc())
-    //                 .load::<models::Transaction>(&con))
-    //             .unwrap_or(vec![]);
-    //             Block::from((block, transactions))
-    //         })
-    // }
-    //
+    async fn proposals(_context: &Context) -> Vec<Proposal> {
+        let mut state = IN_MEMORY_STATE.lock().await;
+        let mut db = MemoryDB::new(&mut state);
+        let proposals = Governance::get_proposals(&mut db);
+        proposals
+            .iter()
+            .cloned()
+            .map(|proposal: governance::Proposal| Proposal {
+                id: U64(proposal.id),
+                proposer: Address(proposal.proposer),
+                title: proposal.title,
+                subtitle: proposal.subtitle,
+                content: proposal.content,
+                actions: proposal
+                    .actions
+                    .iter()
+                    .cloned()
+                    .map(|action| serde_cbor::to_vec(&action).unwrap().into())
+                    .collect(),
+                votes: proposal
+                    .votes
+                    .iter()
+                    .map(|(address, vote)| {
+                        let balance = ellipticoin_contracts::Token::get_balance(
+                            &mut db,
+                            address.clone().into(),
+                            MS,
+                        );
+                        Vote {
+                            address: (*address).into(),
+                            yes: matches!(vote, ellipticoin_contracts::governance::Vote::For),
+                            balance: U64(balance),
+                        }
+                    })
+                    .collect(),
+            })
+            .collect()
+    }
+
     async fn block_number(_context: &Context) -> Option<U64> {
         let mut state = IN_MEMORY_STATE.lock().await;
         let mut db = MemoryDB::new(&mut state);
