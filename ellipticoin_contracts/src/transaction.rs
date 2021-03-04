@@ -1,4 +1,5 @@
-use crate::{Bridge, Ellipticoin, System, Token, AMM};
+use crate::governance::Vote;
+use crate::{Bridge, Ellipticoin, Governance, System, Token, AMM};
 use anyhow::{bail, Result};
 use ellipticoin_types::{Address, DB};
 use serde::{Deserialize, Serialize};
@@ -23,23 +24,35 @@ pub trait Run {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Action {
+    CreateProposal(String, String, String, Vec<Action>),
     StartMining(String, [u8; 32]),
     Seal([u8; 32]),
     CreateRedeemRequest(u64, Address),
     SignRedeemRequest(u64, u64, Vec<u8>),
     Migrate([u8; 32], Vec<u8>),
-    Transfer(u64, Address, Address),
+    Pay(u64, Address, Address),
     CreatePool(u64, Address, u64),
     AddLiquidity(u64, Address),
     RemoveLiquidity(u64, Address),
     Trade(u64, Address, u64, Address),
     Harvest(),
     Redeem(u64, Address),
+    Vote(u64, Vote),
 }
 impl Run for Action {
     fn run<D: DB>(&self, db: &mut D, sender: Address) -> Result<()> {
         System::increment_transaction_number(db, sender);
         let result = match &self {
+            Action::CreateProposal(title, subtitle, content, actions) => {
+                Governance::create_proposal(
+                    db,
+                    sender,
+                    title.to_string(),
+                    subtitle.to_string(),
+                    content.to_string(),
+                    actions.to_vec(),
+                )
+            }
             Action::StartMining(host, onion_skin) => {
                 Ellipticoin::start_mining(db, sender, host.to_string(), *onion_skin)
             }
@@ -55,7 +68,7 @@ impl Run for Action {
             Action::Migrate(legacy_address, legacy_signature) => {
                 Token::migrate(db, sender, *legacy_address, legacy_signature.to_vec())
             }
-            Action::Transfer(amount, token, recipient) => {
+            Action::Pay(amount, token, recipient) => {
                 Token::transfer(db, sender, *amount, *token, *recipient)
             }
             Action::CreatePool(amount, token, starting_price) => {
@@ -76,6 +89,9 @@ impl Run for Action {
                 )
             }
             Action::Harvest() => Ellipticoin::harvest(db, sender),
+            Action::Vote(proposal_id, vote) => {
+                Governance::vote(db, sender, *proposal_id, vote.clone())
+            }
             Action::CreateRedeemRequest(amount, token) => {
                 Bridge::create_redeem_request(db, sender, *amount, *token)
             }
@@ -109,7 +125,7 @@ mod tests {
         let transfer_transaction = Transaction {
             network_id: 0,
             transaction_number: 0,
-            action: Action::Transfer(20, APPLES, BOB),
+            action: Action::Pay(20, APPLES, BOB),
         };
         transfer_transaction.run(&mut db, ALICE).unwrap();
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 80);

@@ -4,6 +4,7 @@ use crate::{
 };
 use async_std::sync::{Arc, Mutex};
 use indicatif::ProgressBar;
+use ellipticoin_contracts::hash_onion;
 
 lazy_static! {
     pub static ref ONION: async_std::sync::Arc<Mutex<Vec<[u8; 32]>>> = Arc::new(Mutex::new(vec![]));

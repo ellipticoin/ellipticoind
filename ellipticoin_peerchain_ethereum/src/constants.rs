@@ -1,8 +1,7 @@
-use ellipticoin_contracts::constants::BASE_FACTOR;
+use ellipticoin_contracts::constants::{BASE_FACTOR, BTC, ETH, USD};
 use hex_literal::hex;
 use lazy_static::lazy_static;
 use std::{collections::HashMap, env};
-use ellipticoin_contracts::constants::{BTC, ETH, USD};
 
 lazy_static! {
     pub static ref ELLIPTICOIN_DECIMALS: usize = BASE_FACTOR.to_string().len() - 1;

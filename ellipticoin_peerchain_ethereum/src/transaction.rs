@@ -1,7 +1,8 @@
 use anyhow::{anyhow, bail, Result};
 use core::array::TryFromSliceError;
 use ellipticoin_contracts::{
-    constants::{BASE_FACTOR, BTC, MS, ETH, USD},
+    constants::{BASE_FACTOR, BTC, ETH, MS, USD},
+    governance::Vote,
     Action, Transaction,
 };
 use ellipticoin_types::{Address, ADDRESS_LENGTH, DB};
@@ -39,7 +40,19 @@ pub trait VerificationString {
 
 impl VerificationString for Action {
     fn verification_string(&self) -> Result<String> {
-        let s = match &self {
+        match &self {
+            Action::Vote(proposal_id, vote) => Ok(format!(
+                "Vote {} on MS {}",
+                vote_to_string(vote.clone()),
+                proposal_id
+            )),
+            Action::CreateProposal(title, subtitle, content, actions) => Ok(format!(
+                "Create Proposal\nTitle: {}\nSubtitle: {}\nContent: {}\nActions: {}",
+                title,
+                subtitle,
+                content,
+                actions_to_string(actions)?
+            )),
             Action::CreatePool(amount, token, intial_price) => Ok(format!(
                 "Create a pool of {} {} at an initial price of ${} USD",
                 amount_to_string(*amount),
@@ -67,8 +80,8 @@ impl VerificationString for Action {
                 amount_to_string(*amount),
                 address_to_string(*token),
             )),
-            Action::Transfer(amount, token, recipient) => Ok(format!(
-                "Transfer {} {} to {}",
+            Action::Pay(amount, token, recipient) => Ok(format!(
+                "Pay {} {} to {}",
                 amount_to_string(*amount),
                 address_to_string(*token),
                 address_to_string(*recipient)
@@ -83,10 +96,24 @@ impl VerificationString for Action {
                 ))
             }
             _ => bail!("Unknown transaction type"),
-        };
-        println!("{}", s.as_ref().unwrap());
-        s
+        }
     }
+}
+
+fn vote_to_string(vote: Vote) -> String {
+    if matches!(vote, Vote::For) {
+        "Yes".to_string()
+    } else {
+        "No".to_string()
+    }
+}
+
+fn actions_to_string(actions: &Vec<Action>) -> Result<String> {
+    Ok(actions
+        .iter()
+        .map(|action| action.verification_string())
+        .collect::<Result<Vec<String>, _>>()?
+        .join("\n"))
 }
 
 fn percentage_to_string(n: u64) -> String {

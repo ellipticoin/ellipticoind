@@ -1,11 +1,11 @@
 use crate::config::HOST;
+use crate::config::SIGNER;
 use crate::db::MemoryDB;
 use crate::transaction::SignedSystemTransaction;
 use crate::{config::OPTS, hash_onion, serde_cbor::Deserializer, state::IN_MEMORY_STATE};
 use ellipticoin_contracts::Action;
-use std::fs::File;
-use crate::config::SIGNER;
 use ellipticoin_peerchain_ethereum::eth_address;
+use std::fs::File;
 
 pub async fn start_miner() {
     let mut state = IN_MEMORY_STATE.lock().await;
@@ -15,7 +15,10 @@ pub async fn start_miner() {
         Action::StartMining(HOST.to_string(), hash_onion::peel().await),
     );
     start_mining_transaction.run(&mut db).await.unwrap();
-    println!("Started Miner: {}", hex::encode(eth_address(SIGNER.verify_key())));
+    println!(
+        "Started Miner: {}",
+        hex::encode(eth_address(SIGNER.verify_key()))
+    );
 }
 pub async fn catch_up() {
     // let pg_db = get_pg_connection();
