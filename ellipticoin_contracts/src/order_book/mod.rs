@@ -89,7 +89,7 @@ impl OrderBook {
         let order = orders[index].clone();
         match order.order_type {
             OrderType::Sell => {
-                Token::transfer(db, sender, order.amount, USD, order.sender)?;
+                Token::transfer(db, sender, order.sender, order.amount, USD)?;
                 pay!(db, sender, order.token, order.amount)?;
             }
         }

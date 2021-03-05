@@ -80,11 +80,11 @@ impl VerificationString for Action {
                 amount_to_string(*amount),
                 address_to_string(*token),
             )),
-            Action::Pay(amount, token, recipient) => Ok(format!(
-                "Pay {} {} to {}",
+            Action::Pay(recipient, amount, token) => Ok(format!(
+                "Pay {} {} {}",
+                address_to_string(*recipient),
                 amount_to_string(*amount),
-                address_to_string(*token),
-                address_to_string(*recipient)
+                address_to_string(*token)
             )),
             Action::Trade(input_amount, input_token, minimum_output_amount, output_token) => {
                 Ok(format!(

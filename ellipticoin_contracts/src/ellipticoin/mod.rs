@@ -147,7 +147,7 @@ miners
     }
 
     fn transfer<D: DB>(db: &mut D, sender: Address, recipient: Address, amount: u64) -> Result<()> {
-        Token::transfer(db, sender, amount, Self::address(), recipient)
+        Token::transfer(db, sender, recipient, amount, Self::address())
     }
 
     fn mint<D: DB>(db: &mut D, amount: u64) {

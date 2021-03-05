@@ -127,7 +127,7 @@ mod tests {
     #[test]
     fn create_proposal() {
         let mut db = TestDB::new();
-        let actions = vec![Action::Pay(1, APPLES, ALICE)];
+        let actions = vec![Action::Pay(ALICE, 1, APPLES)];
         let mut votes = HashMap::new();
         votes.insert(ALICE, Vote::For);
         Token::mint(&mut db, 1, MS, ALICE);
@@ -160,7 +160,7 @@ mod tests {
     #[test]
     fn vote() {
         let mut db = TestDB::new();
-        let actions = vec![Action::Pay(1, APPLES, ALICE)];
+        let actions = vec![Action::Pay(ALICE, 1, APPLES)];
         Token::mint(&mut db, 1, APPLES, Governance::address());
         Token::mint(&mut db, 1, MS, ALICE);
         Token::mint(&mut db, 1, MS, BOB);
