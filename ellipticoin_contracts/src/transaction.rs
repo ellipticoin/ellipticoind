@@ -30,7 +30,7 @@ pub enum Action {
     CreateRedeemRequest(u64, Address),
     SignRedeemRequest(u64, u64, Vec<u8>),
     Migrate([u8; 32], Vec<u8>),
-    Pay(u64, Address, Address),
+    Pay(Address, u64, Address),
     CreatePool(u64, Address, u64),
     AddLiquidity(u64, Address),
     RemoveLiquidity(u64, Address),
@@ -125,7 +125,7 @@ mod tests {
         let transfer_transaction = Transaction {
             network_id: 0,
             transaction_number: 0,
-            action: Action::Pay(20, APPLES, BOB),
+            action: Action::Pay(BOB, 20, APPLES),
         };
         transfer_transaction.run(&mut db, ALICE).unwrap();
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 80);

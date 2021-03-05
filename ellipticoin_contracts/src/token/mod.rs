@@ -47,9 +47,9 @@ impl Token {
             Self::transfer(
                 db,
                 legacy_address[..20].try_into().unwrap(),
+                sender,
                 balance,
                 *token,
-                sender,
             )?;
         }
         for token in TOKENS.iter() {
@@ -67,9 +67,9 @@ impl Token {
     pub fn transfer<D: ellipticoin_types::DB>(
         db: &mut D,
         sender: Address,
+        recipient: Address,
         amount: u64,
         token: Address,
-        recipient: Address,
     ) -> Result<()> {
         Self::debit(db, amount, token, sender)?;
         Self::credit(db, amount, token, recipient);
@@ -146,7 +146,7 @@ mod tests {
     fn test_transfer() {
         let mut db = TestDB::new();
         Token::set_balance(&mut db, ALICE, APPLES, 100);
-        Token::transfer(&mut db, ALICE, 20, APPLES, BOB).unwrap();
+        Token::transfer(&mut db, ALICE, BOB, 20, APPLES).unwrap();
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 80);
         assert_eq!(Token::get_balance(&mut db, BOB, APPLES), 20);
     }
