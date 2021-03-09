@@ -5,7 +5,6 @@ use crate::constants::DB;
 use async_std::sync::RwLock;
 pub use memory_backend::MemoryBackend;
 pub use sled_backend::SledBackend;
-use std::iter::Iterator;
 
 #[derive(Debug)]
 pub enum Backend {
@@ -44,6 +43,18 @@ impl ellipticoin_types::db::Backend for Backend {
     //         Backend::Memory(memory_db) => memory_db.iter(),
     //     }
     // }
+}
+
+impl IntoIterator for Backend {
+    type Item = (Vec<u8>, Vec<u8>);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            // Backend::SledDb(sled_db) => sled_db.insert(key, value),
+            Backend::Memory(memory_db) => memory_db.into_iter().map(|(key, value)| (key, value)).collect::<Vec<(Vec<u8>, Vec<u8>)>>().into_iter()
+        }
+    }
 }
 
 pub async fn initialize() {

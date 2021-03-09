@@ -25,3 +25,12 @@ impl<'a> ellipticoin_types::db::Backend for SledBackend {
     }
     // fn iter(&self) -> impl Iterator<Item=u8> + '_  { todo!() }
 }
+
+impl IntoIterator for SledBackend {
+    type Item = (Vec<u8>, Vec<u8>);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.db.into_iter().map(|item| item.unwrap()).map(|(key, value)| (key.to_vec(), value.to_vec())).collect::<Vec<(Vec<u8>, Vec<u8>)>>().into_iter()
+    }
+}

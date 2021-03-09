@@ -23,3 +23,12 @@ impl Backend for MemoryBackend {
     }
     // fn iter(&self) -> ()  { todo!() }
 }
+
+impl IntoIterator for MemoryBackend {
+    type Item = (Vec<u8>, Vec<u8>);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.state.into_iter().map(|(key, value)| (key, value)).collect::<Vec<(Vec<u8>, Vec<u8>)>>().into_iter()
+    }
+}
