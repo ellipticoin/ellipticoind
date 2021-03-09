@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use ellipticoin_macros::db_accessors;
-use ellipticoin_types::{Address, DB};
+use ellipticoin_types::{Address, db::{Backend, Db}};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -39,8 +39,8 @@ db_accessors!(Governance {
 });
 
 impl Governance {
-    pub fn create_proposal<D: ellipticoin_types::DB>(
-        db: &mut D,
+    pub fn create_proposal<B: Backend>(
+        db: &mut Db<B>,
         sender: Address,
         title: String,
         subtitle: String,
@@ -65,8 +65,8 @@ impl Governance {
         Ok(())
     }
 
-    pub fn vote<D: ellipticoin_types::DB>(
-        db: &mut D,
+    pub fn vote<B: Backend>(
+        db: &mut Db<B>,
         sender: Address,
         proposal_id: u64,
         vote: Vote,
@@ -103,7 +103,7 @@ impl Governance {
         Ok(())
     }
 
-    fn increment_proposal_id_counter<D: DB>(db: &mut D) -> u64 {
+    fn increment_proposal_id_counter<B: Backend>(db: &mut Db<B>) -> u64 {
         let proposal_id_counter = Self::get_proposal_id_counter(db) + 1;
         Self::set_proposal_id_counter(db, proposal_id_counter);
         proposal_id_counter
@@ -120,7 +120,7 @@ mod tests {
             actors::{ALICE, BOB, CAROL},
             tokens::APPLES,
         },
-        test_db::TestDB,
+        test_db::TestDb,
     };
     use std::collections::HashMap;
 

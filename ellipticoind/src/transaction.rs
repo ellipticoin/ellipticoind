@@ -1,18 +1,18 @@
 use crate::config::verification_key;
 use crate::{
+    db,
     constants::{NETWORK_ID, TRANSACTION_QUEUE},
     crypto::{recover, sign, sign_eth},
-    db::MemoryDB,
-    state::IN_MEMORY_STATE,
 };
 use anyhow::Result;
+use ellipticoin_types::db::{Db, Backend};
 use ellipticoin_contracts::{Action, Run, Transaction};
 use ellipticoin_contracts::{Bridge, System};
 use ellipticoin_peerchain_ethereum::{
     constants::{BRIDGE_ADDRESS, REDEEM_TIMEOUT},
     Signed, SignedTransaction,
 };
-use ellipticoin_types::DB;
+use crate::constants::BACKEND;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -25,7 +25,7 @@ impl Signed for SignedSystemTransaction {
 }
 
 impl SignedSystemTransaction {
-    pub fn new<D: DB>(db: &mut D, action: Action) -> SignedSystemTransaction {
+    pub fn new<B: Backend>(db: &mut Db<B>, action: Action) -> SignedSystemTransaction {
         let transaction = Transaction {
             network_id: NETWORK_ID,
             transaction_number: System::get_next_transaction_number(db, verification_key()),
@@ -35,7 +35,7 @@ impl SignedSystemTransaction {
         SignedSystemTransaction(transaction, signature.to_vec())
     }
 
-    pub async fn run<D: DB>(&self, db: &mut D) -> Result<()> {
+    pub async fn run<B: Backend>(&self, db: &mut Db<B>) -> Result<()> {
         let result = self.0.action.run(db, self.sender()?);
         if result.is_ok() {
             db.commit();
@@ -52,8 +52,7 @@ pub async fn dispatch(signed_transaction: SignedTransaction) -> Result<()> {
 }
 
 pub async fn run(signed_transaction: SignedTransaction) -> Result<()> {
-    let mut state = IN_MEMORY_STATE.lock().await;
-    let mut db = MemoryDB::new(&mut state);
+    let mut db = BACKEND.get().unwrap().write().await;
     let result = signed_transaction.run(&mut db).await;
     if matches!(
         signed_transaction.0.action,
@@ -65,7 +64,7 @@ pub async fn run(signed_transaction: SignedTransaction) -> Result<()> {
     result
 }
 
-pub async fn sign_last_redeem_request<D: DB>(db: &mut D) -> Result<()> {
+pub async fn sign_last_redeem_request<B: Backend>(db: &mut Db<B>) -> Result<()> {
     let pending_redeem_request = Bridge::get_pending_redeem_requests(db)
         .last()
         .unwrap()

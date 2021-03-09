@@ -1,3 +1,4 @@
+use crate::db::Backend;
 use anyhow::Result;
 use async_std::{
     channel::{self, Receiver, Sender},
@@ -7,8 +8,14 @@ use broadcaster::BroadcastChannel;
 use ellipticoin_peerchain_ethereum::SignedTransaction;
 use futures::channel::oneshot;
 use std::{sync::Arc, time::Duration};
+use once_cell::sync::OnceCell;
+use ellipticoin_types::db::Db;
+use async_std::sync::RwLock;
 
 pub const NETWORK_ID: u64 = 0;
+pub static BACKEND: OnceCell<RwLock<Db<Backend>>> = OnceCell::new();
+
+
 
 lazy_static! {
     pub static ref BLOCK_TIME: Duration = Duration::from_secs(4);
@@ -20,7 +27,11 @@ lazy_static! {
     pub static ref SYNCING: Arc<Mutex<bool>> = Arc::new(Mutex::new(false));
     pub static ref WEB_SOCKET_BROADCASTER: BroadcastChannel<(u32, String)> =
         BroadcastChannel::new();
+    pub static ref SLED_DB: sled::Db = {
+        sled::open("var/db").unwrap()
+    };
 }
+
 
 impl TRANSACTION_QUEUE {
     pub async fn push(&self, transaction: SignedTransaction) -> oneshot::Receiver<Result<()>> {

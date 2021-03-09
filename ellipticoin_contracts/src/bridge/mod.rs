@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use ellipticoin_macros::db_accessors;
-use ellipticoin_types::{Address, DB};
+use ellipticoin_types::{Address, db::{Db, Backend}};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -32,8 +32,8 @@ db_accessors!(Bridge {
 });
 
 impl Bridge {
-    pub fn mint<D: ellipticoin_types::DB>(
-        db: &mut D,
+    pub fn mint<B: Backend>(
+        db: &mut Db<B>,
         amount: u64,
         token: Address,
         address: Address,
@@ -42,8 +42,8 @@ impl Bridge {
         Ok(())
     }
 
-    pub fn create_redeem_request<D: DB>(
-        db: &mut D,
+    pub fn create_redeem_request<B: Backend>(
+        db: &mut Db<B>,
         sender: Address,
         amount: u64,
         token: Address,
@@ -63,8 +63,8 @@ impl Bridge {
         Ok(())
     }
 
-    pub fn sign_redeem_request<D: DB>(
-        db: &mut D,
+    pub fn sign_redeem_request<B: Backend>(
+        db: &mut Db<B>,
         redeem_id: u64,
         expiration_block_number: u64,
         signature: Vec<u8>,
@@ -81,8 +81,8 @@ impl Bridge {
         Ok(())
     }
 
-    pub fn cancel_redeem_request<D: ellipticoin_types::DB>(
-        db: &mut D,
+    pub fn cancel_redeem_request<B: Backend>(
+        db: &mut Db<B>,
         redeem_id: u64,
     ) -> Result<()> {
         let pending_redeem_request = Self::remove_redeem_request(db, redeem_id)?;
@@ -95,7 +95,7 @@ impl Bridge {
         Ok(())
     }
 
-    pub fn redeem<D: ellipticoin_types::DB>(db: &mut D, redeem_id: u64) -> Result<()> {
+    pub fn redeem<B: Backend>(db: &mut Db<B>, redeem_id: u64) -> Result<()> {
         let pending_redeem_request = Self::remove_redeem_request(db, redeem_id)?;
         Token::burn(
             db,
@@ -106,14 +106,14 @@ impl Bridge {
         Ok(())
     }
 
-    fn increment_redeem_id_counter<D: DB>(db: &mut D) -> u64 {
+    fn increment_redeem_id_counter<B: Backend>(db: &mut Db<B>) -> u64 {
         let redeem_id_counter = Self::get_redeem_id_counter(db) + 1;
         Self::set_redeem_id_counter(db, redeem_id_counter);
         redeem_id_counter
     }
 
-    pub fn remove_redeem_request<D: ellipticoin_types::DB>(
-        db: &mut D,
+    pub fn remove_redeem_request<B: Backend>(
+        db: &mut Db<B>,
         redeem_id: u64,
     ) -> Result<RedeemRequest> {
         let mut pending_redeem_requests = Self::get_pending_redeem_requests(db);

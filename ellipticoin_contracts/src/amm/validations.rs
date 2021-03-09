@@ -1,8 +1,8 @@
 use super::AMM;
 use anyhow::{bail, Result};
-use ellipticoin_types::{Address, DB};
+use ellipticoin_types::{Address, db::{Db, Backend}};
 impl AMM {
-    pub fn validate_pool_does_not_exist<D: DB>(db: &mut D, token: Address) -> Result<()> {
+    pub fn validate_pool_does_not_exist<B: Backend>(db: &mut Db<B>, token: Address) -> Result<()> {
         if Self::get_pool_supply_of_base_token(db, token) != 0 {
             bail!("Pool already exisits: {}", hex::encode(token))
         } else {
@@ -10,7 +10,7 @@ impl AMM {
         }
     }
 
-    pub fn validate_pool_exists<D: DB>(db: &mut D, token: Address) -> Result<()> {
+    pub fn validate_pool_exists<B: Backend>(db: &mut Db<B>, token: Address) -> Result<()> {
         if Self::get_pool_supply_of_token(db, token.clone()) > 0 {
             Ok(())
         } else {

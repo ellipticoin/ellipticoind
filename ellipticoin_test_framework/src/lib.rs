@@ -12,7 +12,7 @@ extern crate sha2;
 
 use constants::actors::ALICE;
 use ellipticoin_contracts::{Ellipticoin, Token};
-use ellipticoin_types::Address;
+use ellipticoin_types::{Address, {db::{Backend, Db}}};
 use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::{collections::HashMap, env};
@@ -42,8 +42,8 @@ pub fn generate_hash_onion(layers: usize, center: Vec<u8>) -> Vec<Vec<u8>> {
     onion
 }
 
-pub fn setup<D: ellipticoin_types::DB>(
-    db: &mut D,
+pub fn setup<B: Backend>(
+    db: &mut Db<B>,
     balances: HashMap<Address, Vec<(u64, [u8; 20])>>,
 ) {
     for (address, balances) in balances.iter() {

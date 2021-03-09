@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use ellipticoin_macros::db_accessors;
-use ellipticoin_types::{Address, DB};
+use ellipticoin_types::{Address, db::{Backend, Db}};
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
@@ -31,8 +31,8 @@ pub struct Miner {
 }
 
 impl Ellipticoin {
-    pub fn start_mining<D: DB>(
-        db: &mut D,
+    pub fn start_mining<B: Backend>(
+        db: &mut Db<B>,
         sender: Address,
         host: String,
         hash_onion_skin: [u8; 32],
@@ -50,7 +50,7 @@ impl Ellipticoin {
         Ok(())
     }
 
-    pub fn seal<D: DB>(db: &mut D, sender: [u8; 20], hash_onion_skin: [u8; 32]) -> Result<()> {
+    pub fn seal<B: Backend>(db: &mut Db<B>, sender: [u8; 20], hash_onion_skin: [u8; 32]) -> Result<()> {
         let mut miners = Self::get_miners(db);
         if sender
             != miners
@@ -87,14 +87,14 @@ miners
         Ok(())
     }
 
-    pub fn harvest<D: DB>(db: &mut D, sender: [u8; 20]) -> Result<()> {
+    pub fn harvest<B: Backend>(db: &mut Db<B>, sender: [u8; 20]) -> Result<()> {
         let issuance_rewards = Self::get_issuance_rewards(db, sender);
         Self::debit_issuance_rewards(db, sender, issuance_rewards);
         pay!(db, sender, Self::address(), issuance_rewards)?;
         Ok(())
     }
 
-    fn issue_block_rewards<D: DB>(db: &mut D) -> Result<()> {
+    fn issue_block_rewards<B: Backend>(db: &mut Db<B>) -> Result<()> {
         let block_number = System::get_block_number(db);
         let block_reward = Self::block_reward_at(block_number);
         Self::mint(db, block_reward);
@@ -125,7 +125,7 @@ miners
         Ok(())
     }
 
-    fn shuffle_miners<D: DB>(db: &mut D, miners: &mut Vec<Miner>, value: [u8; 32]) {
+    fn shuffle_miners<B: Backend>(db: &mut Db<B>, miners: &mut Vec<Miner>, value: [u8; 32]) {
         let mut rng = StdRng::from_seed(value[0..32].try_into().unwrap());
         let mut shuffled_miners = vec![];
         while !miners.is_empty() {
@@ -137,7 +137,7 @@ miners
         Self::set_miners(db, shuffled_miners);
     }
 
-    fn settle_block_rewards<D: DB>(db: &mut D) -> Result<()> {
+    fn settle_block_rewards<B: Backend>(db: &mut Db<B>) -> Result<()> {
         let miners = Self::get_miners(db);
         let winner = miners.first().as_ref().unwrap().clone();
         for miner in &miners {
@@ -146,20 +146,20 @@ miners
         Ok(())
     }
 
-    fn transfer<D: DB>(db: &mut D, sender: Address, recipient: Address, amount: u64) -> Result<()> {
+    fn transfer<B: Backend>(db: &mut Db<B>, sender: Address, recipient: Address, amount: u64) -> Result<()> {
         Token::transfer(db, sender, recipient, amount, Self::address())
     }
 
-    fn mint<D: DB>(db: &mut D, amount: u64) {
+    fn mint<B: Backend>(db: &mut Db<B>, amount: u64) {
         Token::credit(db, amount, Self::address(), Self::address())
     }
 
-    fn credit_issuance_rewards<D: DB>(db: &mut D, address: Address, amount: u64) {
+    fn credit_issuance_rewards<B: Backend>(db: &mut Db<B>, address: Address, amount: u64) {
         let issuance_rewards = Self::get_issuance_rewards(db, address.clone());
         Self::set_issuance_rewards(db, address, issuance_rewards + amount);
     }
 
-    fn debit_issuance_rewards<D: DB>(db: &mut D, address: Address, amount: u64) {
+    fn debit_issuance_rewards<B: Backend>(db: &mut Db<B>, address: Address, amount: u64) {
         let issuance_rewards = Self::get_issuance_rewards(db, address.clone());
         Self::set_issuance_rewards(db, address, issuance_rewards - amount);
     }

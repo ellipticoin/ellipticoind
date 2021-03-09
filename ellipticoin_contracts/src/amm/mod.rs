@@ -9,7 +9,7 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use ellipticoin_macros::db_accessors;
-use ellipticoin_types::{Address, DB};
+use ellipticoin_types::{Address, db::{Db, Backend}};
 use std::{collections::HashSet, convert::TryInto};
 
 pub struct AMM;
@@ -25,8 +25,8 @@ db_accessors!(AMM {
 });
 
 impl AMM {
-    pub fn create_pool<D: DB>(
-        db: &mut D,
+    pub fn create_pool<B: Backend>(
+        db: &mut Db<B>,
         sender: [u8; 20],
         amount: u64,
         token: Address,
@@ -40,8 +40,8 @@ impl AMM {
         Ok(())
     }
 
-    pub fn add_liquidity<D: DB>(
-        db: &mut D,
+    pub fn add_liquidity<B: Backend>(
+        db: &mut Db<B>,
         sender: Address,
         amount: u64,
         token: Address,
@@ -73,8 +73,8 @@ impl AMM {
         Ok(())
     }
 
-    pub fn remove_liquidity<D: DB>(
-        db: &mut D,
+    pub fn remove_liquidity<B: Backend>(
+        db: &mut Db<B>,
         sender: Address,
         percentage: u64,
         token: Address,
@@ -110,8 +110,8 @@ impl AMM {
         Ok(())
     }
 
-    pub fn trade<D: DB>(
-        db: &mut D,
+    pub fn trade<B: Backend>(
+        db: &mut Db<B>,
         sender: Address,
         input_amount: u64,
         input_token: Address,
@@ -128,7 +128,7 @@ impl AMM {
         Ok(())
     }
 
-    fn trade_token_for_base_token<D: DB>(db: &mut D, token: Address, amount: u64) -> Result<u64> {
+    fn trade_token_for_base_token<B: Backend>(db: &mut Db<B>, token: Address, amount: u64) -> Result<u64> {
         if token == BASE_TOKEN {
             return Ok(amount);
         };
@@ -143,7 +143,7 @@ impl AMM {
         Ok(output_amount)
     }
 
-    fn trade_base_token_for_token<D: DB>(db: &mut D, token: Address, amount: u64) -> Result<u64> {
+    fn trade_base_token_for_token<B: Backend>(db: &mut Db<B>, token: Address, amount: u64) -> Result<u64> {
         if token == BASE_TOKEN {
             return Ok(amount);
         };
@@ -169,14 +169,14 @@ impl AMM {
         amount - ((amount as u128 * FEE as u128) / BASE_FACTOR as u128) as u64
     }
 
-    fn charge<D: DB>(db: &mut D, address: Address, token: Address, amount: u64) -> Result<()> {
+    fn charge<B: Backend>(db: &mut Db<B>, address: Address, token: Address, amount: u64) -> Result<()> {
         charge!(db, address, token, amount)?;
         Self::credit_pool_supply_of_token(db, token, amount);
         Ok(())
     }
 
-    fn charge_base_token<D: DB>(
-        db: &mut D,
+    fn charge_base_token<B: Backend>(
+        db: &mut Db<B>,
         address: Address,
         token: Address,
         amount: u64,
@@ -186,14 +186,14 @@ impl AMM {
         Ok(())
     }
 
-    fn pay<D: DB>(db: &mut D, address: Address, token: Address, amount: u64) -> Result<()> {
+    fn pay<B: Backend>(db: &mut Db<B>, address: Address, token: Address, amount: u64) -> Result<()> {
         Self::debit_pool_supply_of_token(db, token, amount)?;
         pay!(db, address, token, amount)?;
         Ok(())
     }
 
-    fn pay_base_token<D: DB>(
-        db: &mut D,
+    fn pay_base_token<B: Backend>(
+        db: &mut Db<B>,
         address: Address,
         token: Address,
         amount: u64,
@@ -203,18 +203,18 @@ impl AMM {
         Ok(())
     }
 
-    fn credit_pool_supply_of_base_token<D: DB>(db: &mut D, token: Address, amount: u64) {
+    fn credit_pool_supply_of_base_token<B: Backend>(db: &mut Db<B>, token: Address, amount: u64) {
         let base_token_supply = Self::get_pool_supply_of_base_token(db, token);
         Self::set_pool_supply_of_base_token(db, token, base_token_supply + amount);
     }
 
-    fn credit_pool_supply_of_token<D: DB>(db: &mut D, token: Address, amount: u64) {
+    fn credit_pool_supply_of_token<B: Backend>(db: &mut Db<B>, token: Address, amount: u64) {
         let token_supply = Self::get_pool_supply_of_token(db, token);
         Self::set_pool_supply_of_token(db, token, token_supply + amount);
     }
 
-    fn debit_pool_supply_of_base_token<D: DB>(
-        db: &mut D,
+    fn debit_pool_supply_of_base_token<B: Backend>(
+        db: &mut Db<B>,
         token: Address,
         amount: u64,
     ) -> Result<()> {
@@ -227,7 +227,7 @@ impl AMM {
         Ok(())
     }
 
-    fn debit_pool_supply_of_token<D: DB>(db: &mut D, token: Address, amount: u64) -> Result<()> {
+    fn debit_pool_supply_of_token<B: Backend>(db: &mut Db<B>, token: Address, amount: u64) -> Result<()> {
         let token_supply = Self::get_pool_supply_of_token(db, token);
         if token_supply >= amount {
             Self::set_pool_supply_of_token(db, token, token_supply - amount);
@@ -237,8 +237,8 @@ impl AMM {
         Ok(())
     }
 
-    pub fn mint_liquidity<D: DB>(
-        db: &mut D,
+    pub fn mint_liquidity<B: Backend>(
+        db: &mut Db<B>,
         sender: Address,
         token: Address,
         amount: u64,
@@ -250,8 +250,8 @@ impl AMM {
         Ok(())
     }
 
-    pub fn burn_liquidity<D: DB>(
-        db: &mut D,
+    pub fn burn_liquidity<B: Backend>(
+        db: &mut Db<B>,
         sender: Address,
         token: Address,
         amount: u64,

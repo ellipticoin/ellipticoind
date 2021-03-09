@@ -1,17 +1,24 @@
 use serde::{de::DeserializeOwned, Serialize};
+use core::fmt::Debug;
+use std::collections::HashMap;
 
-pub trait DB {
-    fn get_bytes(&mut self, key: &[u8]) -> Vec<u8>;
-    fn set_bytes(&mut self, key: &[u8], value: &[u8]);
-    fn commit(&mut self);
-    fn revert(&mut self);
-    fn get<K: Into<Vec<u8>>, V: DeserializeOwned + Default>(
+pub struct Db<B: Backend> {
+    pub backend: B,
+    pub transaction_state: HashMap<Vec<u8>, Vec<u8>>,
+}
+
+impl<B: Backend> Db<B> {
+    pub fn get<K: Into<Vec<u8>>, V: DeserializeOwned + Default>(
         &mut self,
         namespace: u16,
         key: K,
-    ) -> V {
+    ) -> V where Self: Sized {
         let full_key = [namespace.to_le_bytes().to_vec(), key.into()].concat();
-        let bytes = self.get_bytes(&full_key);
+        let bytes = self.transaction_state
+            .get(&full_key)
+            .unwrap_or(&Backend::get(&mut self.backend, &full_key))
+            .to_vec();
+
         if bytes.len() == 0 {
             Default::default()
         } else {
@@ -19,10 +26,34 @@ pub trait DB {
         }
     }
 
-    fn set<K: Into<Vec<u8>>, V: Serialize>(&mut self, namespace: u16, key: K, value: V) {
-        self.set_bytes(
+    pub fn insert<K: Into<Vec<u8>>, V: Serialize>(&mut self, namespace: u16, key: K, value: V) where Self: Sized {
+        Backend::insert(
+            &mut self.backend,
             &[namespace.to_le_bytes().to_vec(), key.into()].concat(),
             &serde_cbor::to_vec(&value).unwrap(),
         )
     }
+    pub fn commit(&mut self) {
+        for (key, value) in &self.transaction_state {
+            Backend::insert(
+                &mut self.backend,
+                &key,
+                &value,
+            );
+        }
+        self.transaction_state.clear();
+    }
+
+    pub fn revert(&mut self) {
+        self.transaction_state.clear();
+    }
+}
+
+pub trait Backend: Send + Sync + Debug {
+    fn get(&self, key: &[u8]) -> Vec<u8>
+    where
+        Self: Sized;
+    fn insert(&mut self, key: &[u8], value: &[u8])
+    where
+        Self: Sized;
 }

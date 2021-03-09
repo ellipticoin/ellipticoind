@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use ellipticoin_macros::db_accessors;
-use ellipticoin_types::Address;
+use ellipticoin_types::{Address, db::{Db, Backend}};
 use std::convert::TryInto;
 
 use hex;
@@ -25,8 +25,8 @@ db_accessors!(Token {
 });
 
 impl Token {
-    pub fn migrate<D: ellipticoin_types::DB>(
-        db: &mut D,
+    pub fn migrate<B: Backend>(
+        db: &mut Db<B>,
         sender: Address,
         legacy_address: [u8; 32],
         legacy_signature: Vec<u8>,
@@ -64,8 +64,8 @@ impl Token {
         Ok(())
     }
 
-    pub fn transfer<D: ellipticoin_types::DB>(
-        db: &mut D,
+    pub fn transfer<B: Backend>(
+        db: &mut Db<B>,
         sender: Address,
         recipient: Address,
         amount: u64,
@@ -76,8 +76,8 @@ impl Token {
         Ok(())
     }
 
-    pub fn mint<D: ellipticoin_types::DB>(
-        db: &mut D,
+    pub fn mint<B: Backend>(
+        db: &mut Db<B>,
         amount: u64,
         token: Address,
         address: Address,
@@ -87,8 +87,8 @@ impl Token {
         Self::set_total_supply(db, token, total_supply + amount);
     }
 
-    pub fn burn<D: ellipticoin_types::DB>(
-        db: &mut D,
+    pub fn burn<B: Backend>(
+        db: &mut Db<B>,
         amount: u64,
         token: Address,
         address: Address,
@@ -99,8 +99,8 @@ impl Token {
         Ok(())
     }
 
-    pub fn credit<D: ellipticoin_types::DB>(
-        db: &mut D,
+    pub fn credit<B: Backend>(
+        db: &mut Db<B>,
         amount: u64,
         token: Address,
         address: Address,
@@ -109,8 +109,8 @@ impl Token {
         Self::set_balance(db, address, token, balance + amount)
     }
 
-    fn debit<D: ellipticoin_types::DB>(
-        db: &mut D,
+    fn debit<B: Backend>(
+        db: &mut Db<B>,
         amount: u64,
         token: Address,
         address: Address,
@@ -145,9 +145,9 @@ mod tests {
     #[test]
     fn test_transfer() {
         let mut db = TestDB::new();
-        Token::set_balance(&mut db, ALICE, APPLES, 100);
-        Token::transfer(&mut db, ALICE, BOB, 20, APPLES).unwrap();
-        assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 80);
-        assert_eq!(Token::get_balance(&mut db, BOB, APPLES), 20);
+        Token::set_balance(db, ALICE, APPLES, 100);
+        Token::transfer(db, ALICE, BOB, 20, APPLES).unwrap();
+        assert_eq!(Token::get_balance(db, ALICE, APPLES), 80);
+        assert_eq!(Token::get_balance(db, BOB, APPLES), 20);
     }
 }

@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use ellipticoin_macros::db_accessors;
-use ellipticoin_types::{Address, DB};
+use ellipticoin_types::{Address, db::{Db, Backend}};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -36,8 +36,8 @@ db_accessors!(OrderBook {
 });
 
 impl OrderBook {
-    pub fn create_order<D: DB>(
-        db: &mut D,
+    pub fn create_order<B: Backend>(
+        db: &mut Db<B>,
         sender: Address,
         order_type: OrderType,
         amount: u64,
@@ -64,7 +64,7 @@ impl OrderBook {
         Ok(())
     }
 
-    pub fn cancel<D: DB>(db: &mut D, sender: Address, order_id: u64) -> Result<()> {
+    pub fn cancel<B: Backend>(db: &mut Db<B>, sender: Address, order_id: u64) -> Result<()> {
         let mut orders = Self::get_orders(db);
         let index = orders
             .iter()
@@ -79,7 +79,7 @@ impl OrderBook {
         Ok(())
     }
 
-    pub fn fill<D: DB>(db: &mut D, sender: Address, order_id: u64) -> Result<()> {
+    pub fn fill<B: Backend>(db: &mut Db<B>, sender: Address, order_id: u64) -> Result<()> {
         let orders = Self::get_orders(db);
         let index = orders
             .iter()
@@ -96,7 +96,7 @@ impl OrderBook {
         Ok(())
     }
 
-    fn increment_order_id_counter<D: DB>(db: &mut D) -> u64 {
+    fn increment_order_id_counter<B: Backend>(db: &mut Db<B>) -> u64 {
         let order_id_counter = Self::get_order_id_counter(db) + 1;
         Self::set_order_id_counter(db, order_id_counter);
         order_id_counter

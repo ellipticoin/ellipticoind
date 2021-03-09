@@ -104,7 +104,7 @@ fn getter(base_namespace: &Ident, attr: &Attribute) -> ItemFn {
     } = attr;
     let fn_ident = Ident::new(&format!("get_{}", &ident), Span::call_site());
     let mut new_inputs = inputs.clone();
-    new_inputs.insert(0, parse_quote!(db: &mut D));
+    new_inputs.insert(0, parse_quote!(db: &mut ellipticoin_types::db::Db<B>));
     let namespace = Ident::new(&ident.to_string().to_camel_case(), Span::call_site());
 
     let key_parts = inputs.iter().map(|input| {
@@ -115,7 +115,7 @@ fn getter(base_namespace: &Ident, attr: &Attribute) -> ItemFn {
         }
     });
     parse_quote!(
-        pub fn #fn_ident<D: ellipticoin_types::DB>(#new_inputs) -> #output {
+        pub fn #fn_ident<B: ellipticoin_types::db::Backend>(#new_inputs) -> #output {
             Self::get(
                 db,
                 [
@@ -136,7 +136,7 @@ fn setter(base_namespace: &Ident, attr: &Attribute) -> ItemFn {
     } = attr;
     let fn_ident = Ident::new(&format!("set_{}", &ident), Span::call_site());
     let mut new_inputs = inputs.clone();
-    new_inputs.insert(0, parse_quote!(db: &mut D));
+    new_inputs.insert(0, parse_quote!(db: &mut ellipticoin_types::Db<B>));
     new_inputs.push(parse_quote!(value: #output));
     let namespace = Ident::new(&ident.to_string().to_camel_case(), Span::call_site());
     let key_parts = inputs.iter().map(|input| {
@@ -147,8 +147,8 @@ fn setter(base_namespace: &Ident, attr: &Attribute) -> ItemFn {
         }
     });
     parse_quote!(
-    pub fn #fn_ident<D: ellipticoin_types::DB>(#new_inputs) {
-        Self::set(
+    pub fn #fn_ident<B: ellipticoin_types::db::Backend>(#new_inputs) {
+        Self::insert(
             db,
             [
                 u16::to_le_bytes(#base_namespace::#namespace as u16).to_vec(),

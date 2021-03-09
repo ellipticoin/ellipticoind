@@ -5,7 +5,7 @@ use ellipticoin_contracts::{
     governance::Vote,
     Action, Transaction,
 };
-use ellipticoin_types::{Address, ADDRESS_LENGTH, DB};
+use ellipticoin_types::{Address, ADDRESS_LENGTH, db::{Db, Backend}};
 use k256::{
     ecdsa::{recoverable, VerifyingKey},
     elliptic_curve::sec1::ToEncodedPoint,
@@ -21,7 +21,7 @@ pub trait Signed: core::fmt::Debug {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SignedTransaction(pub Transaction<Action>, Vec<u8>);
 impl SignedTransaction {
-    pub async fn run<D: DB>(&self, db: &mut D) -> Result<()> {
+    pub async fn run<B: Backend>(&self, db: &mut Db<B>) -> Result<()> {
         self.0.run(db, self.sender()?)
     }
 }

@@ -1,7 +1,7 @@
 use crate::governance::Vote;
 use crate::{Bridge, Ellipticoin, Governance, System, Token, AMM};
 use anyhow::{bail, Result};
-use ellipticoin_types::{Address, DB};
+use ellipticoin_types::{Address, db::{Db, Backend}};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -13,13 +13,13 @@ pub struct Transaction<R: Run> {
 }
 
 impl Transaction<Action> {
-    pub fn run<D: DB>(&self, db: &mut D, sender: Address) -> Result<()> {
+    pub fn run<B: Backend>(&self, db: &mut Db<B>, sender: Address) -> Result<()> {
         self.action.run(db, sender)
     }
 }
 
 pub trait Run {
-    fn run<D: DB>(&self, db: &mut D, address: Address) -> Result<()>;
+    fn run<B: Backend>(&self, db: &mut Db<B>, address: Address) -> Result<()>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -40,7 +40,7 @@ pub enum Action {
     Vote(u64, Vote),
 }
 impl Run for Action {
-    fn run<D: DB>(&self, db: &mut D, sender: Address) -> Result<()> {
+    fn run<B: Backend>(&self, db: &mut Db<B>, sender: Address) -> Result<()> {
         System::increment_transaction_number(db, sender);
         let result = match &self {
             Action::CreateProposal(title, subtitle, content, actions) => {
@@ -121,15 +121,15 @@ mod tests {
     #[test]
     fn test_run() {
         let mut db = TestDB::new();
-        Token::set_balance(&mut db, ALICE, APPLES, 100);
+        Token::set_balance(db, ALICE, APPLES, 100);
         let transfer_transaction = Transaction {
             network_id: 0,
             transaction_number: 0,
             action: Action::Pay(BOB, 20, APPLES),
         };
-        transfer_transaction.run(&mut db, ALICE).unwrap();
-        assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 80);
-        assert_eq!(Token::get_balance(&mut db, BOB, APPLES), 20);
-        assert_eq!(System::get_transaction_number(&mut db, ALICE), 1);
+        transfer_transaction.run(db, ALICE).unwrap();
+        assert_eq!(Token::get_balance(db, ALICE, APPLES), 80);
+        assert_eq!(Token::get_balance(db, BOB, APPLES), 20);
+        assert_eq!(System::get_transaction_number(db, ALICE), 1);
     }
 }

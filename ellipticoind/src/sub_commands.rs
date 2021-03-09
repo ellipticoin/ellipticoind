@@ -1,11 +1,11 @@
 use crate::{
     api,
     config::{socket, GENESIS_NODE},
-    db::MemoryDB,
+    constants::BACKEND,
+    db::{Backend, MemoryBackend},
     miner, peerchains, start_up,
-    state::IN_MEMORY_STATE,
 };
-use async_std::task::{block_on, spawn};
+use async_std::{sync::RwLock, task::{block_on, spawn}};
 use ellipticoin_peerchain_ethereum::address_to_string;
 use ellipticoin_peerchain_ethereum::eth_address;
 use k256::ecdsa::SigningKey;
@@ -36,9 +36,14 @@ pub async fn main() {
         println!("Server listening on {}", info);
     }
     block_on(async {
-        let mut state = IN_MEMORY_STATE.lock().await;
-        let mut db = MemoryDB::new(&mut state);
-        peerchains::start(&mut db).await
+        let memory_backend = MemoryBackend::new();
+        let backend = Backend::Memory(memory_backend);
+        let db = ellipticoin_types::Db {backend: backend, transaction_state: Default::default()};
+        if matches!(BACKEND.set(RwLock::new(db)), Err(_)) {
+            panic!("Failed to initialize db");
+        };
+        let mut db2 = BACKEND.get().unwrap().write().await;
+        peerchains::start(&mut db2).await
     });
     spawn(async move { listener.accept().await.unwrap() });
     miner::run().await;
