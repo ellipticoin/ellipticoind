@@ -60,7 +60,7 @@ impl<B: Backend> Db<B> {
     }
 }
 
-pub trait Backend: Send + Sync {
+pub trait Backend<'a>: Send + Sync {
     fn get(&self, key: &[u8]) -> Vec<u8>
     where
         Self: Sized;
