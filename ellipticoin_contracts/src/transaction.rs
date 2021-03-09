@@ -1,7 +1,9 @@
-use crate::governance::Vote;
-use crate::{Bridge, Ellipticoin, Governance, System, Token, AMM};
+use crate::{governance::Vote, Bridge, Ellipticoin, Governance, System, Token, AMM};
 use anyhow::{bail, Result};
-use ellipticoin_types::{Address, db::{Db, Backend}};
+use ellipticoin_types::{
+    db::{Backend, Db},
+    Address,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -115,21 +117,21 @@ mod tests {
             actors::{ALICE, BOB},
             tokens::APPLES,
         },
-        TestDB,
+        new_db,
     };
 
     #[test]
     fn test_run() {
-        let mut db = TestDB::new();
-        Token::set_balance(db, ALICE, APPLES, 100);
+        let mut db = new_db();
+        Token::set_balance(&mut db, ALICE, APPLES, 100);
         let transfer_transaction = Transaction {
             network_id: 0,
             transaction_number: 0,
             action: Action::Pay(BOB, 20, APPLES),
         };
-        transfer_transaction.run(db, ALICE).unwrap();
-        assert_eq!(Token::get_balance(db, ALICE, APPLES), 80);
-        assert_eq!(Token::get_balance(db, BOB, APPLES), 20);
-        assert_eq!(System::get_transaction_number(db, ALICE), 1);
+        transfer_transaction.run(&mut db, ALICE).unwrap();
+        assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 80);
+        assert_eq!(Token::get_balance(&mut db, BOB, APPLES), 20);
+        assert_eq!(System::get_transaction_number(&mut db, ALICE), 1);
     }
 }

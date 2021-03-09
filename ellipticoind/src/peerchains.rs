@@ -1,13 +1,15 @@
+use crate::constants::DB;
 use ellipticoin_contracts::Bridge;
-use ellipticoin_types::db::{Db, Backend};
 use ellipticoin_peerchain_ethereum::{Mint, Redeem, Update};
+use ellipticoin_types::db::{Backend, Db};
 use std::task::Poll;
 
-pub async fn start<'a, B: Backend>(db: &mut Db<B>) {
+pub async fn start() {
+    let mut db = DB.get().unwrap().write().await;
     let ethereum_block_number = ellipticoin_peerchain_ethereum::get_current_block()
         .await
         .unwrap();
-    Bridge::set_ethereum_block_number(db, ethereum_block_number);
+    Bridge::set_ethereum_block_number(&mut db, ethereum_block_number);
     db.commit();
 }
 pub async fn poll<'a, B: Backend>(db: &mut Db<B>) {

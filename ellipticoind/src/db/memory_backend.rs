@@ -21,4 +21,5 @@ impl Backend for MemoryBackend {
     fn insert(&mut self, key: &[u8], value: &[u8]) {
         self.state.insert(key.to_vec(), value.to_vec());
     }
+    // fn iter(&self) -> ()  { todo!() }
 }

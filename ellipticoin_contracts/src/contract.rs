@@ -1,5 +1,8 @@
 use crate::helpers::pad_left;
-use ellipticoin_types::{ADDRESS_LENGTH, db::{Backend, Db}};
+use ellipticoin_types::{
+    db::{Backend, Db},
+    ADDRESS_LENGTH,
+};
 use serde::{de::DeserializeOwned, Serialize};
 use std::convert::TryInto;
 
@@ -14,11 +17,7 @@ pub trait Contract {
     }
 
     fn insert<K: Into<Vec<u8>>, V: Serialize, B: Backend>(db: &mut Db<B>, key: K, value: V) {
-        db.insert(
-            Self::NAME as u16,
-            key,
-            value,
-        )
+        db.insert(Self::NAME as u16, key, value)
     }
 
     fn address() -> [u8; ADDRESS_LENGTH] {

@@ -1,13 +1,12 @@
+use crate::constants::DB;
 use crate::{
     constants::{BLOCK_TIME, TRANSACTION_QUEUE, WEB_SOCKET_BROADCASTER},
-    db::Backend,
     hash_onion,
     helpers::run_for,
     peerchains,
     transaction::SignedSystemTransaction,
 };
 use ellipticoin_contracts::{Action, Ellipticoin, System};
-use crate::constants::BACKEND;
 
 pub async fn run() {
     loop {
@@ -52,7 +51,7 @@ async fn _wait_for_peer() {
 // }
 async fn mine_block(_block_number: u32) {
     let block_number = {
-        let mut db = BACKEND.get().unwrap().write().await;
+        let mut db = DB.get().unwrap().write().await;
         System::get_block_number(&mut db)
     };
     println!("Won block #{}", block_number);
@@ -65,7 +64,7 @@ async fn mine_block(_block_number: u32) {
         }
     })
     .await;
-    let mut db = BACKEND.get().unwrap().write().await;
+    let mut db = DB.get().unwrap().write().await;
     peerchains::poll(&mut db).await;
     let seal_transaction =
         SignedSystemTransaction::new(&mut db, Action::Seal(hash_onion::peel().await));

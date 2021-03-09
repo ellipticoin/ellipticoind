@@ -1,6 +1,7 @@
 use serde::{de::DeserializeOwned, Serialize};
-use core::fmt::Debug;
 use std::collections::HashMap;
+use std::result::Iter;
+use std::iter::Iterator;
 
 pub struct Db<B: Backend> {
     pub backend: B,
@@ -12,9 +13,13 @@ impl<B: Backend> Db<B> {
         &mut self,
         namespace: u16,
         key: K,
-    ) -> V where Self: Sized {
+    ) -> V
+    where
+        Self: Sized,
+    {
         let full_key = [namespace.to_le_bytes().to_vec(), key.into()].concat();
-        let bytes = self.transaction_state
+        let bytes = self
+            .transaction_state
             .get(&full_key)
             .unwrap_or(&Backend::get(&mut self.backend, &full_key))
             .to_vec();
@@ -26,20 +31,26 @@ impl<B: Backend> Db<B> {
         }
     }
 
-    pub fn insert<K: Into<Vec<u8>>, V: Serialize>(&mut self, namespace: u16, key: K, value: V) where Self: Sized {
-        Backend::insert(
-            &mut self.backend,
-            &[namespace.to_le_bytes().to_vec(), key.into()].concat(),
-            &serde_cbor::to_vec(&value).unwrap(),
-        )
+    pub fn insert<K: Into<Vec<u8>>, V: Serialize>(&mut self, namespace: u16, key: K, value: V)
+    where
+        Self: Sized,
+    {
+        self.transaction_state.insert(
+            [namespace.to_le_bytes().to_vec(), key.into()].concat(),
+            serde_cbor::to_vec(&value).unwrap(),
+        );
     }
+
+    pub fn insert_raw(&mut self, key: &[u8], value: &[u8])
+    where
+        Self: Sized,
+    {
+        Backend::insert(&mut self.backend, &key, &value);
+    }
+
     pub fn commit(&mut self) {
         for (key, value) in &self.transaction_state {
-            Backend::insert(
-                &mut self.backend,
-                &key,
-                &value,
-            );
+            Backend::insert(&mut self.backend, &key, &value);
         }
         self.transaction_state.clear();
     }
@@ -49,11 +60,16 @@ impl<B: Backend> Db<B> {
     }
 }
 
-pub trait Backend: Send + Sync + Debug {
+pub trait Backend: Send + Sync {
     fn get(&self, key: &[u8]) -> Vec<u8>
     where
         Self: Sized;
     fn insert(&mut self, key: &[u8], value: &[u8])
     where
         Self: Sized;
+    
+    // fn iter(&self) -> dyn Iterator<Item = (Vec<u8>, Vec<u8>)>
+    // where
+    //     Self: Sized;
+    //
 }

@@ -1,10 +1,8 @@
-use crate::{
-    api::{
-        graphql::Context,
-        types::{self, *},
-    },
-    db::Backend,
+use crate::api::{
+    graphql::Context,
+    types::{self, *},
 };
+use crate::constants::DB;
 use anyhow::anyhow;
 use ellipticoin_contracts::{
     bridge,
@@ -12,10 +10,9 @@ use ellipticoin_contracts::{
     governance, Bridge, Ellipticoin, Governance, System, AMM,
 };
 use ellipticoin_peerchain_ethereum::constants::BRIDGE_ADDRESS;
+
 use juniper::FieldError;
 use std::convert::{TryFrom, TryInto};
-use ellipticoin_types::db::{Db};
-use crate::constants::BACKEND;
 
 pub struct QueryRoot;
 #[juniper::graphql_object(
@@ -34,7 +31,7 @@ impl QueryRoot {
         tokens: Vec<Address>,
         address: Address,
     ) -> Result<Vec<Token>, FieldError> {
-        let mut db = BACKEND.get().unwrap().write().await;
+        let mut db = DB.get().unwrap().write().await;
         Ok(tokens
             .iter()
             .cloned()
@@ -81,7 +78,7 @@ impl QueryRoot {
         tokens: Vec<Address>,
         address: Address,
     ) -> Result<Vec<LiquidityToken>, FieldError> {
-        let mut db = BACKEND.get().unwrap().write().await;
+        let mut db = DB.get().unwrap().write().await;
         Ok(tokens
             .iter()
             .cloned()
@@ -111,7 +108,7 @@ impl QueryRoot {
     }
 
     async fn proposals(_context: &Context) -> Vec<Proposal> {
-        let mut db = BACKEND.get().unwrap().write().await;
+        let mut db = DB.get().unwrap().write().await;
         let proposals = Governance::get_proposals(&mut db);
         proposals
             .iter()
@@ -149,13 +146,13 @@ impl QueryRoot {
     }
 
     async fn block_number(_context: &Context) -> Option<U64> {
-        let mut db = BACKEND.get().unwrap().write().await;
+        let mut db = DB.get().unwrap().write().await;
         let block_number = System::get_block_number(&mut db);
         Some(block_number.into())
     }
 
     async fn issuance_rewards(_context: &Context, address: Bytes) -> Result<U64, FieldError> {
-        let mut db = BACKEND.get().unwrap().write().await;
+        let mut db = DB.get().unwrap().write().await;
         let issuance_rewards = Ellipticoin::get_issuance_rewards(
             &mut db,
             address
@@ -171,7 +168,7 @@ impl QueryRoot {
         address: Bytes,
     ) -> Result<Vec<RedeemRequest>, FieldError> {
         let address = <[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?;
-        let mut db = BACKEND.get().unwrap().write().await;
+        let mut db = DB.get().unwrap().write().await;
         let pending_redeem_requests = Bridge::get_pending_redeem_requests(&mut db);
         Ok(pending_redeem_requests
             .iter()
@@ -201,7 +198,7 @@ impl QueryRoot {
         address: Bytes,
     ) -> Result<U64, FieldError> {
         let address = <[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?;
-        let mut db = BACKEND.get().unwrap().write().await;
+        let mut db = DB.get().unwrap().write().await;
         Ok(U64(System::get_next_transaction_number(&mut db, address)))
     }
 }

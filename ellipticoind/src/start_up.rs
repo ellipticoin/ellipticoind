@@ -1,14 +1,15 @@
 use crate::config::HOST;
 use crate::config::SIGNER;
-use crate::db::Backend;
+
+use crate::config::GENESIS_NODE;
 use crate::transaction::SignedSystemTransaction;
-use crate::{config::OPTS, hash_onion, serde_cbor::Deserializer, constants::BACKEND};
+use crate::{config::OPTS, constants::DB, hash_onion, serde_cbor::Deserializer};
 use ellipticoin_contracts::Action;
 use ellipticoin_peerchain_ethereum::eth_address;
 use std::fs::File;
 
 pub async fn start_miner() {
-    let mut db = BACKEND.get().unwrap().write().await;
+    let mut db = DB.get().unwrap().write().await;
     let start_mining_transaction = SignedSystemTransaction::new(
         &mut db,
         Action::StartMining(HOST.to_string(), hash_onion::peel().await),
@@ -20,6 +21,9 @@ pub async fn start_miner() {
     );
 }
 pub async fn catch_up() {
+    if *GENESIS_NODE {
+        return;
+    }
     // let pg_db = get_pg_connection();
     // let mut won_blocks = 0;
     // for block_number in 0.. {
@@ -49,7 +53,7 @@ pub async fn reset_state() {
 }
 
 pub async fn load_genesis_state() {
-    // let &mut backend = BACKEND.get().unwrap();
+    let mut db = DB.get().unwrap().write().await;
     let genesis_file = File::open(OPTS.genesis_state_path.clone()).expect(&format!(
         "Genesis file {} not found",
         &OPTS.genesis_state_path
@@ -59,6 +63,7 @@ pub async fn load_genesis_state() {
         .into_iter::<(Vec<u8>, Vec<u8>)>()
         .map(Result::unwrap)
     {
-        // ellipticoin_types::db::Backend::insert(backend, &key, &value);
+        db.insert_raw(&key, &value);
+        // ellipticoin_types::db::Backend::insert(db.backend, &key, &value);
     }
 }

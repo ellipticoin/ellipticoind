@@ -6,7 +6,10 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use ellipticoin_macros::db_accessors;
-use ellipticoin_types::{Address, db::{Db, Backend}};
+use ellipticoin_types::{
+    db::{Backend, Db},
+    Address,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -81,10 +84,7 @@ impl Bridge {
         Ok(())
     }
 
-    pub fn cancel_redeem_request<B: Backend>(
-        db: &mut Db<B>,
-        redeem_id: u64,
-    ) -> Result<()> {
+    pub fn cancel_redeem_request<B: Backend>(db: &mut Db<B>, redeem_id: u64) -> Result<()> {
         let pending_redeem_request = Self::remove_redeem_request(db, redeem_id)?;
         pay!(
             db,
@@ -135,19 +135,19 @@ mod tests {
     use crate::{constants::BASE_FACTOR, Token};
     use ellipticoin_test_framework::{
         constants::{actors::ALICE, tokens::APPLES},
-        test_db::TestDB,
+        new_db,
     };
 
     #[test]
     fn test_mint() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         Bridge::mint(&mut db, 1 * BASE_FACTOR, APPLES, ALICE).unwrap();
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES,), 1 * BASE_FACTOR);
     }
 
     #[test]
     fn test_redeem() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         Bridge::mint(&mut db, 1 * BASE_FACTOR, APPLES, ALICE).unwrap();
         Bridge::create_redeem_request(&mut db, ALICE, 1 * BASE_FACTOR, APPLES).unwrap();
         Bridge::redeem(&mut db, 0).unwrap();
@@ -156,7 +156,7 @@ mod tests {
 
     #[test]
     fn test_create_redeem_request() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         Bridge::mint(&mut db, 1 * BASE_FACTOR, APPLES, ALICE).unwrap();
         Bridge::create_redeem_request(&mut db, ALICE, 1 * BASE_FACTOR, APPLES).unwrap();
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 0 * BASE_FACTOR);
@@ -164,7 +164,7 @@ mod tests {
 
     #[test]
     fn test_sign_redeem_request() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         Bridge::mint(&mut db, 1 * BASE_FACTOR, APPLES, ALICE).unwrap();
         Bridge::create_redeem_request(&mut db, ALICE, 1 * BASE_FACTOR, APPLES).unwrap();
         Bridge::sign_redeem_request(&mut db, 0, 1, vec![1, 2, 3]).unwrap();
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_cancel_redeem_request() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         Bridge::mint(&mut db, 1 * BASE_FACTOR, APPLES, ALICE).unwrap();
         Bridge::create_redeem_request(&mut db, ALICE, 1 * BASE_FACTOR, APPLES).unwrap();
         Bridge::cancel_redeem_request(&mut db, 0).unwrap();

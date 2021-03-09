@@ -8,6 +8,9 @@ mod mutations;
 mod query_root;
 mod routes;
 mod types;
+use async_std::task::spawn;
+use std::net::SocketAddr;
+use tide::listener::Listener;
 pub mod views;
 pub struct API {
     pub app: tide::Server<()>,
@@ -23,4 +26,13 @@ impl API {
         api.routes();
         api
     }
+}
+
+pub async fn start(socket: SocketAddr) {
+    let api = API::new();
+    let mut listener = api.app.bind(socket).await.unwrap();
+    for info in listener.info().iter() {
+        println!("Server listening on {}", info);
+    }
+    spawn(async move { listener.accept().await.unwrap() });
 }

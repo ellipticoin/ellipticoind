@@ -1,18 +1,17 @@
 use crate::config::verification_key;
+use crate::constants::DB;
 use crate::{
-    db,
     constants::{NETWORK_ID, TRANSACTION_QUEUE},
     crypto::{recover, sign, sign_eth},
 };
 use anyhow::Result;
-use ellipticoin_types::db::{Db, Backend};
 use ellipticoin_contracts::{Action, Run, Transaction};
 use ellipticoin_contracts::{Bridge, System};
 use ellipticoin_peerchain_ethereum::{
     constants::{BRIDGE_ADDRESS, REDEEM_TIMEOUT},
     Signed, SignedTransaction,
 };
-use crate::constants::BACKEND;
+use ellipticoin_types::db::{Backend, Db};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -52,7 +51,7 @@ pub async fn dispatch(signed_transaction: SignedTransaction) -> Result<()> {
 }
 
 pub async fn run(signed_transaction: SignedTransaction) -> Result<()> {
-    let mut db = BACKEND.get().unwrap().write().await;
+    let mut db = DB.get().unwrap().write().await;
     let result = signed_transaction.run(&mut db).await;
     if matches!(
         signed_transaction.0.action,

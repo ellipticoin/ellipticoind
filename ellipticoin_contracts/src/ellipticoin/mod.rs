@@ -8,7 +8,10 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use ellipticoin_macros::db_accessors;
-use ellipticoin_types::{Address, db::{Backend, Db}};
+use ellipticoin_types::{
+    db::{Backend, Db},
+    Address,
+};
 use rand::{rngs::StdRng, seq::SliceRandom, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
@@ -50,7 +53,11 @@ impl Ellipticoin {
         Ok(())
     }
 
-    pub fn seal<B: Backend>(db: &mut Db<B>, sender: [u8; 20], hash_onion_skin: [u8; 32]) -> Result<()> {
+    pub fn seal<B: Backend>(
+        db: &mut Db<B>,
+        sender: [u8; 20],
+        hash_onion_skin: [u8; 32],
+    ) -> Result<()> {
         let mut miners = Self::get_miners(db);
         if sender
             != miners
@@ -64,8 +71,7 @@ impl Ellipticoin {
                 hex::encode(sender)
             )
         };
-        if !
-miners
+        if !miners
             .first()
             .unwrap()
             .hash_onion_skin
@@ -146,7 +152,12 @@ miners
         Ok(())
     }
 
-    fn transfer<B: Backend>(db: &mut Db<B>, sender: Address, recipient: Address, amount: u64) -> Result<()> {
+    fn transfer<B: Backend>(
+        db: &mut Db<B>,
+        sender: Address,
+        recipient: Address,
+        amount: u64,
+    ) -> Result<()> {
         Token::transfer(db, sender, recipient, amount, Self::address())
     }
 
@@ -190,13 +201,13 @@ mod tests {
     use crate::hash_onion;
     use ellipticoin_test_framework::{
         constants::actors::{ALICE, ALICES_PRIVATE_KEY, BOB, BOBS_PRIVATE_KEY},
-        setup, TestDB,
+        new_db, setup,
     };
 
     #[test]
     fn test_commit_and_seal() {
         let elc: [u8; 20] = Ellipticoin::address();
-        let mut db = TestDB::new();
+        let mut db = new_db();
         setup(
             &mut db,
             hashmap! {

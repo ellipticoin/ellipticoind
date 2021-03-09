@@ -1,13 +1,15 @@
-use crate::transaction::Run;
-use crate::Ellipticoin;
 use crate::{
     contract::{self, Contract},
     token::Token,
-    Action,
+    transaction::Run,
+    Action, Ellipticoin,
 };
 use anyhow::{anyhow, Result};
 use ellipticoin_macros::db_accessors;
-use ellipticoin_types::{Address, db::{Backend, Db}};
+use ellipticoin_types::{
+    db::{Backend, Db},
+    Address,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -113,20 +115,19 @@ impl Governance {
 #[cfg(test)]
 mod tests {
     use super::{Governance, Proposal, Vote};
-    use crate::contract::Contract;
-    use crate::{constants::MS, Action, Token};
+    use crate::{constants::MS, contract::Contract, Action, Token};
     use ellipticoin_test_framework::{
         constants::{
             actors::{ALICE, BOB, CAROL},
             tokens::APPLES,
         },
-        test_db::TestDb,
+        new_db,
     };
     use std::collections::HashMap;
 
     #[test]
     fn create_proposal() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         let actions = vec![Action::Pay(ALICE, 1, APPLES)];
         let mut votes = HashMap::new();
         votes.insert(ALICE, Vote::For);
@@ -159,7 +160,7 @@ mod tests {
 
     #[test]
     fn vote() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         let actions = vec![Action::Pay(ALICE, 1, APPLES)];
         Token::mint(&mut db, 1, APPLES, Governance::address());
         Token::mint(&mut db, 1, MS, ALICE);

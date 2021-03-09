@@ -9,7 +9,10 @@ use crate::{
 };
 use anyhow::{bail, Result};
 use ellipticoin_macros::db_accessors;
-use ellipticoin_types::{Address, db::{Db, Backend}};
+use ellipticoin_types::{
+    db::{Backend, Db},
+    Address,
+};
 use std::{collections::HashSet, convert::TryInto};
 
 pub struct AMM;
@@ -128,7 +131,11 @@ impl AMM {
         Ok(())
     }
 
-    fn trade_token_for_base_token<B: Backend>(db: &mut Db<B>, token: Address, amount: u64) -> Result<u64> {
+    fn trade_token_for_base_token<B: Backend>(
+        db: &mut Db<B>,
+        token: Address,
+        amount: u64,
+    ) -> Result<u64> {
         if token == BASE_TOKEN {
             return Ok(amount);
         };
@@ -143,7 +150,11 @@ impl AMM {
         Ok(output_amount)
     }
 
-    fn trade_base_token_for_token<B: Backend>(db: &mut Db<B>, token: Address, amount: u64) -> Result<u64> {
+    fn trade_base_token_for_token<B: Backend>(
+        db: &mut Db<B>,
+        token: Address,
+        amount: u64,
+    ) -> Result<u64> {
         if token == BASE_TOKEN {
             return Ok(amount);
         };
@@ -169,7 +180,12 @@ impl AMM {
         amount - ((amount as u128 * FEE as u128) / BASE_FACTOR as u128) as u64
     }
 
-    fn charge<B: Backend>(db: &mut Db<B>, address: Address, token: Address, amount: u64) -> Result<()> {
+    fn charge<B: Backend>(
+        db: &mut Db<B>,
+        address: Address,
+        token: Address,
+        amount: u64,
+    ) -> Result<()> {
         charge!(db, address, token, amount)?;
         Self::credit_pool_supply_of_token(db, token, amount);
         Ok(())
@@ -186,7 +202,12 @@ impl AMM {
         Ok(())
     }
 
-    fn pay<B: Backend>(db: &mut Db<B>, address: Address, token: Address, amount: u64) -> Result<()> {
+    fn pay<B: Backend>(
+        db: &mut Db<B>,
+        address: Address,
+        token: Address,
+        amount: u64,
+    ) -> Result<()> {
         Self::debit_pool_supply_of_token(db, token, amount)?;
         pay!(db, address, token, amount)?;
         Ok(())
@@ -227,7 +248,11 @@ impl AMM {
         Ok(())
     }
 
-    fn debit_pool_supply_of_token<B: Backend>(db: &mut Db<B>, token: Address, amount: u64) -> Result<()> {
+    fn debit_pool_supply_of_token<B: Backend>(
+        db: &mut Db<B>,
+        token: Address,
+        amount: u64,
+    ) -> Result<()> {
         let token_supply = Self::get_pool_supply_of_token(db, token);
         if token_supply >= amount {
             Self::set_pool_supply_of_token(db, token, token_supply - amount);
@@ -282,12 +307,12 @@ mod tests {
             actors::{ALICE, BOB},
             tokens::{APPLES, BANANAS},
         },
-        setup, TestDB,
+        new_db, setup,
     };
 
     #[test]
     fn test_create_pool() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         setup(
             &mut db,
             hashmap! {
@@ -315,7 +340,7 @@ mod tests {
 
     #[test]
     fn test_recreate_pool() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         setup(
             &mut db,
             hashmap! {
@@ -349,7 +374,7 @@ mod tests {
 
     #[test]
     fn test_create_pool_insufficient_token_balance() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         setup(
             &mut db,
             hashmap! {
@@ -385,7 +410,7 @@ mod tests {
     }
     #[test]
     fn test_create_pool_insufficient_base_token_balance() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         setup(
             &mut db,
             hashmap! {
@@ -422,7 +447,7 @@ mod tests {
 
     #[test]
     fn test_add_liquidity() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         setup(
             &mut db,
             hashmap! {
@@ -451,7 +476,7 @@ mod tests {
 
     #[test]
     fn test_add_to_existing_liquidity() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         setup(
             &mut db,
             hashmap! {
@@ -481,7 +506,7 @@ mod tests {
 
     #[test]
     fn test_remove_liquidity() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         setup(
             &mut db,
             hashmap! {
@@ -516,7 +541,7 @@ mod tests {
 
     #[test]
     fn test_trade() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         setup(
             &mut db,
             hashmap! {
@@ -538,7 +563,7 @@ mod tests {
 
     #[test]
     fn test_trade_base_token() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         setup(
             &mut db,
             hashmap! {
@@ -577,7 +602,7 @@ mod tests {
 
     #[test]
     fn test_trade_for_base_token() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         setup(
             &mut db,
             hashmap! {
@@ -615,7 +640,7 @@ mod tests {
 
     #[test]
     fn test_trade_max_slippage_exceeded() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         setup(
             &mut db,
             hashmap! {
@@ -664,7 +689,7 @@ mod tests {
 
     #[test]
     fn test_trade_with_invariant_overflow() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         setup(
             &mut db,
             hashmap! {
@@ -715,7 +740,7 @@ mod tests {
 
     #[test]
     fn test_remove_liquidity_after_trade() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         setup(
             &mut db,
             hashmap! {

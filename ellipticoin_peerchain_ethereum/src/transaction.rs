@@ -5,7 +5,10 @@ use ellipticoin_contracts::{
     governance::Vote,
     Action, Transaction,
 };
-use ellipticoin_types::{Address, ADDRESS_LENGTH, db::{Db, Backend}};
+use ellipticoin_types::{
+    db::{Backend, Db},
+    Address, ADDRESS_LENGTH,
+};
 use k256::{
     ecdsa::{recoverable, VerifyingKey},
     elliptic_curve::sec1::ToEncodedPoint,

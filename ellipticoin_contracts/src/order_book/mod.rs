@@ -7,7 +7,10 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use ellipticoin_macros::db_accessors;
-use ellipticoin_types::{Address, db::{Db, Backend}};
+use ellipticoin_types::{
+    db::{Backend, Db},
+    Address,
+};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -112,12 +115,12 @@ mod tests {
             actors::{ALICE, BOB},
             tokens::APPLES,
         },
-        test_db::TestDB,
+        new_db,
     };
 
     #[test]
     fn test_create_order() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         Token::set_balance(&mut db, ALICE, APPLES, 1);
         OrderBook::create_order(&mut db, ALICE, OrderType::Sell, 1, APPLES, 1).unwrap();
         assert_eq!(
@@ -135,7 +138,7 @@ mod tests {
 
     #[test]
     fn test_cancel() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         Token::set_balance(&mut db, ALICE, APPLES, 1);
         OrderBook::create_order(&mut db, ALICE, OrderType::Sell, 1, APPLES, 1).unwrap();
         OrderBook::cancel(&mut db, ALICE, 0).unwrap();
@@ -144,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_fill() {
-        let mut db = TestDB::new();
+        let mut db = new_db();
         Token::set_balance(&mut db, ALICE, APPLES, 1);
         Token::set_balance(&mut db, BOB, USD, 1);
         OrderBook::create_order(&mut db, ALICE, OrderType::Sell, 1, APPLES, 1).unwrap();

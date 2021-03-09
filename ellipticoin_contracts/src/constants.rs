@@ -1,5 +1,4 @@
-use crate::contract::Contract;
-use crate::Ellipticoin;
+use crate::{contract::Contract, Ellipticoin};
 use ellipticoin_types::Address;
 use std::time::Duration;
 

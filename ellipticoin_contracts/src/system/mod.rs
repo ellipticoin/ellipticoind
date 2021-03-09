@@ -1,6 +1,9 @@
 use crate::contract::{self, Contract};
 use ellipticoin_macros::db_accessors;
-use ellipticoin_types::{Address, db::{Db, Backend}};
+use ellipticoin_types::{
+    db::{Backend, Db},
+    Address,
+};
 
 pub struct System;
 
