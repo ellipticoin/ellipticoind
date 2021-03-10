@@ -57,6 +57,14 @@ impl<B: Backend> Db<B> {
     pub fn revert(&mut self) {
         self.transaction_state.clear();
     }
+
+    pub fn all(&mut self) -> Vec<(Vec<u8>, Vec<u8>)> {
+        self.backend.all()
+    }
+
+    pub fn into_iter(self) -> B::IntoIter {
+        self.backend.into_iter()
+    }
 }
 
 pub trait Backend: Send + Sync + IntoIterator {
@@ -66,9 +74,8 @@ pub trait Backend: Send + Sync + IntoIterator {
     fn insert(&mut self, key: &[u8], value: &[u8])
     where
         Self: Sized;
+    fn all(&self) -> Vec<(Vec<u8>, Vec<u8>)>
+    where
+        Self: Sized;
     
-    // fn iter(&self) -> dyn Iterator<Item = (Vec<u8>, Vec<u8>)>
-    // where
-    //     Self: Sized;
-    //
 }

@@ -21,14 +21,16 @@ impl Backend for MemoryBackend {
     fn insert(&mut self, key: &[u8], value: &[u8]) {
         self.state.insert(key.to_vec(), value.to_vec());
     }
-    // fn iter(&self) -> ()  { todo!() }
+
+    fn all(&self) -> Vec<(Vec<u8>, Vec<u8>)>  {
+        self.state.iter().map(|(key, value)| (key.to_vec(), value.to_vec())).collect()
+    }
 }
 
-impl IntoIterator for MemoryBackend {
-    type Item = (Vec<u8>, Vec<u8>);
-    type IntoIter = std::vec::IntoIter<Self::Item>;
 
-    fn into_iter(self) -> Self::IntoIter {
-        self.state.into_iter().map(|(key, value)| (key, value)).collect::<Vec<(Vec<u8>, Vec<u8>)>>().into_iter()
+impl Iterator for MemoryBackend {
+    type Item = (Vec<u8>, Vec<u8>);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.state.iter().map(|(key, value)| (key.to_vec(), value.to_vec())).next()
     }
 }

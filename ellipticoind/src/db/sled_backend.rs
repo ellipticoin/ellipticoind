@@ -3,14 +3,6 @@ pub struct SledBackend {
     pub db: sled::Db,
 }
 
-// impl SledBackend {
-//     pub fn new(path: String) -> Result<Self> {
-//         Ok(Self {
-//             db: sled::open(path)?,
-//         })
-//     }
-// }
-
 impl<'a> ellipticoin_types::db::Backend for SledBackend {
     fn get(&self, key: &[u8]) -> Vec<u8> {
         self.db
@@ -23,14 +15,13 @@ impl<'a> ellipticoin_types::db::Backend for SledBackend {
     fn insert(&mut self, key: &[u8], value: &[u8]) {
         self.db.insert(key.to_vec(), value.to_vec()).unwrap();
     }
-    // fn iter(&self) -> impl Iterator<Item=u8> + '_  { todo!() }
+
+    fn all(&self) -> Vec<(Vec<u8>, Vec<u8>)>  {
+        self.db.iter().map(Result::unwrap).map(|(key, value)| (key.to_vec(), value.to_vec())).collect()
+    }
 }
 
-impl IntoIterator for SledBackend {
+impl Iterator for SledBackend {
     type Item = (Vec<u8>, Vec<u8>);
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.db.into_iter().map(|item| item.unwrap()).map(|(key, value)| (key.to_vec(), value.to_vec())).collect::<Vec<(Vec<u8>, Vec<u8>)>>().into_iter()
-    }
+    fn next(&mut self) -> std::option::Option<<Self as Iterator>::Item> { todo!() }
 }
