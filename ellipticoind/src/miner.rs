@@ -51,7 +51,12 @@ async fn _wait_for_peer() {
 // }
 async fn mine_block(_block_number: u32) {
     let block_number = {
-        let mut db = DB.get().unwrap().write().await;
+    let mut backend = DB.get().unwrap().write().await;
+    let store_lock = crate::db::StoreLock{guard: backend};
+    let mut db = ellipticoin_types::Db {
+backend: store_lock,
+             transaction_state: Default::default(),
+    };
         System::get_block_number(&mut db)
     };
     println!("Won block #{}", block_number);
@@ -64,7 +69,12 @@ async fn mine_block(_block_number: u32) {
         }
     })
     .await;
-    let mut db = DB.get().unwrap().write().await;
+    let mut backend = DB.get().unwrap().write().await;
+    let store_lock = crate::db::StoreLock{guard: backend};
+    let mut db = ellipticoin_types::Db {
+backend: store_lock,
+             transaction_state: Default::default(),
+    };
     peerchains::poll(&mut db).await;
     let seal_transaction =
         SignedSystemTransaction::new(&mut db, Action::Seal(hash_onion::peel().await));

@@ -52,6 +52,12 @@ pub async fn dispatch(signed_transaction: SignedTransaction) -> Result<()> {
 
 pub async fn run(signed_transaction: SignedTransaction) -> Result<()> {
     let mut db = DB.get().unwrap().write().await;
+    let mut backend = DB.get().unwrap().write().await;
+    let store_lock = crate::db::StoreLock{guard: backend};
+    let mut db = ellipticoin_types::Db {
+backend: store_lock,
+             transaction_state: Default::default(),
+    };
     let result = signed_transaction.run(&mut db).await;
     if matches!(
         signed_transaction.0.action,

@@ -13,7 +13,7 @@ use once_cell::sync::OnceCell;
 use std::{sync::Arc, time::Duration};
 
 pub const NETWORK_ID: u64 = 0;
-pub static DB: OnceCell<RwLock<Db<Backend>>> = OnceCell::new();
+pub static DB: OnceCell<RwLock<Backend>> = OnceCell::new();
 
 lazy_static! {
     pub static ref BLOCK_TIME: Duration = Duration::from_secs(4);

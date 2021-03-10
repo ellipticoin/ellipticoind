@@ -9,7 +9,12 @@ use ellipticoin_peerchain_ethereum::eth_address;
 use std::fs::File;
 
 pub async fn start_miner() {
-    let mut db = DB.get().unwrap().write().await;
+    let mut backend = DB.get().unwrap().write().await;
+    let store_lock = crate::db::StoreLock{guard: backend};
+    let mut db = ellipticoin_types::Db {
+backend: store_lock,
+             transaction_state: Default::default(),
+    };
     let start_mining_transaction = SignedSystemTransaction::new(
         &mut db,
         Action::StartMining(HOST.to_string(), hash_onion::peel().await),
@@ -53,7 +58,12 @@ pub async fn reset_state() {
 }
 
 pub async fn load_genesis_state() {
-    let mut db = DB.get().unwrap().write().await;
+    let mut backend = DB.get().unwrap().write().await;
+    let store_lock = crate::db::StoreLock{guard: backend};
+    let mut db = ellipticoin_types::Db {
+backend: store_lock,
+             transaction_state: Default::default(),
+    };
     let genesis_file = File::open(OPTS.genesis_state_path.clone()).expect(&format!(
         "Genesis file {} not found",
         &OPTS.genesis_state_path
