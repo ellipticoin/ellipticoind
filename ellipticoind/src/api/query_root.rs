@@ -31,9 +31,9 @@ impl QueryRoot {
         tokens: Vec<Address>,
         address: Address,
     ) -> Result<Vec<Token>, FieldError> {
-        let mut db = DB.get().unwrap().write().await;
-        let mut backend = DB.get().unwrap().write().await;
-        let store_lock = crate::db::StoreLock{guard: backend};
+        let _db = DB.get().unwrap().write().await;
+        let backend = DB.get().unwrap().write().await;
+        let store_lock = crate::db::StoreLock { guard: backend };
         let mut db = ellipticoin_types::Db {
             backend: store_lock,
             transaction_state: Default::default(),
@@ -84,9 +84,9 @@ impl QueryRoot {
         tokens: Vec<Address>,
         address: Address,
     ) -> Result<Vec<LiquidityToken>, FieldError> {
-        let mut db = DB.get().unwrap().write().await;
-        let mut backend = DB.get().unwrap().write().await;
-        let store_lock = crate::db::StoreLock{guard: backend};
+        let _db = DB.get().unwrap().write().await;
+        let backend = DB.get().unwrap().write().await;
+        let store_lock = crate::db::StoreLock { guard: backend };
         let mut db = ellipticoin_types::Db {
             backend: store_lock,
             transaction_state: Default::default(),
@@ -120,9 +120,9 @@ impl QueryRoot {
     }
 
     async fn proposals(_context: &Context) -> Vec<Proposal> {
-        let mut db = DB.get().unwrap().write().await;
-        let mut backend = DB.get().unwrap().write().await;
-        let store_lock = crate::db::StoreLock{guard: backend};
+        let _db = DB.get().unwrap().write().await;
+        let backend = DB.get().unwrap().write().await;
+        let store_lock = crate::db::StoreLock { guard: backend };
         let mut db = ellipticoin_types::Db {
             backend: store_lock,
             transaction_state: Default::default(),
@@ -164,9 +164,9 @@ impl QueryRoot {
     }
 
     async fn block_number(_context: &Context) -> Option<U64> {
-        let mut db = DB.get().unwrap().write().await;
-        let mut backend = DB.get().unwrap().write().await;
-        let store_lock = crate::db::StoreLock{guard: backend};
+        let _db = DB.get().unwrap().write().await;
+        let backend = DB.get().unwrap().write().await;
+        let store_lock = crate::db::StoreLock { guard: backend };
         let mut db = ellipticoin_types::Db {
             backend: store_lock,
             transaction_state: Default::default(),
@@ -176,8 +176,8 @@ impl QueryRoot {
     }
 
     async fn issuance_rewards(_context: &Context, address: Bytes) -> Result<U64, FieldError> {
-        let mut backend = DB.get().unwrap().write().await;
-        let store_lock = crate::db::StoreLock{guard: backend};
+        let backend = DB.get().unwrap().write().await;
+        let store_lock = crate::db::StoreLock { guard: backend };
         let mut db = ellipticoin_types::Db {
             backend: store_lock,
             transaction_state: Default::default(),
@@ -197,8 +197,8 @@ impl QueryRoot {
         address: Bytes,
     ) -> Result<Vec<RedeemRequest>, FieldError> {
         let address = <[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?;
-        let mut backend = DB.get().unwrap().write().await;
-        let store_lock = crate::db::StoreLock{guard: backend};
+        let backend = DB.get().unwrap().write().await;
+        let store_lock = crate::db::StoreLock { guard: backend };
         let mut db = ellipticoin_types::Db {
             backend: store_lock,
             transaction_state: Default::default(),
@@ -232,8 +232,8 @@ impl QueryRoot {
         address: Bytes,
     ) -> Result<U64, FieldError> {
         let address = <[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?;
-        let mut backend = DB.get().unwrap().write().await;
-        let store_lock = crate::db::StoreLock{guard: backend};
+        let backend = DB.get().unwrap().write().await;
+        let store_lock = crate::db::StoreLock { guard: backend };
         let mut db = ellipticoin_types::Db {
             backend: store_lock,
             transaction_state: Default::default(),

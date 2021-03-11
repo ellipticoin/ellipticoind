@@ -5,11 +5,11 @@ use ellipticoin_types::db::{Backend, Db};
 use std::task::Poll;
 
 pub async fn start() {
-    let mut backend = DB.get().unwrap().write().await;
-    let store_lock = crate::db::StoreLock{guard: backend};
+    let backend = DB.get().unwrap().write().await;
+    let store_lock = crate::db::StoreLock { guard: backend };
     let mut db = ellipticoin_types::Db {
-backend: store_lock,
-             transaction_state: Default::default(),
+        backend: store_lock,
+        transaction_state: Default::default(),
     };
     let ethereum_block_number = ellipticoin_peerchain_ethereum::get_current_block()
         .await

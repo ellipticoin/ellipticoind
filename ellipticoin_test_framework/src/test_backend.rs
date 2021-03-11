@@ -23,12 +23,17 @@ impl ellipticoin_types::db::Backend for TestBackend {
         self.state.insert(key.to_vec(), value.to_vec());
     }
 
-    fn all(&self) -> Vec<(Vec<u8>, Vec<u8>)>  {
-        self.state.iter().map(|(key, value)| (key.to_vec(), value.to_vec())).collect()
+    fn all(&self) -> Vec<(Vec<u8>, Vec<u8>)> {
+        self.state
+            .iter()
+            .map(|(key, value)| (key.to_vec(), value.to_vec()))
+            .collect()
     }
 }
 
 impl Iterator for TestBackend {
     type Item = (Vec<u8>, Vec<u8>);
-    fn next(&mut self) -> std::option::Option<<Self as Iterator>::Item> { todo!() }
+    fn next(&mut self) -> std::option::Option<<Self as Iterator>::Item> {
+        todo!()
+    }
 }

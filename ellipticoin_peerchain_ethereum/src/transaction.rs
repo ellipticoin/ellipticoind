@@ -207,8 +207,10 @@ pub fn ecrecover(hash: Vec<u8>, signature_bytes_slice: &[u8]) -> Result<Address>
         .map_err(|e: TryFromSliceError| anyhow!(e.to_string()))
 }
 
-pub fn eth_address(verify_key: VerifyingKey) -> Vec<u8> {
-    keccak256(verify_key.to_encoded_point(false).to_bytes().to_vec()[1..].to_vec())[12..].to_vec()
+pub fn eth_address(verify_key: VerifyingKey) -> [u8; 20] {
+    keccak256(verify_key.to_encoded_point(false).to_bytes().to_vec()[1..].to_vec())[12..]
+        .try_into()
+        .unwrap()
 }
 
 pub fn keccak256(bytes: Vec<u8>) -> Vec<u8> {

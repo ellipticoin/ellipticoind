@@ -1,5 +1,6 @@
 use crate::config::verification_key;
 use crate::constants::DB;
+use crate::constants::TRANSACTIONS_FILE;
 use crate::{
     constants::{NETWORK_ID, TRANSACTION_QUEUE},
     crypto::{recover, sign, sign_eth},
@@ -15,7 +16,7 @@ use ellipticoin_types::db::{Backend, Db};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SignedSystemTransaction(Transaction<Action>, Vec<u8>);
+pub struct SignedSystemTransaction(pub Transaction<Action>, Vec<u8>);
 
 impl Signed for SignedSystemTransaction {
     fn sender(&self) -> Result<[u8; 20]> {
@@ -41,6 +42,17 @@ impl SignedSystemTransaction {
         } else {
             db.revert();
         }
+        serde_cbor::to_writer(&*TRANSACTIONS_FILE, &self).unwrap();
+        result
+    }
+
+    pub async fn apply<B: Backend>(&self, db: &mut Db<B>) -> Result<()> {
+        let result = self.0.action.run(db, self.sender()?);
+        if result.is_ok() {
+            db.commit();
+        } else {
+            db.revert();
+        }
         result
     }
 }
@@ -51,12 +63,12 @@ pub async fn dispatch(signed_transaction: SignedTransaction) -> Result<()> {
 }
 
 pub async fn run(signed_transaction: SignedTransaction) -> Result<()> {
-    let mut db = DB.get().unwrap().write().await;
-    let mut backend = DB.get().unwrap().write().await;
-    let store_lock = crate::db::StoreLock{guard: backend};
+    let _db = DB.get().unwrap().write().await;
+    let backend = DB.get().unwrap().write().await;
+    let store_lock = crate::db::StoreLock { guard: backend };
     let mut db = ellipticoin_types::Db {
-backend: store_lock,
-             transaction_state: Default::default(),
+        backend: store_lock,
+        transaction_state: Default::default(),
     };
     let result = signed_transaction.run(&mut db).await;
     if matches!(

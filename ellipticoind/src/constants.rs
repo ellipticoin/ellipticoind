@@ -7,15 +7,22 @@ use async_std::{
 };
 use broadcaster::BroadcastChannel;
 use ellipticoin_peerchain_ethereum::SignedTransaction;
-use ellipticoin_types::db::Db;
 use futures::channel::oneshot;
 use once_cell::sync::OnceCell;
+use std::fs::File;
+use std::fs::OpenOptions;
 use std::{sync::Arc, time::Duration};
 
 pub const NETWORK_ID: u64 = 0;
 pub static DB: OnceCell<RwLock<Backend>> = OnceCell::new();
 
 lazy_static! {
+    pub static ref TRANSACTIONS_FILE: File = OpenOptions::new()
+        .write(true)
+        .append(true)
+        .create(true)
+        .open("transactions.cbor")
+        .unwrap();
     pub static ref BLOCK_TIME: Duration = Duration::from_secs(4);
     pub static ref TRANSACTION_QUEUE_SIZE: usize = 1000;
     pub static ref TRANSACTION_QUEUE: (

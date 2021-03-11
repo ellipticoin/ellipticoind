@@ -1,6 +1,6 @@
 use clap::Clap;
 use dotenv::dotenv;
-
+use ellipticoin_peerchain_ethereum::eth_address;
 use k256::ecdsa::SigningKey;
 use serde::{Deserialize, Deserializer};
 use std::{
@@ -101,6 +101,9 @@ pub fn socket() -> SocketAddr {
     (OPTS.bind_address.parse::<IpAddr>().unwrap(), OPTS.port).into()
 }
 
+pub fn address() -> [u8; 20] {
+    eth_address(SIGNER.verify_key())
+}
 pub fn verification_key() -> [u8; 20] {
     [0; 20]
     // VerificationKey::from(&signing_key()).into()

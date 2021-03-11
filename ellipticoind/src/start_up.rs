@@ -1,55 +1,62 @@
 use crate::config::HOST;
 use crate::config::SIGNER;
-
-use crate::config::GENESIS_NODE;
+use crate::config::{self, address};
 use crate::transaction::SignedSystemTransaction;
 use crate::{config::OPTS, constants::DB, hash_onion, serde_cbor::Deserializer};
 use ellipticoin_contracts::Action;
+use ellipticoin_contracts::{Ellipticoin, Miner};
 use ellipticoin_peerchain_ethereum::eth_address;
+use ellipticoin_peerchain_ethereum::Signed;
 use std::fs::File;
+use std::path::Path;
+use crate::db;
 
 pub async fn start_miner() {
-    let mut backend = DB.get().unwrap().write().await;
-    let store_lock = crate::db::StoreLock{guard: backend};
+    let backend = DB.get().unwrap().write().await;
+    let store_lock = crate::db::StoreLock { guard: backend };
     let mut db = ellipticoin_types::Db {
-backend: store_lock,
-             transaction_state: Default::default(),
+        backend: store_lock,
+        transaction_state: Default::default(),
     };
     let start_mining_transaction = SignedSystemTransaction::new(
         &mut db,
         Action::StartMining(HOST.to_string(), hash_onion::peel().await),
     );
-    start_mining_transaction.run(&mut db).await.unwrap();
-    println!(
-        "Started Miner: {}",
-        hex::encode(eth_address(SIGNER.verify_key()))
-    );
+    if !Ellipticoin::get_miners(&mut db)
+        .iter()
+        .any(|Miner { address, .. }| address.clone() == config::address())
+    {
+        start_mining_transaction.run(&mut db).await.unwrap();
+        println!(
+            "Started Miner: {}",
+            hex::encode(eth_address(SIGNER.verify_key()))
+        );
+    }
 }
 pub async fn catch_up() {
-    if *GENESIS_NODE {
-        return;
-    }
-    // let pg_db = get_pg_connection();
-    // let mut won_blocks = 0;
-    // for block_number in 0.. {
-    //     if let Ok((block, transactions)) = get_block(block_number).await {
-    //         if !block.sealed {
-    //             break;
-    //         }
-    //
-    //         // let state = block.apply(transactions).await;
-    //         // if state.miners.first().unwrap().address == verification_key() {
-    //         //     won_blocks += 1;
-    //         // }
-    //     } else {
-    //         break;
-    //     }
-    // }
-    // if won_blocks > 0 {
-    //     HashOnion::skip(&pg_db, won_blocks);
-    // }
-
     println!("Syncing complete");
+    if Path::new("transactions.cbor").exists() {
+        let transacations_file = File::open("transactions.cbor").unwrap();
+        for transaction in Deserializer::from_reader(&transacations_file)
+            .into_iter::<SignedSystemTransaction>()
+            .map(Result::unwrap)
+        {
+            let backend = DB.get().unwrap().write().await;
+            let store_lock = crate::db::StoreLock { guard: backend };
+            let mut db = ellipticoin_types::Db {
+                backend: store_lock,
+                transaction_state: Default::default(),
+            };
+            let result = transaction.apply(&mut db).await;
+            if transaction.sender().unwrap_or(Default::default()) == address()
+                && matches!(&transaction.0.action, Action::Seal(_))
+                && result.is_ok()
+            {
+                hash_onion::peel().await;
+            }
+        }
+        db::verify().await;
+    }
 }
 
 pub async fn reset_state() {
@@ -58,11 +65,11 @@ pub async fn reset_state() {
 }
 
 pub async fn load_genesis_state() {
-    let mut backend = DB.get().unwrap().write().await;
-    let store_lock = crate::db::StoreLock{guard: backend};
+    let backend = DB.get().unwrap().write().await;
+    let store_lock = crate::db::StoreLock { guard: backend };
     let mut db = ellipticoin_types::Db {
-backend: store_lock,
-             transaction_state: Default::default(),
+        backend: store_lock,
+        transaction_state: Default::default(),
     };
     let genesis_file = File::open(OPTS.genesis_state_path.clone()).expect(&format!(
         "Genesis file {} not found",
@@ -74,6 +81,5 @@ backend: store_lock,
         .map(Result::unwrap)
     {
         db.insert_raw(&key, &value);
-        // ellipticoin_types::db::Backend::insert(db.backend, &key, &value);
     }
 }

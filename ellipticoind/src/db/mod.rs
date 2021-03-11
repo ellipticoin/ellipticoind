@@ -2,11 +2,13 @@ pub mod memory_backend;
 pub mod sled_backend;
 
 use crate::constants::DB;
-use std::collections::HashMap;
-use async_std::sync::{RwLock, RwLockWriteGuard, RwLockReadGuard};
+use async_std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use indicatif::ProgressBar;
 pub use memory_backend::MemoryBackend;
+use serde_cbor::Deserializer;
 pub use sled_backend::SledBackend;
-use std::collections::hash_map::Iter;
+use std::fs::File;
+use std::path::Path;
 
 #[derive(Debug)]
 pub enum Backend {
@@ -38,37 +40,70 @@ impl ellipticoin_types::db::Backend for Backend {
             Backend::Memory(memory_db) => memory_db.all(),
         }
     }
-
-
-    
 }
 impl Backend {
-    fn get_cursor(&self) -> Cursor {
+    fn dump(&self) {
+        println!("\nDumping state...");
+        let file = File::create("state-dump.cbor").unwrap();
+        let pb = ProgressBar::new(0);
+        pb.set_style(
+            indicatif::ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] [{bar}] {pos}/{len} ({percent}%)")
+                .progress_chars("=> "),
+        );
         match self {
-            Backend::_SledDb(sled_db) => panic!(),
+            Backend::_SledDb(_sled_db) => panic!(),
             Backend::Memory(memory_db) => {
-        println!("getting: {}",memory_db.state.len() );
-        Cursor{iter: memory_db.state.iter()}
-},
+                let state_length = memory_db.state.len();
+                pb.set_length(state_length as u64);
+                for key_value in &memory_db.state {
+                    pb.inc(1);
+                    serde_cbor::to_writer(&file, &key_value).unwrap();
+                }
+                pb.finish();
+            }
         }
+    }
+
+    fn verify(&self) {
+        println!("Verifying state dump");
+        let state_dump_file = File::open("state-dump.cbor")
+        .unwrap();
+        match self {
+            Backend::_SledDb(_sled_db) => panic!(),
+            Backend::Memory(memory_db) => {
+                let mut key_count = 0;
+                for (key, value) in Deserializer::from_reader(&state_dump_file).into_iter::<(Vec<u8>, Vec<u8>)>().map(Result::unwrap) {
+                    // Skip verification of ethereum block number
+                    if base64::encode(&key) == "AQAAAA==" {
+                        continue;
+                    };
+                    println!("{}: {} == {}", base64::encode(&key), base64::encode(&value), base64::encode(memory_db.state.get(&key).unwrap()));
+                    assert!(memory_db.state.get(&key).expect(&format!("State verification failed {} != {}", base64::encode(key), base64::encode(&value))).to_vec() == value);
+                    key_count+=1;
+                }
+
+
+                if key_count == memory_db.state.len() {
+                    println!("Verified state dump");
+                } else {
+                    panic!("State dump verification failed")
+                }
+                }
+            }
     }
 }
 
-// impl Backend {
-//     pub fn iter<'a>(self) -> Cursor<'a> {
-//         match self {
-//             Backend::_SledDb(sled_db) => panic!(""),
-// // BackendIterator{
-// //                 iter: BackendIteratorType::SledIterator(sled_db.db.iter())
-// //             },
-//             Backend::Memory(memory_db) => Cursor{
-//                 iter: memory_db.state.iter()
-// // BackendIteratorType::HashMapIterator(memory_db.state.iter())
-//             },
-//         }
-//     }
-// }
-
+pub async fn verify() {
+    if Path::new("state-dump.cbor").exists() {
+        let lock = lock().await;
+        lock.verify();
+    }
+}
+pub async fn dump() {
+    let lock = lock().await;
+    lock.dump();
+}
 pub struct StoreLock<'a> {
     pub guard: RwLockWriteGuard<'a, Backend>,
 }
@@ -78,18 +113,13 @@ pub struct ReadLock<'a> {
 }
 
 pub async fn lock<'a>() -> ReadLock<'a> {
-    let backend=  DB.get().unwrap().read().await;
-    ReadLock{guard: backend}
+    let backend = DB.get().unwrap().read().await;
+    ReadLock { guard: backend }
 }
 impl<'a> Iterator for StoreLock<'a> {
-   type Item = (Vec<u8>, Vec<u8>);
-   fn next(&mut self) -> Option<<Self as Iterator>::Item> { 
-        println!("StoreLock");
+    type Item = (Vec<u8>, Vec<u8>);
+    fn next(&mut self) -> Option<<Self as Iterator>::Item> {
         None
-        // match &mut self.iter {
-        //   BackendIteratorType::HashMapIterator(mut hash_map_iter) => hash_map_iter.next().map(|(key, value)| (key.clone(), value.clone())),
-        //  BackendIteratorType::SledIterator(sled_iter) => sled_iter.next().map(Result::unwrap).map(|(key, value)| (key.to_vec(), value.to_vec())),
-        // }
     }
 }
 
@@ -110,69 +140,25 @@ impl ellipticoin_types::db::Backend for StoreLock<'_> {
     }
 }
 impl<'a> ReadLock<'a> {
-    pub fn get_cursor(&self) -> Cursor {
-        println!("get_cursor");
-        self.guard.get_cursor()
+    pub fn dump(&self) {
+        self.guard.dump()
+    }
+
+    pub fn verify(&self) {
+        self.guard.verify()
     }
 }
 
-struct BackendIterator<'a> {
-    iter: BackendIteratorType<'a>,
-}
-
-pub struct Cursor<'a> {
-    iter: Iter<'a, Vec<u8>, Vec<u8>>,
-}
-
-impl<'a> Iterator for Cursor<'a> {
-   type Item = (Vec<u8>, Vec<u8>);
-   fn next(&mut self) -> Option<<Self as Iterator>::Item> { println!("next"); self.iter.next().map(|(key, value)| (key.clone(), value.clone())) }
-}
-
-enum BackendIteratorType<'a>{
-    HashMapIterator(Iter<'a, Vec<u8>, Vec<u8>>),
-    SledIterator(sled::Iter),
-}
-//
-// pub async fn lock<'a>() -> StoreLock<'a> {
-//     let hash=  DB.get().unwrap().read().await;
-//     StoreLock{guard: hash}
-// }
-
-impl<'a> Iterator for BackendIterator<'a> {
-   type Item = (Vec<u8>, Vec<u8>);
-   fn next(&mut self) -> Option<<Self as Iterator>::Item> { 
-        None
-        // match &mut self.iter {
-        //   BackendIteratorType::HashMapIterator(mut hash_map_iter) => hash_map_iter.next().map(|(key, value)| (key.clone(), value.clone())),
-        //  BackendIteratorType::SledIterator(sled_iter) => sled_iter.next().map(Result::unwrap).map(|(key, value)| (key.to_vec(), value.to_vec())),
-        // }
-    }
-}
-
-impl IntoIterator for Backend {
+impl Iterator for Backend {
     type Item = (Vec<u8>, Vec<u8>);
-    // fn next(&mut self) -> std::option::Option<<Self as Iterator>::Item> { todo!() }
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            Backend::_SledDb(sled_db) => sled_db.into_iter().map(|(key, value)| (key, value)).collect::<Vec<(Vec<u8>, Vec<u8>)>>().into_iter(),
-            Backend::Memory(memory_db) => memory_db.into_iter().map(|(key, value)| (key, value)).collect::<Vec<(Vec<u8>, Vec<u8>)>>().into_iter()
-        }
+    fn next(&mut self) -> Option<Self::Item> {
+        None
     }
 }
 
 pub async fn initialize() {
     let memory_backend = MemoryBackend::new();
     let backend = Backend::Memory(memory_backend);
-    // let db = ellipticoin_types::Db {
-    //     backend: backend,
-    //     transaction_state: Default::default(),
-    // };
-    // for (key, value) in db {
-    //     println!("{:?}", base64::encode(key));
-    // }
     if matches!(DB.set(RwLock::new(backend)), Err(_)) {
         panic!("Failed to initialize db");
     };

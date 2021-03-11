@@ -1,6 +1,5 @@
 use serde::{de::DeserializeOwned, Serialize};
-use std::collections::HashMap;
-use std::iter::IntoIterator;
+use std::{collections::HashMap, iter::IntoIterator};
 
 pub struct Db<B: Backend> {
     pub backend: B,
@@ -77,5 +76,4 @@ pub trait Backend: Send + Sync + IntoIterator {
     fn all(&self) -> Vec<(Vec<u8>, Vec<u8>)>
     where
         Self: Sized;
-    
 }
