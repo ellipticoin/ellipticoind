@@ -12,9 +12,10 @@ use once_cell::sync::OnceCell;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::{sync::Arc, time::Duration};
+use crate::db::sled_db::SledBackend;
 
 pub const NETWORK_ID: u64 = 0;
-pub static DB: OnceCell<RwLock<Backend>> = OnceCell::new();
+pub static DB: OnceCell<RwLock<SledBackend>> = OnceCell::new();
 
 lazy_static! {
     pub static ref TRANSACTIONS_FILE: File = OpenOptions::new()
