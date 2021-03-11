@@ -107,7 +107,7 @@ impl Ellipticoin {
         let reward_per_pool = block_reward / INCENTIVISED_POOLS.len() as u64;
         for token in INCENTIVISED_POOLS.iter() {
             let liquidity_providers = AMM::get_liquidity_providers(db, token.clone());
-            let (addresses, balances): (Vec<_>, Vec<_>) = liquidity_providers
+            let mut balances: Vec<(Address, u64)> = liquidity_providers
                 .iter()
                 .cloned()
                 .map(|address| {
@@ -116,10 +116,9 @@ impl Ellipticoin {
                         Token::get_balance(db, address, AMM::liquidity_token(*token)),
                     )
                 })
-                .collect::<Vec<(Address, u64)>>()
-                .iter()
-                .cloned()
-                .unzip();
+                .collect();
+            balances.sort();
+            let (addresses, balances): (Vec<_>, Vec<_>) = balances.iter().cloned().unzip();
 
             for (address, issuance) in addresses
                 .iter()

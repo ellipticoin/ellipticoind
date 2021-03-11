@@ -1,6 +1,7 @@
 use crate::config::HOST;
 use crate::config::SIGNER;
 use crate::config::{self, address};
+use crate::db;
 use crate::transaction::SignedSystemTransaction;
 use crate::{config::OPTS, constants::DB, hash_onion, serde_cbor::Deserializer};
 use ellipticoin_contracts::Action;
@@ -9,7 +10,6 @@ use ellipticoin_peerchain_ethereum::eth_address;
 use ellipticoin_peerchain_ethereum::Signed;
 use std::fs::File;
 use std::path::Path;
-use crate::db;
 
 pub async fn start_miner() {
     let backend = DB.get().unwrap().write().await;
@@ -54,6 +54,7 @@ pub async fn catch_up() {
             {
                 hash_onion::peel().await;
             }
+            db.flush();
         }
         db::verify().await;
     }
@@ -81,5 +82,6 @@ pub async fn load_genesis_state() {
         .map(Result::unwrap)
     {
         db.insert_raw(&key, &value);
+        db.flush();
     }
 }

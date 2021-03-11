@@ -13,13 +13,13 @@ use std::path::Path;
 #[derive(Debug)]
 pub enum Backend {
     Memory(MemoryBackend),
-    _SledDb(SledBackend),
+    Sled(SledBackend),
 }
 
 impl ellipticoin_types::db::Backend for Backend {
     fn get(&self, key: &[u8]) -> Vec<u8> {
         match self {
-            Backend::_SledDb(sled_db) => sled_db.get(key),
+            Backend::Sled(sled_db) => sled_db.get(key),
             Backend::Memory(memory_db) => memory_db.get(key),
         }
     }
@@ -29,15 +29,22 @@ impl ellipticoin_types::db::Backend for Backend {
         Self: Sized,
     {
         match self {
-            Backend::_SledDb(sled_db) => sled_db.insert(key, value),
+            Backend::Sled(sled_db) => sled_db.insert(key, value),
             Backend::Memory(memory_db) => memory_db.insert(key, value),
         }
     }
 
     fn all(&self) -> Vec<(Vec<u8>, Vec<u8>)> {
         match self {
-            Backend::_SledDb(sled_db) => sled_db.all(),
+            Backend::Sled(sled_db) => sled_db.all(),
             Backend::Memory(memory_db) => memory_db.all(),
+        }
+    }
+
+    fn flush(&mut self) {
+        match self {
+            Backend::Sled(sled_db) => sled_db.flush(),
+            Backend::Memory(memory_db) => memory_db.flush(),
         }
     }
 }
@@ -52,7 +59,18 @@ impl Backend {
                 .progress_chars("=> "),
         );
         match self {
-            Backend::_SledDb(_sled_db) => panic!(),
+            Backend::Sled(sled_db) => {
+                let state_length = sled_db.db.len();
+                pb.set_length(state_length as u64);
+                for key_value in sled_db.db.into_iter().map(|v| {
+                    let (key, value) = v.unwrap();
+                    (key.to_vec(), value.to_vec())
+                }) {
+                    pb.inc(1);
+                    serde_cbor::to_writer(&file, &key_value).unwrap();
+                }
+                pb.finish();
+            }
             Backend::Memory(memory_db) => {
                 let state_length = memory_db.state.len();
                 pb.set_length(state_length as u64);
@@ -67,30 +85,74 @@ impl Backend {
 
     fn verify(&self) {
         println!("Verifying state dump");
-        let state_dump_file = File::open("state-dump.cbor")
-        .unwrap();
+        let state_dump_file = File::open("state-dump.cbor").unwrap();
         match self {
-            Backend::_SledDb(_sled_db) => panic!(),
-            Backend::Memory(memory_db) => {
+            Backend::Sled(sled_db) => {
                 let mut key_count = 0;
-                for (key, value) in Deserializer::from_reader(&state_dump_file).into_iter::<(Vec<u8>, Vec<u8>)>().map(Result::unwrap) {
+                for (key, value) in Deserializer::from_reader(&state_dump_file)
+                    .into_iter::<(Vec<u8>, Vec<u8>)>()
+                    .map(Result::unwrap)
+                {
                     // Skip verification of ethereum block number
                     if base64::encode(&key) == "AQAAAA==" {
                         continue;
                     };
-                    println!("{}: {} == {}", base64::encode(&key), base64::encode(&value), base64::encode(memory_db.state.get(&key).unwrap()));
-                    assert!(memory_db.state.get(&key).expect(&format!("State verification failed {} != {}", base64::encode(key), base64::encode(&value))).to_vec() == value);
-                    key_count+=1;
+                    // println!("{}: {} == {}", base64::encode(&key), base64::encode(&value), base64::encode(sled_db.db.get(&key).unwrap_or(None).map(|v| v.to_vec()).unwrap_or(vec![])));
+                    assert!(
+                        sled_db
+                            .db
+                            .get(&key)
+                            .expect(&format!(
+                                "State verification failed {} != {}",
+                                base64::encode(key),
+                                base64::encode(&value)
+                            ))
+                            .unwrap()
+                            .to_vec()
+                            == value
+                    );
+                    key_count += 1;
                 }
 
+                if key_count == sled_db.db.len() {
+                    println!("Verified {} keys", key_count);
+                } else {
+                    panic!("State dump verification failed")
+                }
+            }
+            Backend::Memory(memory_db) => {
+                let mut key_count = 0;
+                for (key, value) in Deserializer::from_reader(&state_dump_file)
+                    .into_iter::<(Vec<u8>, Vec<u8>)>()
+                    .map(Result::unwrap)
+                {
+                    // Skip verification of ethereum block number
+                    if base64::encode(&key) == "AQAAAA==" {
+                        continue;
+                    };
+                    // println!("{}: {} == {}", base64::encode(&key), base64::encode(&value), base64::encode(memory_db.state.get(&key).unwrap()));
+                    assert!(
+                        memory_db
+                            .state
+                            .get(&key)
+                            .expect(&format!(
+                                "State verification failed {} != {}",
+                                base64::encode(key),
+                                base64::encode(&value)
+                            ))
+                            .to_vec()
+                            == value
+                    );
+                    key_count += 1;
+                }
 
                 if key_count == memory_db.state.len() {
                     println!("Verified state dump");
                 } else {
                     panic!("State dump verification failed")
                 }
-                }
             }
+        }
     }
 }
 
@@ -135,6 +197,11 @@ impl ellipticoin_types::db::Backend for StoreLock<'_> {
         self.guard.insert(key, value)
     }
 
+    fn flush(&mut self) {
+        // println!("guard flushing!!");
+        self.guard.flush();
+    }
+
     fn all(&self) -> Vec<(Vec<u8>, Vec<u8>)> {
         self.guard.all()
     }
@@ -157,8 +224,8 @@ impl Iterator for Backend {
 }
 
 pub async fn initialize() {
-    let memory_backend = MemoryBackend::new();
-    let backend = Backend::Memory(memory_backend);
+    let sled_backend = SledBackend::new();
+    let backend = Backend::Sled(sled_backend);
     if matches!(DB.set(RwLock::new(backend)), Err(_)) {
         panic!("Failed to initialize db");
     };

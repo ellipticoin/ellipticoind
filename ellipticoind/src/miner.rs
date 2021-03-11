@@ -87,4 +87,5 @@ async fn mine_block(_block_number: u32) {
     WEB_SOCKET_BROADCASTER
         .broadcast(block_number + 1, current_miner)
         .await;
+    db.flush();
 }

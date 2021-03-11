@@ -23,6 +23,8 @@ impl ellipticoin_types::db::Backend for TestBackend {
         self.state.insert(key.to_vec(), value.to_vec());
     }
 
+    fn flush(&mut self) {}
+
     fn all(&self) -> Vec<(Vec<u8>, Vec<u8>)> {
         self.state
             .iter()

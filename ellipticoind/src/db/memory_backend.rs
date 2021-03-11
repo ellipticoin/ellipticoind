@@ -28,6 +28,8 @@ impl Backend for MemoryBackend {
             .map(|(key, value)| (key.to_vec(), value.to_vec()))
             .collect()
     }
+
+    fn flush(&mut self) {}
 }
 
 impl Iterator for MemoryBackend {
