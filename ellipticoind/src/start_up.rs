@@ -35,8 +35,8 @@ pub async fn start_miner() {
 }
 pub async fn catch_up() {
     println!("Syncing complete");
-    if Path::new("transactions.cbor").exists() {
-        let transacations_file = File::open("transactions.cbor").unwrap();
+    if Path::new("var/transactions.cbor").exists() {
+        let transacations_file = File::open("var/transactions.cbor").unwrap();
         for transaction in Deserializer::from_reader(&transacations_file)
             .into_iter::<SignedSystemTransaction>()
             .map(Result::unwrap)

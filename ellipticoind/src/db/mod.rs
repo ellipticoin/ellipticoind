@@ -51,7 +51,7 @@ impl ellipticoin_types::db::Backend for Backend {
 impl Backend {
     fn dump(&self) {
         println!("\nDumping state...");
-        let file = File::create("state-dump.cbor").unwrap();
+        let file = File::create("var/state-dump.cbor").unwrap();
         let pb = ProgressBar::new(0);
         pb.set_style(
             indicatif::ProgressStyle::default_bar()
@@ -62,7 +62,7 @@ impl Backend {
             Backend::Sled(sled_db) => {
                 let state_length = sled_db.db.len();
                 pb.set_length(state_length as u64);
-                for key_value in sled_db.db.into_iter().map(|v| {
+                for key_value in sled_db.db.iter().map(|v| {
                     let (key, value) = v.unwrap();
                     (key.to_vec(), value.to_vec())
                 }) {
@@ -85,7 +85,7 @@ impl Backend {
 
     fn verify(&self) {
         println!("Verifying state dump");
-        let state_dump_file = File::open("state-dump.cbor").unwrap();
+        let state_dump_file = File::open("var/state-dump.cbor").unwrap();
         match self {
             Backend::Sled(sled_db) => {
                 let mut key_count = 0;
@@ -157,7 +157,8 @@ impl Backend {
 }
 
 pub async fn verify() {
-    if Path::new("state-dump.cbor").exists() {
+    println!("before verify");
+    if Path::new("var/state-dump.cbor").exists() {
         let lock = lock().await;
         lock.verify();
     }

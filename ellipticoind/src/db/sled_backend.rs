@@ -9,7 +9,7 @@ pub struct SledBackend {
 
 impl SledBackend {
     pub fn new() -> Self {
-        let db = sled::open("db").unwrap();
+        let db = sled::open("var/db").unwrap();
         db.clear().unwrap();
         Self {
             state: Default::default(),

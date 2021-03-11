@@ -21,7 +21,7 @@ lazy_static! {
         .write(true)
         .append(true)
         .create(true)
-        .open("transactions.cbor")
+        .open("var/transactions.cbor")
         .unwrap();
     pub static ref BLOCK_TIME: Duration = Duration::from_secs(4);
     pub static ref TRANSACTION_QUEUE_SIZE: usize = 1000;
