@@ -7,6 +7,7 @@ use ellipticoin_contracts::{
 };
 use ellipticoin_types::{
     db::{Backend, Db},
+    traits::Run,
     Address, ADDRESS_LENGTH,
 };
 use k256::{
@@ -17,23 +18,18 @@ use serde::{Deserialize, Serialize};
 use sha3::{Digest, Keccak256};
 use std::convert::{TryFrom, TryInto};
 
-pub trait Signed: core::fmt::Debug {
-    fn sender(&self) -> Result<[u8; 20]>;
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SignedTransaction(pub Transaction<Action>, Vec<u8>);
-impl SignedTransaction {
-    pub async fn run<B: Backend>(&self, db: &mut Db<B>) -> Result<()> {
-        self.0.run(db, self.sender()?)
-    }
-}
+pub struct SignedTransaction(pub Transaction, Vec<u8>);
 
 const SIGNATURE_LENGTH: usize = 65;
 
-impl Signed for SignedTransaction {
+impl Run for SignedTransaction {
     fn sender(&self) -> Result<[u8; 20]> {
         recover_signed_message(&self.0.verification_string()?, &self.1)
+    }
+
+    fn run<B: Backend>(&self, db: &mut Db<B>) -> Result<()> {
+        self.0.run(db, self.sender()?)
     }
 }
 
@@ -172,7 +168,7 @@ pub fn address_to_string(address: Address) -> String {
     address_str
 }
 
-impl VerificationString for Transaction<Action> {
+impl VerificationString for Transaction {
     fn verification_string(&self) -> Result<String> {
         Ok(format!(
             "Network ID: {}\nTransaction Number: {}\nAction: {}",

@@ -23,7 +23,9 @@ pub struct Update {
     pub redeems: Vec<Redeem>,
 }
 pub async fn poll(latest_block: u64) -> Result<Poll<Update>, surf::Error> {
+    println!("before current block");
     let current_block = get_current_block().await?;
+    println!("after current block");
     if current_block == latest_block {
         return Ok(Poll::Pending);
     }

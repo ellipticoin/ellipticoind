@@ -1,3 +1,6 @@
+use crate::{db::Backend, Db};
+use anyhow::Result;
+
 pub trait ToKey {
     fn to_key(&self) -> Vec<u8>;
 }
@@ -12,4 +15,9 @@ impl ToKey for [u8; 20] {
     fn to_key(&self) -> Vec<u8> {
         self.to_vec()
     }
+}
+
+pub trait Run: core::fmt::Debug {
+    fn sender(&self) -> Result<[u8; 20]>;
+    fn run<B: Backend>(&self, db: &mut Db<B>) -> Result<()>;
 }

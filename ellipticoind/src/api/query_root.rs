@@ -1,3 +1,4 @@
+use crate::aquire_db_read_lock;
 use crate::api::{
     graphql::Context,
     types::{self, *},
@@ -232,12 +233,13 @@ impl QueryRoot {
         address: Bytes,
     ) -> Result<U64, FieldError> {
         let address = <[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?;
-        let backend = DB.get().unwrap().write().await;
-        let store_lock = crate::db::StoreLock { guard: backend };
-        let mut db = ellipticoin_types::Db {
-            backend: store_lock,
-            transaction_state: Default::default(),
-        };
+        // let backend = DB.get().unwrap().write().await;
+        // let store_lock = crate::db::StoreLock { guard: backend };
+        // let mut db = ellipticoin_types::Db {
+        //     backend: store_lock,
+        //     transaction_state: Default::default(),
+        // };
+        let mut db = aquire_db_read_lock!();
         Ok(U64(System::get_next_transaction_number(&mut db, address)))
     }
 }

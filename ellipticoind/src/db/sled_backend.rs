@@ -1,5 +1,8 @@
+use indicatif::ProgressBar;
+use serde_cbor::Deserializer;
 use sled::Batch;
 use std::collections::HashMap;
+use std::fs::File;
 
 #[derive(Debug)]
 pub struct SledBackend {
@@ -14,6 +17,63 @@ impl SledBackend {
         Self {
             state: Default::default(),
             db,
+        }
+    }
+
+    pub fn dump(&self) {
+        println!("\nDumping state...");
+        let file = File::create("var/state-dump.cbor").unwrap();
+        let pb = ProgressBar::new(0);
+        pb.set_style(
+            indicatif::ProgressStyle::default_bar()
+                .template("[{elapsed_precise}] [{bar}] {pos}/{len} ({percent}%)")
+                .progress_chars("=> "),
+        );
+        let state_length = self.db.len();
+        pb.set_length(state_length as u64);
+        for key_value in self.db.iter().map(|v| {
+            let (key, value) = v.unwrap();
+            (key.to_vec(), value.to_vec())
+        }) {
+            pb.inc(1);
+            // println!("{} {}", base64::encode(&key_value.0), base64::encode(&key_value.1));
+            serde_cbor::to_writer(&file, &key_value).unwrap();
+        }
+        pb.finish();
+    }
+
+    pub fn verify(&self) {
+        println!("Verifying state dump");
+        let state_dump_file = File::open("var/state-dump.cbor").unwrap();
+        let mut key_count = 0;
+        for (key, value) in Deserializer::from_reader(&state_dump_file)
+            .into_iter::<(Vec<u8>, Vec<u8>)>()
+            .map(Result::unwrap)
+        {
+            // Skip verification of ethereum block number
+            if base64::encode(&key) == "AQAAAA==" {
+                continue;
+            };
+            // println!("{}: {} == {}", base64::encode(&key), base64::encode(&value), base64::encode(self.db.get(&key).unwrap_or(None).map(|v| v.to_vec()).unwrap_or(vec![])));
+            assert!(
+                self.db
+                    .get(&key)
+                    .expect(&format!(
+                        "State verification failed {} != {}",
+                        base64::encode(key),
+                        base64::encode(&value)
+                    ))
+                    .unwrap()
+                    .to_vec()
+                    == value
+            );
+            key_count += 1;
+        }
+
+        if key_count == self.db.len() {
+            println!("Verified {} keys", key_count);
+        } else {
+            panic!("State dump verification failed")
         }
     }
 }
@@ -35,29 +95,16 @@ impl<'a> ellipticoin_types::db::Backend for SledBackend {
 
     fn insert(&mut self, key: &[u8], value: &[u8]) {
         self.state.insert(key.to_vec(), value.to_vec());
-        // self.db.insert(key.to_vec(), value.to_vec()).unwrap();
     }
 
-    fn all(&self) -> Vec<(Vec<u8>, Vec<u8>)> {
-        self.db
-            .iter()
-            .map(Result::unwrap)
-            .map(|(key, value)| (key.to_vec(), value.to_vec()))
-            .collect()
-    }
     fn flush(&mut self) {
+        println!("starting flush");
         let mut batch = Batch::default();
 
         for (key, value) in &self.state {
             batch.insert(key.to_vec(), value.to_vec());
         }
         self.db.apply_batch(batch).unwrap();
-    }
-}
-
-impl Iterator for SledBackend {
-    type Item = (Vec<u8>, Vec<u8>);
-    fn next(&mut self) -> std::option::Option<<Self as Iterator>::Item> {
-        todo!()
+        println!("flushed");
     }
 }

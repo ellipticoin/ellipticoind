@@ -1,4 +1,4 @@
-use crate::db::Backend;
+use crate::db::sled_backend::SledBackend;
 use anyhow::Result;
 use async_std::sync::RwLock;
 use async_std::{
@@ -12,7 +12,6 @@ use once_cell::sync::OnceCell;
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::{sync::Arc, time::Duration};
-use crate::db::sled_db::SledBackend;
 
 pub const NETWORK_ID: u64 = 0;
 pub static DB: OnceCell<RwLock<SledBackend>> = OnceCell::new();

@@ -2,31 +2,32 @@ use crate::config::HOST;
 use crate::config::SIGNER;
 use crate::config::{self, address};
 use crate::db;
+use crate::aquire_db_write_lock;
+use crate::transaction::run;
 use crate::transaction::SignedSystemTransaction;
+use crate::transaction::SignedTransaction2;
 use crate::{config::OPTS, constants::DB, hash_onion, serde_cbor::Deserializer};
 use ellipticoin_contracts::Action;
 use ellipticoin_contracts::{Ellipticoin, Miner};
 use ellipticoin_peerchain_ethereum::eth_address;
-use ellipticoin_peerchain_ethereum::Signed;
+use ellipticoin_types::traits::Run;
 use std::fs::File;
 use std::path::Path;
 
 pub async fn start_miner() {
-    let backend = DB.get().unwrap().write().await;
-    let store_lock = crate::db::StoreLock { guard: backend };
-    let mut db = ellipticoin_types::Db {
-        backend: store_lock,
-        transaction_state: Default::default(),
-    };
+    let mut db = aquire_db_write_lock!();
     let start_mining_transaction = SignedSystemTransaction::new(
-        &mut db,
-        Action::StartMining(HOST.to_string(), hash_onion::peel().await),
-    );
-    if !Ellipticoin::get_miners(&mut db)
+            &mut db,
+            Action::StartMining(HOST.to_string(), hash_onion::peel().await),
+        );
+    let miners = Ellipticoin::get_miners(&mut db);
+    if !miners
         .iter()
         .any(|Miner { address, .. }| address.clone() == config::address())
     {
-        start_mining_transaction.run(&mut db).await.unwrap();
+        run(SignedTransaction2::System(start_mining_transaction), &mut db)
+            .await
+            .unwrap();
         println!(
             "Started Miner: {}",
             hex::encode(eth_address(SIGNER.verify_key()))
@@ -38,22 +39,17 @@ pub async fn catch_up() {
     if Path::new("var/transactions.cbor").exists() {
         let transacations_file = File::open("var/transactions.cbor").unwrap();
         for transaction in Deserializer::from_reader(&transacations_file)
-            .into_iter::<SignedSystemTransaction>()
+            .into_iter::<SignedTransaction2>()
             .map(Result::unwrap)
         {
-            let backend = DB.get().unwrap().write().await;
-            let store_lock = crate::db::StoreLock { guard: backend };
-            let mut db = ellipticoin_types::Db {
-                backend: store_lock,
-                transaction_state: Default::default(),
-            };
-            let result = transaction.apply(&mut db).await;
+            let result = crate::transaction::apply(&transaction).await;
             if transaction.sender().unwrap_or(Default::default()) == address()
-                && matches!(&transaction.0.action, Action::Seal(_))
+                && transaction.is_seal()
                 && result.is_ok()
             {
                 hash_onion::peel().await;
             }
+            let mut db = aquire_db_write_lock!();
             db.flush();
         }
         db::verify().await;

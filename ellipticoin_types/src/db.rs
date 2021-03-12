@@ -1,5 +1,5 @@
 use serde::{de::DeserializeOwned, Serialize};
-use std::{collections::HashMap, iter::IntoIterator};
+use std::collections::HashMap;
 
 pub struct Db<B: Backend> {
     pub backend: B,
@@ -57,20 +57,12 @@ impl<B: Backend> Db<B> {
         self.transaction_state.clear();
     }
 
-    pub fn all(&mut self) -> Vec<(Vec<u8>, Vec<u8>)> {
-        self.backend.all()
-    }
-
-    pub fn into_iter(self) -> B::IntoIter {
-        self.backend.into_iter()
-    }
-
     pub fn flush(&mut self) {
         self.backend.flush()
     }
 }
 
-pub trait Backend: Send + Sync + IntoIterator {
+pub trait Backend: Send + Sync {
     fn get(&self, key: &[u8]) -> Vec<u8>
     where
         Self: Sized;
@@ -78,9 +70,6 @@ pub trait Backend: Send + Sync + IntoIterator {
     where
         Self: Sized;
     fn flush(&mut self)
-    where
-        Self: Sized;
-    fn all(&self) -> Vec<(Vec<u8>, Vec<u8>)>
     where
         Self: Sized;
 }

@@ -1,16 +1,17 @@
 use crate::constants::DB;
+use ellipticoin_types::db::{Db,Backend};
 use crate::{
     constants::{BLOCK_TIME, TRANSACTION_QUEUE, WEB_SOCKET_BROADCASTER},
     hash_onion,
     helpers::run_for,
-    peerchains,
-    transaction::SignedSystemTransaction,
+    aquire_db_write_lock, peerchains,
+    transaction::{self, SignedSystemTransaction, SignedTransaction2},
 };
 use ellipticoin_contracts::{Action, Ellipticoin, System};
 
 pub async fn run() {
     loop {
-        mine_block(1).await
+        mine_block().await
     }
     // loop {
     //     match timeout(
@@ -26,7 +27,6 @@ pub async fn run() {
 }
 
 async fn _wait_for_peer() {
-    println!("waitng for peers");
     // let current_miner = current_miner().await;
     // println!(
     //     "Waiting for peer: {} ({})",
@@ -49,43 +49,39 @@ async fn _wait_for_peer() {
 //         sleep(*BLOCK_TIME).await;
 //     }
 // }
-async fn mine_block(_block_number: u32) {
+async fn mine_block() {
     let block_number = {
-        let backend = DB.get().unwrap().write().await;
-        let store_lock = crate::db::StoreLock { guard: backend };
-        let mut db = ellipticoin_types::Db {
-            backend: store_lock,
-            transaction_state: Default::default(),
-        };
+        let mut db = aquire_db_write_lock!();
         System::get_block_number(&mut db)
     };
     println!("Won block #{}", block_number);
     run_for(*BLOCK_TIME, async {
         loop {
             let (transaction, sender) = TRANSACTION_QUEUE.1.recv().await.unwrap();
+            let mut db = aquire_db_write_lock!();
             sender
-                .send(crate::transaction::run(transaction).await)
+                .send(crate::transaction::run(SignedTransaction2::Ethereum(transaction), &mut db).await)
                 .unwrap();
         }
     })
     .await;
-    let backend = DB.get().unwrap().write().await;
-    let store_lock = crate::db::StoreLock { guard: backend };
-    let mut db = ellipticoin_types::Db {
-        backend: store_lock,
-        transaction_state: Default::default(),
-    };
+    let mut db = aquire_db_write_lock!();
     peerchains::poll(&mut db).await;
-    let seal_transaction =
-        SignedSystemTransaction::new(&mut db, Action::Seal(hash_onion::peel().await));
-    seal_transaction.run(&mut db).await.unwrap();
+    run_seal(&mut db).await;
     let current_miner = Ellipticoin::get_miners(&mut db)
-        .first()
-        .unwrap()
-        .host
-        .clone();
+            .first()
+            .unwrap()
+            .host
+            .clone();
     WEB_SOCKET_BROADCASTER
-        .broadcast(block_number + 1, current_miner)
+        .broadcast(System::get_block_number(&mut db), current_miner)
         .await;
     db.flush();
+}
+
+async fn run_seal<B: Backend>(db: &mut Db<B>) {
+    let seal_transaction = SignedSystemTransaction::new(db, Action::Seal(hash_onion::peel().await));
+    transaction::run(SignedTransaction2::System(seal_transaction), db)
+        .await
+        .unwrap();
 }

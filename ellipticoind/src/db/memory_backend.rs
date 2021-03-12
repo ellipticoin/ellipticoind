@@ -22,22 +22,5 @@ impl Backend for MemoryBackend {
         self.state.insert(key.to_vec(), value.to_vec());
     }
 
-    fn all(&self) -> Vec<(Vec<u8>, Vec<u8>)> {
-        self.state
-            .iter()
-            .map(|(key, value)| (key.to_vec(), value.to_vec()))
-            .collect()
-    }
-
     fn flush(&mut self) {}
-}
-
-impl Iterator for MemoryBackend {
-    type Item = (Vec<u8>, Vec<u8>);
-    fn next(&mut self) -> Option<Self::Item> {
-        self.state
-            .iter()
-            .map(|(key, value)| (key.to_vec(), value.to_vec()))
-            .next()
-    }
 }

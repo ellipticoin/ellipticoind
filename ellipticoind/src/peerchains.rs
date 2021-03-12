@@ -1,7 +1,7 @@
 use crate::constants::DB;
 use ellipticoin_contracts::Bridge;
+use ellipticoin_types::db::{Db, Backend};
 use ellipticoin_peerchain_ethereum::{Mint, Redeem, Update};
-use ellipticoin_types::db::{Backend, Db};
 use std::task::Poll;
 
 pub async fn start() {
@@ -17,7 +17,7 @@ pub async fn start() {
     Bridge::set_ethereum_block_number(&mut db, ethereum_block_number);
     db.commit();
 }
-pub async fn poll<'a, B: Backend>(db: &mut Db<B>) {
+pub async fn poll<B: Backend>(db: &mut Db<B>) {
     let ethereum_block_number = Bridge::get_ethereum_block_number(db);
     match ellipticoin_peerchain_ethereum::poll(ethereum_block_number)
         .await
@@ -60,6 +60,8 @@ pub async fn poll<'a, B: Backend>(db: &mut Db<B>) {
                 );
             }
         }
-        Poll::Pending => (),
-    }
+        Poll::Pending => {
+
+    },
+    };
 }

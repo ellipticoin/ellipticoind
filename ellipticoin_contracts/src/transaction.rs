@@ -8,21 +8,21 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Transaction<R: Run> {
+pub struct Transaction {
     pub transaction_number: u64,
     pub network_id: u64,
-    pub action: R,
+    pub action: Action,
 }
 
-impl Transaction<Action> {
+impl Transaction {
     pub fn run<B: Backend>(&self, db: &mut Db<B>, sender: Address) -> Result<()> {
         self.action.run(db, sender)
     }
 }
 
-pub trait Run {
-    fn run<B: Backend>(&self, db: &mut Db<B>, address: Address) -> Result<()>;
-}
+// pub trait Run {
+//     fn run<B: Backend>(&self, db: &mut Db<B>, address: Address) -> Result<()>;
+// }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Action {
@@ -41,8 +41,8 @@ pub enum Action {
     Redeem(u64, Address),
     Vote(u64, Vote),
 }
-impl Run for Action {
-    fn run<B: Backend>(&self, db: &mut Db<B>, sender: Address) -> Result<()> {
+impl Action {
+    pub fn run<B: Backend>(&self, db: &mut Db<B>, sender: Address) -> Result<()> {
         System::increment_transaction_number(db, sender);
         let result = match &self {
             Action::CreateProposal(title, subtitle, content, actions) => {
