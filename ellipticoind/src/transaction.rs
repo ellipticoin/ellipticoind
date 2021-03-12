@@ -1,7 +1,7 @@
 use crate::config::verification_key;
 use crate::constants::DB;
-
 use crate::{
+    aquire_db_write_lock,
     constants::{NETWORK_ID, TRANSACTION_QUEUE, TRANSACTIONS_FILE},
     crypto::{recover, sign, sign_eth},
 };
@@ -112,27 +112,24 @@ pub async fn dispatch(signed_transaction: SignedTransaction) -> Result<()> {
 }
 
 // pub async fn run<R: Run + IsRedeemRequest + Serialize>(transaction: R) -> Result<()> {
-pub async fn run<B: Backend>(transaction: SignedTransaction2, db: &mut Db<B>) -> Result<()> {
+pub async fn run(transaction: SignedTransaction2) -> Result<()> {
     // let backend = DB.get().unwrap().write().await;
     // let store_lock = crate::db::StoreLock { guard: backend };
     // let mut db = ellipticoin_types::Db {
     //     backend: store_lock,
     //     transaction_state: Default::default(),
     // };
-    println!("1");
-    let result = transaction.run(db);
-    println!("2");
+    let mut db = aquire_db_write_lock!();
+    let result = transaction.run(&mut db);
     if transaction.is_redeem_request() && result.is_ok() {
-        sign_last_redeem_request(db).await.unwrap();
+        sign_last_redeem_request(&mut db).await.unwrap();
     }
     if result.is_ok() {
         db.commit();
     } else {
         db.revert();
     }
-    println!("3");
     serde_cbor::to_writer(&*TRANSACTIONS_FILE, &transaction).unwrap();
-    println!("4");
 
     result
 }

@@ -4,7 +4,7 @@ use crate::{
     constants::{BLOCK_TIME, TRANSACTION_QUEUE, WEB_SOCKET_BROADCASTER},
     hash_onion,
     helpers::run_for,
-    aquire_db_write_lock, peerchains,
+    aquire_db_read_lock,aquire_db_write_lock, peerchains,
     transaction::{self, SignedSystemTransaction, SignedTransaction2},
 };
 use ellipticoin_contracts::{Action, Ellipticoin, System};
@@ -51,37 +51,44 @@ async fn _wait_for_peer() {
 // }
 async fn mine_block() {
     let block_number = {
-        let mut db = aquire_db_write_lock!();
+        let mut db = aquire_db_read_lock!();
         System::get_block_number(&mut db)
     };
     println!("Won block #{}", block_number);
     run_for(*BLOCK_TIME, async {
         loop {
             let (transaction, sender) = TRANSACTION_QUEUE.1.recv().await.unwrap();
-            let mut db = aquire_db_write_lock!();
             sender
-                .send(crate::transaction::run(SignedTransaction2::Ethereum(transaction), &mut db).await)
+                .send(crate::transaction::run(SignedTransaction2::Ethereum(transaction)).await)
                 .unwrap();
         }
     })
     .await;
+    peerchains::poll().await;
+    println!("1");
+    // let mut db = aquire_db_read_lock!();
+    println!("2");
+    run_seal().await;
+    println!("3");
     let mut db = aquire_db_write_lock!();
-    peerchains::poll(&mut db).await;
-    run_seal(&mut db).await;
     let current_miner = Ellipticoin::get_miners(&mut db)
             .first()
             .unwrap()
             .host
             .clone();
+    println!("4");
     WEB_SOCKET_BROADCASTER
         .broadcast(System::get_block_number(&mut db), current_miner)
         .await;
     db.flush();
 }
 
-async fn run_seal<B: Backend>(db: &mut Db<B>) {
-    let seal_transaction = SignedSystemTransaction::new(db, Action::Seal(hash_onion::peel().await));
-    transaction::run(SignedTransaction2::System(seal_transaction), db)
+async fn run_seal() {
+    let seal_transaction = {
+        let mut db = aquire_db_read_lock!();
+        SignedSystemTransaction::new(&mut db, Action::Seal(hash_onion::peel().await))
+    };
+    transaction::run(SignedTransaction2::System(seal_transaction))
         .await
         .unwrap();
 }

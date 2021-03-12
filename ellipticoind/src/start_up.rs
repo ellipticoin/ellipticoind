@@ -2,7 +2,7 @@ use crate::config::HOST;
 use crate::config::SIGNER;
 use crate::config::{self, address};
 use crate::db;
-use crate::aquire_db_write_lock;
+use crate::{aquire_db_read_lock, aquire_db_write_lock};
 use crate::transaction::run;
 use crate::transaction::SignedSystemTransaction;
 use crate::transaction::SignedTransaction2;
@@ -15,7 +15,7 @@ use std::fs::File;
 use std::path::Path;
 
 pub async fn start_miner() {
-    let mut db = aquire_db_write_lock!();
+    let mut db = aquire_db_read_lock!();
     let start_mining_transaction = SignedSystemTransaction::new(
             &mut db,
             Action::StartMining(HOST.to_string(), hash_onion::peel().await),
@@ -25,7 +25,7 @@ pub async fn start_miner() {
         .iter()
         .any(|Miner { address, .. }| address.clone() == config::address())
     {
-        run(SignedTransaction2::System(start_mining_transaction), &mut db)
+        run(SignedTransaction2::System(start_mining_transaction))
             .await
             .unwrap();
         println!(
