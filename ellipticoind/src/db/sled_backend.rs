@@ -1,8 +1,7 @@
 use indicatif::ProgressBar;
 use serde_cbor::Deserializer;
 use sled::Batch;
-use std::collections::HashMap;
-use std::fs::File;
+use std::{collections::HashMap, fs::File};
 
 #[derive(Debug)]
 pub struct SledBackend {
@@ -36,7 +35,6 @@ impl SledBackend {
             (key.to_vec(), value.to_vec())
         }) {
             pb.inc(1);
-            // println!("{} {}", base64::encode(&key_value.0), base64::encode(&key_value.1));
             serde_cbor::to_writer(&file, &key_value).unwrap();
         }
         pb.finish();
@@ -98,13 +96,11 @@ impl<'a> ellipticoin_types::db::Backend for SledBackend {
     }
 
     fn flush(&mut self) {
-        println!("starting flush");
         let mut batch = Batch::default();
 
         for (key, value) in &self.state {
             batch.insert(key.to_vec(), value.to_vec());
         }
         self.db.apply_batch(batch).unwrap();
-        println!("flushed");
     }
 }

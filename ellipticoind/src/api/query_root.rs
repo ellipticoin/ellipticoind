@@ -1,9 +1,11 @@
-use crate::aquire_db_read_lock;
-use crate::api::{
-    graphql::Context,
-    types::{self, *},
+use crate::{
+    api::{
+        graphql::Context,
+        types::{self, *},
+    },
+    aquire_db_read_lock,
+    constants::DB,
 };
-use crate::constants::DB;
 use anyhow::anyhow;
 use ellipticoin_contracts::{
     bridge,

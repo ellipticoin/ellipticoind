@@ -1,30 +1,28 @@
-use crate::config::verification_key;
-use crate::constants::DB;
 use crate::{
-    aquire_db_write_lock,
-    constants::{NETWORK_ID, TRANSACTION_QUEUE, TRANSACTIONS_FILE},
+    aquire_db_read_lock, aquire_db_write_lock,
+    config::{verification_key, HOST},
+    constants::{DB, NETWORK_ID, TRANSACTIONS_FILE, TRANSACTION_QUEUE},
     crypto::{recover, sign, sign_eth},
+    hash_onion,
 };
 use anyhow::Result;
-use ellipticoin_contracts::{Action, Transaction};
-use ellipticoin_contracts::{Bridge, System};
-use ellipticoin_peerchain_ethereum::{
-    constants::{BRIDGE_ADDRESS, REDEEM_TIMEOUT},
-    SignedTransaction,
+use ellipticoin_contracts::{Action, Bridge, System, Transaction};
+use ellipticoin_peerchain_ethereum::constants::{BRIDGE_ADDRESS, REDEEM_TIMEOUT};
+use ellipticoin_types::{
+    db::{Backend, Db},
+    traits::Run,
 };
-use ellipticoin_types::db::{Backend, Db};
-use ellipticoin_types::traits::Run;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
-pub enum SignedTransaction2 {
+pub enum SignedTransaction {
     Ethereum(ellipticoin_peerchain_ethereum::SignedTransaction),
     System(SignedSystemTransaction),
 }
 
-impl SignedTransaction2 {
+impl SignedTransaction {
     fn is_redeem_request(&self) -> bool {
-        if let SignedTransaction2::Ethereum(transaction) = self {
+        if let SignedTransaction::Ethereum(transaction) = self {
             matches!(transaction.0.action, Action::CreateRedeemRequest(_, _))
         } else {
             false
@@ -32,25 +30,25 @@ impl SignedTransaction2 {
     }
 
     pub fn is_seal(&self) -> bool {
-        if let SignedTransaction2::System(transaction) = self {
+        if let SignedTransaction::System(transaction) = self {
             matches!(transaction.0.action, Action::Seal(_))
         } else {
             false
         }
     }
 }
-impl Run for SignedTransaction2 {
+impl Run for SignedTransaction {
     fn sender(&self) -> Result<[u8; 20]> {
         match self {
-            SignedTransaction2::Ethereum(transaction) => transaction.sender(),
-            SignedTransaction2::System(transaction) => transaction.sender(),
+            SignedTransaction::Ethereum(transaction) => transaction.sender(),
+            SignedTransaction::System(transaction) => transaction.sender(),
         }
     }
 
     fn run<B: Backend>(&self, db: &mut Db<B>) -> Result<()> {
         match self {
-            SignedTransaction2::Ethereum(transaction) => transaction.run(db),
-            SignedTransaction2::System(transaction) => transaction.run(db),
+            SignedTransaction::Ethereum(transaction) => transaction.run(db),
+            SignedTransaction::System(transaction) => transaction.run(db),
         }
     }
 }
@@ -72,7 +70,7 @@ pub trait IsRedeemRequest {
     fn is_redeem_request(&self) -> bool;
 }
 
-impl IsRedeemRequest for SignedTransaction {
+impl IsRedeemRequest for ellipticoin_peerchain_ethereum::SignedTransaction {
     fn is_redeem_request(&self) -> bool {
         matches!(self.0.action, Action::CreateRedeemRequest(_, _))
     }
@@ -112,7 +110,7 @@ pub async fn dispatch(signed_transaction: SignedTransaction) -> Result<()> {
 }
 
 // pub async fn run<R: Run + IsRedeemRequest + Serialize>(transaction: R) -> Result<()> {
-pub async fn run(transaction: SignedTransaction2) -> Result<()> {
+pub async fn run(transaction: SignedTransaction) -> Result<()> {
     // let backend = DB.get().unwrap().write().await;
     // let store_lock = crate::db::StoreLock { guard: backend };
     // let mut db = ellipticoin_types::Db {
@@ -134,7 +132,7 @@ pub async fn run(transaction: SignedTransaction2) -> Result<()> {
     result
 }
 
-pub async fn apply(transaction: &SignedTransaction2) -> Result<()> {
+pub async fn apply(transaction: &SignedTransaction) -> Result<()> {
     let backend = DB.get().unwrap().write().await;
     let store_lock = crate::db::StoreLock { guard: backend };
     let mut db = ellipticoin_types::Db {
@@ -179,4 +177,18 @@ pub async fn sign_last_redeem_request<B: Backend>(db: &mut Db<B>) -> Result<()> 
         ),
     );
     redeem_transaction.run(db)
+}
+
+pub async fn new_start_mining_transaction() -> SignedTransaction {
+    let mut db = aquire_db_read_lock!();
+    SignedTransaction::System(SignedSystemTransaction::new(
+        &mut db,
+        Action::StartMining(HOST.to_string(), hash_onion::peel().await),
+    ))
+}
+pub async fn new_seal_transaction() -> SignedTransaction {
+    let mut db = aquire_db_read_lock!();
+    let seal_transaction =
+        SignedSystemTransaction::new(&mut db, Action::Seal(hash_onion::peel().await));
+    SignedTransaction::System(seal_transaction)
 }

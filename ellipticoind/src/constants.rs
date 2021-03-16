@@ -1,17 +1,17 @@
-use crate::db::sled_backend::SledBackend;
+use crate::{db, db::sled_backend::SledBackend, transaction::SignedTransaction};
 use anyhow::Result;
-use async_std::sync::RwLock;
 use async_std::{
     channel::{self, Receiver, Sender},
-    sync::Mutex,
+    sync::{Mutex, RwLock},
 };
 use broadcaster::BroadcastChannel;
-use ellipticoin_peerchain_ethereum::SignedTransaction;
 use futures::channel::oneshot;
 use once_cell::sync::OnceCell;
-use std::fs::File;
-use std::fs::OpenOptions;
-use std::{sync::Arc, time::Duration};
+use std::{
+    fs::{File, OpenOptions},
+    sync::Arc,
+    time::Duration,
+};
 
 pub const NETWORK_ID: u64 = 0;
 pub static DB: OnceCell<RwLock<SledBackend>> = OnceCell::new();
@@ -41,11 +41,20 @@ impl TRANSACTION_QUEUE {
         self.0.send((transaction, sender)).await.unwrap();
         receiver
     }
+
+    pub async fn process_next_transaction(&self) {
+        let (transaction, sender) = self.1.recv().await.unwrap();
+        sender
+            .send(crate::transaction::run(transaction).await)
+            .unwrap();
+    }
 }
 
 impl WEB_SOCKET_BROADCASTER {
-    pub async fn broadcast(&self, block_number: u64, current_miner_host: String) {
-        self.send(&(block_number as u32, current_miner_host))
+    pub async fn broadcast(&self) {
+        let current_miner = db::get_current_miner().await.unwrap();
+        let block_number = db::get_block_number().await;
+        self.send(&(block_number as u32, current_miner.host))
             .await
             .unwrap();
     }

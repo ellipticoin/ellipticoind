@@ -1,8 +1,6 @@
 use crate::{api, config::socket, db, miner, peerchains, start_up};
-use ellipticoin_peerchain_ethereum::address_to_string;
-use ellipticoin_peerchain_ethereum::eth_address;
-use k256::ecdsa::SigningKey;
-use k256::ecdsa::VerifyingKey;
+use ellipticoin_peerchain_ethereum::{address_to_string, eth_address};
+use k256::ecdsa::{SigningKey, VerifyingKey};
 use rand::rngs::OsRng;
 use std::convert::TryInto;
 

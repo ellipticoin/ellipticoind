@@ -1,17 +1,10 @@
-use crate::constants::DB;
-use crate::aquire_db_write_lock;
+use crate::{aquire_db_write_lock, constants::DB};
 use ellipticoin_contracts::Bridge;
-use ellipticoin_types::db::{Db, Backend};
 use ellipticoin_peerchain_ethereum::{Mint, Redeem, Update};
 use std::task::Poll;
 
 pub async fn start() {
-    let backend = DB.get().unwrap().write().await;
-    let store_lock = crate::db::StoreLock { guard: backend };
-    let mut db = ellipticoin_types::Db {
-        backend: store_lock,
-        transaction_state: Default::default(),
-    };
+    let mut db = aquire_db_write_lock!();
     let ethereum_block_number = ellipticoin_peerchain_ethereum::get_current_block()
         .await
         .unwrap();
@@ -62,8 +55,6 @@ pub async fn poll() {
                 );
             }
         }
-        Poll::Pending => {
-
-    },
+        Poll::Pending => {}
     };
 }

@@ -4,8 +4,8 @@ use crate::{
         types::Bytes,
     },
     transaction,
+    transaction::SignedTransaction,
 };
-use ellipticoin_peerchain_ethereum::SignedTransaction;
 
 use juniper::FieldError;
 use std::string::ToString;
@@ -20,12 +20,14 @@ impl Mutations {
         _context: &Context,
         transaction: Bytes,
     ) -> Result<Option<String>, FieldError> {
-        let signed_transaction: SignedTransaction =
+        let signed_transaction: ellipticoin_peerchain_ethereum::SignedTransaction =
             serde_cbor::from_slice(&transaction.0).map_err(|err| Error(err.to_string()))?;
-        Ok(transaction::dispatch(signed_transaction)
-            .await
-            .map_err(|err| err.to_string())
-            .err())
+        Ok(
+            transaction::dispatch(SignedTransaction::Ethereum(signed_transaction))
+                .await
+                .map_err(|err| err.to_string())
+                .err(),
+        )
     }
 
     pub async fn post_block(_context: &Context, _block: Bytes) -> Result<bool, FieldError> {

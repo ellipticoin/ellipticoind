@@ -2,6 +2,7 @@ pub mod memory_backend;
 pub mod sled_backend;
 use crate::constants::DB;
 use async_std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use ellipticoin_contracts::{Ellipticoin, Miner, System};
 pub use memory_backend::MemoryBackend;
 pub use sled_backend::SledBackend;
 use std::path::Path;
@@ -94,6 +95,25 @@ macro_rules! aquire_db_read_lock {
             transaction_state: Default::default(),
         }
     }};
+}
+
+pub async fn get_block_number() -> u64 {
+    let mut db = aquire_db_read_lock!();
+    System::get_block_number(&mut db)
+}
+
+pub async fn get_miners() -> Vec<Miner> {
+    let mut db = aquire_db_read_lock!();
+    Ellipticoin::get_miners(&mut db)
+}
+
+pub async fn get_current_miner() -> Option<Miner> {
+    get_miners().await.first().cloned()
+}
+
+pub async fn flush() {
+    let mut db = aquire_db_write_lock!();
+    db.flush();
 }
 
 pub async fn initialize() {
