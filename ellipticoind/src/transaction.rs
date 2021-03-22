@@ -13,6 +13,7 @@ use ellipticoin_types::{
     traits::Run,
 };
 use serde::{Deserialize, Serialize};
+use ellipticoin_contracts::bridge::Update;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum SignedTransaction {
@@ -186,9 +187,24 @@ pub async fn new_start_mining_transaction() -> SignedTransaction {
         Action::StartMining(HOST.to_string(), hash_onion::peel().await),
     ))
 }
+
 pub async fn new_seal_transaction() -> SignedTransaction {
     let mut db = aquire_db_read_lock!();
     let seal_transaction =
         SignedSystemTransaction::new(&mut db, Action::Seal(hash_onion::peel().await));
     SignedTransaction::System(seal_transaction)
+}
+
+pub async fn new_start_bridge_transaction(ethereum_block_number: u64) -> SignedTransaction {
+    let mut db = aquire_db_read_lock!();
+    let start_bridge_transaction =
+        SignedSystemTransaction::new(&mut db, Action::StartBridge(ethereum_block_number));
+    SignedTransaction::System(start_bridge_transaction)
+}
+
+pub async fn new_update_transaction(update: Update) -> SignedTransaction {
+    let mut db = aquire_db_read_lock!();
+    let update_transaction =
+        SignedSystemTransaction::new(&mut db, Action::Update(update));
+    SignedTransaction::System(update_transaction)
 }

@@ -6,23 +6,24 @@ use crate::constants::{
     BASE_TOKEN_ADDRESS, EXCHANGE_RATE_CURRENT_SELECTOR, BRIDGE_ADDRESS, DECIMALS, ELLIPTICOIN_DECIMALS, ETH_ADDRESS, RECEIVED_ETH_TOPIC, REDEEM_TOPIC,
     TOKENS, TRANSFER_TOPIC, WEB3_URL,
 };
+use ellipticoin_contracts::bridge::{Mint, Redeem, Update};
 use num_bigint::BigInt;
 use num_traits::{pow::pow, ToPrimitive};
 use serde_json::{json, Value};
 use std::{collections::HashMap, convert::TryInto, task::Poll};
 use surf;
 
-#[derive(Clone, Debug)]
-pub struct Mint(pub u64, pub [u8; 20], pub [u8; 20]);
-#[derive(Clone, Debug)]
-pub struct Redeem(pub u64);
-
-pub struct Update {
-    pub block_number: u64,
-    pub base_token_exchange_rate: u128,
-    pub mints: Vec<Mint>,
-    pub redeems: Vec<Redeem>,
-}
+// #[derive(Clone, Debug)]
+// pub struct Mint(pub u64, pub [u8; 20], pub [u8; 20]);
+// #[derive(Clone, Debug)]
+// pub struct Redeem(pub u64);
+//
+// pub struct Update {
+//     pub block_number: u64,
+//     pub base_token_exchange_rate: u128,
+//     pub mints: Vec<Mint>,
+//     pub redeems: Vec<Redeem>,
+// }
 pub async fn poll(latest_block: u64) -> Result<Poll<Update>, surf::Error> {
     let current_block = get_current_block().await?;
     if current_block == latest_block {
@@ -132,7 +133,7 @@ fn scale_down(amount: BigInt, decimals: usize) -> u64 {
         .unwrap()
 }
 
-pub async fn get_base_token_exchange_rate(block_number: u64) -> Result<u128, surf::Error> {
+pub async fn get_base_token_exchange_rate(block_number: u64) -> Result<BigInt, surf::Error> {
     let mut res = surf::post(WEB3_URL.clone())
         .body(json!(
          {
@@ -148,7 +149,6 @@ pub async fn get_base_token_exchange_rate(block_number: u64) -> Result<u128, sur
          ]}
         ))
         .await?;
-    // println!("{:?}", res.body_string().await.unwrap());
     let res_hex = serde_json::from_value::<String>(
         res.body_json::<HashMap<String, serde_json::Value>>()
             .await?
@@ -157,11 +157,10 @@ pub async fn get_base_token_exchange_rate(block_number: u64) -> Result<u128, sur
             .clone(),
     )
     .unwrap();
+
     Ok(
         BigInt::parse_bytes(res_hex.trim_start_matches("0x").as_bytes(), 16)
             .unwrap()
-            .to_u128()
-            .unwrap(),
     )
 }
 

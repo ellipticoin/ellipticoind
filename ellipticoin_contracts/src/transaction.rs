@@ -1,10 +1,9 @@
-use crate::{governance::Vote, Bridge, OrderBook, Ellipticoin, Governance, System, Token, AMM, order_book::OrderType};
-use anyhow::{bail, Result};
+use crate::{governance::Vote, Bridge, OrderBook, Ellipticoin, Governance, System, Token, AMM, order_book::OrderType, bridge::Update};
+use anyhow::Result;
 use ellipticoin_types::{
     db::{Backend, Db},
     Address,
 };
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -39,8 +38,10 @@ pub enum Action {
     RemoveLiquidity(u64, Address),
     Seal([u8; 32]),
     SignRedeemRequest(u64, u64, Vec<u8>),
+    StartBridge(u64),
     StartMining(String, [u8; 32]),
     Trade(u64, Address, u64, Address),
+    Update(Update),
     Vote(u64, Vote),
 }
 impl Action {
@@ -89,6 +90,9 @@ impl Action {
                     signature.to_vec(),
                 )
             }
+            Action::StartBridge(ethereum_block_number) => {
+                Bridge::start(db, *ethereum_block_number)
+            }
             Action::StartMining(host, onion_skin) => {
                 Ellipticoin::start_mining(db, sender, host.to_string(), *onion_skin)
             }
@@ -101,6 +105,9 @@ impl Action {
                     *minimum_output_token_amount,
                     *output_token,
                 )
+            }
+            Action::Update(update) => {
+                Bridge::update(db, update.clone())
             }
             Action::Vote(proposal_id, vote) => {
                 Governance::vote(db, sender, *proposal_id, vote.clone())

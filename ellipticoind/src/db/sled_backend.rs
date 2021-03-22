@@ -49,9 +49,9 @@ impl SledBackend {
             .map(Result::unwrap)
         {
             // Skip verification of ethereum block number
-            if base64::encode(&key) == "AQAAAA==" {
-                continue;
-            };
+            // if base64::encode(&key) == "AQAAAA==" {
+            //     continue;
+            // };
             // println!("{}: {} == {}", base64::encode(&key), base64::encode(&value), base64::encode(self.db.get(&key).unwrap_or(None).map(|v| v.to_vec()).unwrap_or(vec![])));
             assert!(
                 self.db
