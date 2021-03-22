@@ -78,6 +78,37 @@ impl LiquidityToken {
 }
 
 #[derive(Clone, Debug)]
+pub struct Order {
+    pub id: U64,
+    pub order_type: String,
+    pub amount: U64,
+    pub token: Address,
+    pub price: U64,
+}
+
+#[juniper::graphql_object]
+impl Order {
+    fn id(&self) -> U64 {
+        self.id.clone()
+    }
+
+    fn order_type(&self) -> String {
+        self.order_type.clone()
+    }
+
+    fn token(&self) -> Address {
+        self.token.clone()
+    }
+
+    fn amount(&self) -> U64 {
+        self.amount.clone()
+    }
+
+    fn price(&self) -> U64 {
+        self.price.clone()
+    }
+}
+#[derive(Clone, Debug)]
 pub struct Proposal {
     pub id: U64,
     pub proposer: Address,

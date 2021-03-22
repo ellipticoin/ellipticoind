@@ -17,7 +17,7 @@ hex-literal = "0.2"
 k256 = {version = "0.7.2", features= ["ecdsa", "sha256", "ecdsa-core", "keccak256"]}
 lazy_static = "*"
 num-bigint = "*"
-num-traits = "*"
+num-traits = "0.2.14"
 phf = { version = "0.7.24", features = ["macros"] }
 serde = { version = "*", features = ["derive"] }
 serde_cbor = "*"

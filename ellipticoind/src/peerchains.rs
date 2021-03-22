@@ -1,5 +1,5 @@
 use crate::{aquire_db_write_lock, constants::DB};
-use ellipticoin_contracts::Bridge;
+use ellipticoin_contracts::{Bridge, Token};
 use ellipticoin_peerchain_ethereum::{Mint, Redeem, Update};
 use std::task::Poll;
 
@@ -7,7 +7,7 @@ pub async fn start() {
     let mut db = aquire_db_write_lock!();
     let ethereum_block_number = ellipticoin_peerchain_ethereum::get_current_block()
         .await
-        .unwrap();
+        .unwrap() - 1;
     Bridge::set_ethereum_block_number(&mut db, ethereum_block_number);
     db.commit();
 }
@@ -20,10 +20,13 @@ pub async fn poll() {
     {
         Poll::Ready(Update {
             block_number,
+            base_token_exchange_rate,
             mints,
             redeems,
         }) => {
+            println!("{}", base_token_exchange_rate);
             Bridge::set_ethereum_block_number(&mut db, block_number);
+            // Token::set_base_token_exchange_rate(&mut db, base_token_exchange_rate);
             let pending_redeem_requests = Bridge::get_pending_redeem_requests(&mut db);
             for pending_redeem_request in pending_redeem_requests.iter() {
                 if block_number > pending_redeem_request.expiration_block_number.unwrap() {

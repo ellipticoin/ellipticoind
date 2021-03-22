@@ -9,8 +9,8 @@ use crate::{
 use anyhow::anyhow;
 use ellipticoin_contracts::{
     bridge,
-    constants::{BASE_FACTOR, MS, USD},
-    governance, Bridge, Ellipticoin, Governance, System, AMM,
+    constants::{BASE_FACTOR, MS, LEVERAGED_BASE_TOKEN},
+    governance, Bridge, Ellipticoin, Governance, System, AMM, OrderBook, order_book,
 };
 use ellipticoin_peerchain_ethereum::constants::BRIDGE_ADDRESS;
 
@@ -34,13 +34,7 @@ impl QueryRoot {
         tokens: Vec<Address>,
         address: Address,
     ) -> Result<Vec<Token>, FieldError> {
-        let _db = DB.get().unwrap().write().await;
-        let backend = DB.get().unwrap().write().await;
-        let store_lock = crate::db::StoreLock { guard: backend };
-        let mut db = ellipticoin_types::Db {
-            backend: store_lock,
-            transaction_state: Default::default(),
-        };
+        let mut db = aquire_db_read_lock!();
         Ok(tokens
             .iter()
             .cloned()
@@ -53,7 +47,7 @@ impl QueryRoot {
 
                 let total_supply =
                     ellipticoin_contracts::Token::get_total_supply(&mut db, token.clone().into());
-                let price = if token.0 == USD {
+                let price = if token.0 == LEVERAGED_BASE_TOKEN {
                     BASE_FACTOR
                 } else {
                     let token_supply = ellipticoin_contracts::AMM::get_pool_supply_of_token(
@@ -87,13 +81,7 @@ impl QueryRoot {
         tokens: Vec<Address>,
         address: Address,
     ) -> Result<Vec<LiquidityToken>, FieldError> {
-        let _db = DB.get().unwrap().write().await;
-        let backend = DB.get().unwrap().write().await;
-        let store_lock = crate::db::StoreLock { guard: backend };
-        let mut db = ellipticoin_types::Db {
-            backend: store_lock,
-            transaction_state: Default::default(),
-        };
+        let mut db = aquire_db_read_lock!();
         Ok(tokens
             .iter()
             .cloned()
@@ -122,14 +110,24 @@ impl QueryRoot {
             .collect())
     }
 
+    async fn orders(_context: &Context) -> Vec<Order> {
+        let mut db = aquire_db_read_lock!();
+        let orders = OrderBook::get_orders(&mut db);
+        orders
+            .iter()
+            .cloned()
+            .map(|order: order_book::Order| Order {
+                order_type: format!("{:?}", order.order_type),
+                id: U64(order.id),
+                token: order.token.into(),
+                amount: U64(order.amount),
+                price: U64(order.price),
+            })
+            .collect()
+    }
+
     async fn proposals(_context: &Context) -> Vec<Proposal> {
-        let _db = DB.get().unwrap().write().await;
-        let backend = DB.get().unwrap().write().await;
-        let store_lock = crate::db::StoreLock { guard: backend };
-        let mut db = ellipticoin_types::Db {
-            backend: store_lock,
-            transaction_state: Default::default(),
-        };
+        let mut db = aquire_db_read_lock!();
         let proposals = Governance::get_proposals(&mut db);
         proposals
             .iter()
@@ -167,24 +165,13 @@ impl QueryRoot {
     }
 
     async fn block_number(_context: &Context) -> Option<U64> {
-        let _db = DB.get().unwrap().write().await;
-        let backend = DB.get().unwrap().write().await;
-        let store_lock = crate::db::StoreLock { guard: backend };
-        let mut db = ellipticoin_types::Db {
-            backend: store_lock,
-            transaction_state: Default::default(),
-        };
+        let mut db = aquire_db_read_lock!();
         let block_number = System::get_block_number(&mut db);
         Some(block_number.into())
     }
 
     async fn issuance_rewards(_context: &Context, address: Bytes) -> Result<U64, FieldError> {
-        let backend = DB.get().unwrap().write().await;
-        let store_lock = crate::db::StoreLock { guard: backend };
-        let mut db = ellipticoin_types::Db {
-            backend: store_lock,
-            transaction_state: Default::default(),
-        };
+        let mut db = aquire_db_read_lock!();
         let issuance_rewards = Ellipticoin::get_issuance_rewards(
             &mut db,
             address
@@ -200,12 +187,7 @@ impl QueryRoot {
         address: Bytes,
     ) -> Result<Vec<RedeemRequest>, FieldError> {
         let address = <[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?;
-        let backend = DB.get().unwrap().write().await;
-        let store_lock = crate::db::StoreLock { guard: backend };
-        let mut db = ellipticoin_types::Db {
-            backend: store_lock,
-            transaction_state: Default::default(),
-        };
+        let mut db = aquire_db_read_lock!();
         let pending_redeem_requests = Bridge::get_pending_redeem_requests(&mut db);
         Ok(pending_redeem_requests
             .iter()
@@ -235,12 +217,6 @@ impl QueryRoot {
         address: Bytes,
     ) -> Result<U64, FieldError> {
         let address = <[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?;
-        // let backend = DB.get().unwrap().write().await;
-        // let store_lock = crate::db::StoreLock { guard: backend };
-        // let mut db = ellipticoin_types::Db {
-        //     backend: store_lock,
-        //     transaction_state: Default::default(),
-        // };
         let mut db = aquire_db_read_lock!();
         Ok(U64(System::get_next_transaction_number(&mut db, address)))
     }

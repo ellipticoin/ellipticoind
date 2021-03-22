@@ -1,7 +1,7 @@
 mod validations;
 use crate::{
     charge,
-    constants::{BASE_FACTOR, BASE_TOKEN, FEE},
+    constants::{BASE_FACTOR, LEVERAGED_BASE_TOKEN, FEE},
     contract::{self, Contract},
     crypto::sha256,
     helpers::proportion_of,
@@ -136,7 +136,7 @@ impl AMM {
         token: Address,
         amount: u64,
     ) -> Result<u64> {
-        if token == BASE_TOKEN {
+        if token == LEVERAGED_BASE_TOKEN {
             return Ok(amount);
         };
         Self::validate_pool_exists(db, token)?;
@@ -155,7 +155,7 @@ impl AMM {
         token: Address,
         amount: u64,
     ) -> Result<u64> {
-        if token == BASE_TOKEN {
+        if token == LEVERAGED_BASE_TOKEN {
             return Ok(amount);
         };
         Self::validate_pool_exists(db, token)?;
@@ -197,7 +197,7 @@ impl AMM {
         token: Address,
         amount: u64,
     ) -> Result<()> {
-        charge!(db, address, BASE_TOKEN, amount)?;
+        charge!(db, address, LEVERAGED_BASE_TOKEN, amount)?;
         Self::credit_pool_supply_of_base_token(db, token, amount);
         Ok(())
     }
@@ -220,7 +220,7 @@ impl AMM {
         amount: u64,
     ) -> Result<()> {
         Self::debit_pool_supply_of_base_token(db, token, amount)?;
-        pay!(db, address, BASE_TOKEN, amount)?;
+        pay!(db, address, LEVERAGED_BASE_TOKEN, amount)?;
         Ok(())
     }
 
@@ -300,7 +300,7 @@ impl AMM {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constants::{BASE_FACTOR, BASE_TOKEN};
+    use crate::constants::{BASE_FACTOR, LEVERAGED_BASE_TOKEN};
 
     use ellipticoin_test_framework::{
         constants::{
@@ -318,7 +318,7 @@ mod tests {
             hashmap! {
                 ALICE => vec![
                     (1, APPLES),
-                    (1, BASE_TOKEN),
+                    (1, LEVERAGED_BASE_TOKEN),
                 ],
             },
         );
@@ -346,7 +346,7 @@ mod tests {
             hashmap! {
                 ALICE => vec![
                     (2, APPLES),
-                    (2, BASE_TOKEN),
+                    (2, LEVERAGED_BASE_TOKEN),
                 ],
             },
         );
@@ -380,7 +380,7 @@ mod tests {
             hashmap! {
                 ALICE => vec![
                     (1, APPLES),
-                    (2, BASE_TOKEN),
+                    (2, LEVERAGED_BASE_TOKEN),
                 ],
             },
         );
@@ -416,7 +416,7 @@ mod tests {
             hashmap! {
                 ALICE => vec![
                     (2, APPLES),
-                    (1, BASE_TOKEN),
+                    (1, LEVERAGED_BASE_TOKEN),
                 ],
             },
         );
@@ -453,7 +453,7 @@ mod tests {
             hashmap! {
                 ALICE => vec![
                     (2, APPLES),
-                    (2, BASE_TOKEN),
+                    (2, LEVERAGED_BASE_TOKEN),
                 ],
             },
         );
@@ -482,7 +482,7 @@ mod tests {
             hashmap! {
                 ALICE => vec![
                     (3 * BASE_FACTOR, APPLES),
-                    (3 * BASE_FACTOR, BASE_TOKEN),
+                    (3 * BASE_FACTOR, LEVERAGED_BASE_TOKEN),
                 ],
             },
         );
@@ -512,7 +512,7 @@ mod tests {
             hashmap! {
                 ALICE => vec![
                     (3 * BASE_FACTOR, APPLES),
-                    (3 * BASE_FACTOR, BASE_TOKEN),
+                    (3 * BASE_FACTOR, LEVERAGED_BASE_TOKEN),
                 ],
             },
         );
@@ -523,7 +523,7 @@ mod tests {
 
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 2 * BASE_FACTOR);
         assert_eq!(
-            Token::get_balance(&mut db, ALICE, BASE_TOKEN),
+            Token::get_balance(&mut db, ALICE, LEVERAGED_BASE_TOKEN),
             2 * BASE_FACTOR
         );
         assert_eq!(
@@ -548,7 +548,7 @@ mod tests {
                 ALICE => vec![
                     (100 * BASE_FACTOR, APPLES),
                     (100 * BASE_FACTOR, BANANAS),
-                    (200 * BASE_FACTOR, BASE_TOKEN),
+                    (200 * BASE_FACTOR, LEVERAGED_BASE_TOKEN),
                 ],
                 BOB => vec![
                     (100 * BASE_FACTOR, BANANAS),
@@ -569,10 +569,10 @@ mod tests {
             hashmap! {
                 ALICE => vec![
                     (100 * BASE_FACTOR, APPLES),
-                    (100 * BASE_FACTOR, BASE_TOKEN),
+                    (100 * BASE_FACTOR, LEVERAGED_BASE_TOKEN),
                 ],
                 BOB => vec![
-                    (100 * BASE_FACTOR, BASE_TOKEN),
+                    (100 * BASE_FACTOR, LEVERAGED_BASE_TOKEN),
                 ],
             },
         );
@@ -589,7 +589,7 @@ mod tests {
             &mut db,
             BOB,
             100 * BASE_FACTOR,
-            BASE_TOKEN.clone(),
+            LEVERAGED_BASE_TOKEN.clone(),
             0,
             APPLES.clone(),
         )
@@ -608,7 +608,7 @@ mod tests {
             hashmap! {
                 ALICE => vec![
                     (100 * BASE_FACTOR, APPLES),
-                    (100 * BASE_FACTOR, BASE_TOKEN),
+                    (100 * BASE_FACTOR, LEVERAGED_BASE_TOKEN),
                 ],
                 BOB => vec![
                     (100 * BASE_FACTOR, APPLES),
@@ -629,11 +629,11 @@ mod tests {
             100 * BASE_FACTOR,
             APPLES.clone(),
             0,
-            BASE_TOKEN.clone(),
+            LEVERAGED_BASE_TOKEN.clone(),
         )
         .unwrap();
         assert_eq!(
-            Token::get_balance(&mut db, BOB, BASE_TOKEN.clone()),
+            Token::get_balance(&mut db, BOB, LEVERAGED_BASE_TOKEN.clone()),
             49_924_888
         );
     }
@@ -647,7 +647,7 @@ mod tests {
                 ALICE => vec![
                     (100 * BASE_FACTOR, APPLES),
                     (100 * BASE_FACTOR, BANANAS),
-                    (200 * BASE_FACTOR, BASE_TOKEN),
+                    (200 * BASE_FACTOR, LEVERAGED_BASE_TOKEN),
                 ],
                 BOB => vec![
                     (100 * BASE_FACTOR, APPLES),
@@ -695,7 +695,7 @@ mod tests {
             hashmap! {
                 ALICE => vec![
                     (100_000 * BASE_FACTOR, APPLES),
-                    (1000 * BASE_FACTOR, BASE_TOKEN),
+                    (1000 * BASE_FACTOR, LEVERAGED_BASE_TOKEN),
                 ],
                 BOB => vec![
                     (100_000 * BASE_FACTOR, APPLES),
@@ -718,19 +718,19 @@ mod tests {
             100 * BASE_FACTOR,
             APPLES.clone(),
             0,
-            BASE_TOKEN.clone(),
+            LEVERAGED_BASE_TOKEN.clone(),
         )
         .unwrap();
         assert_eq!(
-            Token::get_balance(&mut db, BOB, BASE_TOKEN.clone(),),
+            Token::get_balance(&mut db, BOB, LEVERAGED_BASE_TOKEN.clone(),),
             996_007
         );
-        AMM::trade(&mut db, BOB, 996_007, BASE_TOKEN.clone(), 0, APPLES.clone()).unwrap();
+        AMM::trade(&mut db, BOB, 996_007, LEVERAGED_BASE_TOKEN.clone(), 0, APPLES.clone()).unwrap();
         assert_eq!(
             Token::get_balance(&mut db, BOB, APPLES.clone(),),
             99_999_401_499
         );
-        assert_eq!(Token::get_balance(&mut db, BOB, BASE_TOKEN.clone(),), 0);
+        assert_eq!(Token::get_balance(&mut db, BOB, LEVERAGED_BASE_TOKEN.clone(),), 0);
 
         AMM::remove_liquidity(&mut db, ALICE, BASE_FACTOR, APPLES).unwrap();
         let alices_apples = Token::get_balance(&mut db, ALICE, APPLES);
@@ -747,7 +747,7 @@ mod tests {
                 ALICE => vec![
                     (100 * BASE_FACTOR, APPLES),
                     (100 * BASE_FACTOR, BANANAS),
-                    (200 * BASE_FACTOR, BASE_TOKEN),
+                    (200 * BASE_FACTOR, LEVERAGED_BASE_TOKEN),
                 ],
                 BOB => vec![
                     (100 * BASE_FACTOR, BANANAS),
@@ -759,7 +759,7 @@ mod tests {
         AMM::trade(&mut db, BOB, 100 * BASE_FACTOR, BANANAS, 0, APPLES).unwrap();
         AMM::remove_liquidity(&mut db, ALICE, BASE_FACTOR, APPLES).unwrap();
         let alices_apples = Token::get_balance(&mut db, ALICE, APPLES);
-        let alices_base_tokens = Token::get_balance(&mut db, ALICE, BASE_TOKEN);
+        let alices_base_tokens = Token::get_balance(&mut db, ALICE, LEVERAGED_BASE_TOKEN);
         assert_eq!(alices_apples, 66766766);
         assert_eq!(alices_base_tokens, 149924888);
         let bobs_apples = Token::get_balance(&mut db, BOB, APPLES);

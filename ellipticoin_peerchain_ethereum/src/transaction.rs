@@ -1,8 +1,9 @@
 use anyhow::{anyhow, bail, Result};
 use core::array::TryFromSliceError;
 use ellipticoin_contracts::{
-    constants::{BASE_FACTOR, BTC, ETH, MS, USD},
+    constants::{BASE_FACTOR, BTC, ETH, MS, LEVERAGED_BASE_TOKEN},
     governance::Vote,
+    order_book::OrderType,
     Action, Transaction,
 };
 use ellipticoin_types::{
@@ -40,10 +41,25 @@ pub trait VerificationString {
 impl VerificationString for Action {
     fn verification_string(&self) -> Result<String> {
         match &self {
-            Action::Vote(proposal_id, vote) => Ok(format!(
-                "Vote {} on MS {}",
-                vote_to_string(vote.clone()),
-                proposal_id
+            Action::AddLiquidity(amount, token) => Ok(format!(
+                "Add {} {} to the liquidity pool",
+                amount_to_string(*amount),
+                address_to_string(*token),
+            )),
+            Action::CreateOrder(order_type, amount, token, price) => {
+                return Ok(format!(
+                    "Create a limit order to {} {} {} for $ {} a piece",
+                    order_type_to_string(order_type.clone()),
+                    amount_to_string(*amount),
+                    address_to_string(*token),
+                    amount_to_string(*price),
+                ));
+            }
+            Action::CreatePool(amount, token, intial_price) => Ok(format!(
+                "Create a pool of {} {} at an initial price of ${} USD",
+                amount_to_string(*amount),
+                address_to_string(*token),
+                amount_to_string(*intial_price),
             )),
             Action::CreateProposal(title, subtitle, content, actions) => Ok(format!(
                 "Create Proposal\nTitle: {}\nSubtitle: {}\nContent: {}\nActions: {}",
@@ -52,38 +68,49 @@ impl VerificationString for Action {
                 content,
                 actions_to_string(actions)?
             )),
-            Action::CreatePool(amount, token, intial_price) => Ok(format!(
-                "Create a pool of {} {} at an initial price of ${} USD",
-                amount_to_string(*amount),
-                address_to_string(*token),
-                amount_to_string(*intial_price),
-            )),
-            Action::AddLiquidity(amount, token) => Ok(format!(
-                "Add {} {} to the liquidity pool",
+            Action::CreateRedeemRequest(amount, token) => Ok(format!(
+                "Redeem {} {}",
                 amount_to_string(*amount),
                 address_to_string(*token),
             )),
-            Action::RemoveLiquidity(percentage, token) => Ok(format!(
-                "Remove {} of my {} from the liquidity pool",
-                percentage_to_string(*percentage),
-                address_to_string(*token),
-            )),
+            Action::FillOrder(order_id, order_type, amount, token, price) => {
+                println!(
+                    "{}\nOrder Id: #{}\nToken: {}\nAmount: {}\nPrice: $ {} / {}\nTotal: $ {}",
+                    inverted_order_type_to_string(order_type.clone()),
+                    order_id,
+                    address_to_string(*token),
+                    amount_to_string(*amount),
+                    amount_to_string(*price),
+                    address_to_string(*token),
+                    amount_to_string(*amount * *price / BASE_FACTOR),
+                );
+                return Ok(format!(
+                    "{}\nOrder Id: #{}\nToken: {}\nAmount: {}\nPrice: $ {} / {}\nTotal: $ {}",
+                    inverted_order_type_to_string(order_type.clone()),
+                    order_id,
+                    address_to_string(*token),
+                    amount_to_string(*amount),
+                    amount_to_string(*price),
+                    address_to_string(*token),
+                    amount_to_string(*amount * *price / BASE_FACTOR),
+                ));
+            }
             Action::Harvest() => Ok(format!("Harvest")),
             Action::Migrate(legacy_address, legacy_signature) => Ok(format!(
                 "Migrate {} Signature: {}",
                 base64::encode_config(legacy_address, base64::URL_SAFE_NO_PAD),
                 base64::encode_config(legacy_signature, base64::URL_SAFE_NO_PAD)
             )),
-            Action::CreateRedeemRequest(amount, token) => Ok(format!(
-                "Redeem {} {}",
-                amount_to_string(*amount),
-                address_to_string(*token),
-            )),
             Action::Pay(recipient, amount, token) => Ok(format!(
                 "Pay {} {} {}",
                 address_to_string(*recipient),
                 amount_to_string(*amount),
                 address_to_string(*token)
+            )),
+            Action::RemoveLiquidity(percentage, token) => Ok(format!(
+                "Remove {} of my {} from the liquidity pool",
+                percentage_to_string(*percentage),
+                address_to_string(*token),
             )),
             Action::Trade(input_amount, input_token, minimum_output_amount, output_token) => {
                 Ok(format!(
@@ -94,6 +121,11 @@ impl VerificationString for Action {
                     address_to_string(*output_token)
                 ))
             }
+            Action::Vote(proposal_id, vote) => Ok(format!(
+                "Vote {} on MS {}",
+                vote_to_string(vote.clone()),
+                proposal_id
+            )),
             _ => bail!("Unknown transaction type"),
         }
     }
@@ -104,6 +136,17 @@ fn vote_to_string(vote: Vote) -> String {
         "Yes".to_string()
     } else {
         "No".to_string()
+    }
+}
+
+fn order_type_to_string(order_type: OrderType) -> String {
+    format!("{:?}", order_type).to_ascii_lowercase()
+}
+
+fn inverted_order_type_to_string(order_type: OrderType) -> String {
+    match order_type {
+        OrderType::Buy => "Sell".to_string(),
+        OrderType::Sell => "Buy".to_string(),
     }
 }
 
@@ -140,7 +183,7 @@ pub fn address_to_string(address: Address) -> String {
         BTC => return "BTC".to_string(),
         MS => return "MS".to_string(),
         ETH => return "ETH".to_string(),
-        USD => return "USD".to_string(),
+        LEVERAGED_BASE_TOKEN => return "USD".to_string(),
         _ => (),
     };
 

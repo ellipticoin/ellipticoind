@@ -23,6 +23,7 @@ impl Contract for Token {
 }
 
 db_accessors!(Token {
+    base_token_exchange_rate() -> u128;
     balance(address: Address, token: Address) -> u64;
     total_supply(token: Address) -> u64;
 });

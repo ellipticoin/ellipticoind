@@ -9,7 +9,6 @@ use std::process;
 async fn main() {
     ctrlc::set_handler(move || {
         async_std::task::block_on(async {
-            println!("dumpin!");
             db::dump().await;
             process::exit(0)
         })

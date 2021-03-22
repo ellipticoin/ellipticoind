@@ -1,12 +1,13 @@
 use crate::{
     charge,
-    constants::USD,
+    constants::BASE_TOKEN,
     contract::{self, Contract},
     pay,
     token::Token,
 };
 use anyhow::{anyhow, bail, Result};
 use ellipticoin_macros::db_accessors;
+use crate::constants::BASE_FACTOR;
 use ellipticoin_types::{
     db::{Backend, Db},
     Address,
@@ -16,6 +17,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum OrderType {
     Sell,
+    Buy,
 }
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Order {
@@ -57,9 +59,12 @@ impl OrderBook {
             price,
         };
         match order.order_type {
+            OrderType::Buy => {
+                charge!(db, sender, BASE_TOKEN, amount * price / BASE_FACTOR)?;
+            },
             OrderType::Sell => {
                 charge!(db, sender, token, amount)?;
-            }
+            },
         }
         orders.push(order);
         Self::increment_order_id_counter(db);
@@ -77,6 +82,14 @@ impl OrderBook {
         if orders[index].sender != sender {
             bail!("Permission denied")
         }
+        match orders[index].order_type {
+            OrderType::Buy => {
+                pay!(db, sender, BASE_TOKEN, orders[index].amount)?;
+            },
+            OrderType::Sell => {
+                pay!(db, sender, orders[index].token, orders[index].amount)?;
+            },
+        }
         orders.remove(index);
         Self::set_orders(db, orders);
         Ok(())
@@ -91,8 +104,12 @@ impl OrderBook {
             .ok_or(anyhow!("Order {} not found", order_id))?;
         let order = orders[index].clone();
         match order.order_type {
+            OrderType::Buy => {
+                Token::transfer(db, sender, order.sender, order.amount, order.token)?;
+                pay!(db, sender, BASE_TOKEN, order.amount * order.price/BASE_FACTOR)?;
+            }
             OrderType::Sell => {
-                Token::transfer(db, sender, order.sender, order.amount, USD)?;
+                Token::transfer(db, sender, order.sender, order.amount, BASE_TOKEN)?;
                 pay!(db, sender, order.token, order.amount)?;
             }
         }
@@ -109,7 +126,7 @@ impl OrderBook {
 #[cfg(test)]
 mod tests {
     use super::{Order, OrderBook, OrderType};
-    use crate::{order_book::USD, Token};
+    use crate::{order_book::BASE_TOKEN, Token, constants::BASE_FACTOR};
     use ellipticoin_test_framework::{
         constants::{
             actors::{ALICE, BOB},
@@ -121,6 +138,7 @@ mod tests {
     #[test]
     fn test_create_order() {
         let mut db = new_db();
+        Token::set_base_token_exchange_rate(&mut db, 1);
         Token::set_balance(&mut db, ALICE, APPLES, 1);
         OrderBook::create_order(&mut db, ALICE, OrderType::Sell, 1, APPLES, 1).unwrap();
         assert_eq!(
@@ -139,22 +157,40 @@ mod tests {
     #[test]
     fn test_cancel() {
         let mut db = new_db();
+        Token::set_base_token_exchange_rate(&mut db, 1);
         Token::set_balance(&mut db, ALICE, APPLES, 1);
         OrderBook::create_order(&mut db, ALICE, OrderType::Sell, 1, APPLES, 1).unwrap();
         OrderBook::cancel(&mut db, ALICE, 0).unwrap();
         assert_eq!(OrderBook::get_orders(&mut db), vec![]);
+        assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 1);
     }
 
     #[test]
-    fn test_fill() {
+    fn test_fill_sell() {
         let mut db = new_db();
+        Token::set_base_token_exchange_rate(&mut db, 1);
         Token::set_balance(&mut db, ALICE, APPLES, 1);
-        Token::set_balance(&mut db, BOB, USD, 1);
-        OrderBook::create_order(&mut db, ALICE, OrderType::Sell, 1, APPLES, 1).unwrap();
+        Token::set_balance(&mut db, BOB, BASE_TOKEN, 1);
+        OrderBook::create_order(&mut db, ALICE, OrderType::Sell, 1, APPLES, BASE_FACTOR).unwrap();
         OrderBook::fill(&mut db, BOB, 0).unwrap();
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 0);
-        assert_eq!(Token::get_balance(&mut db, ALICE, USD), 1);
+        assert_eq!(Token::get_balance(&mut db, ALICE, BASE_TOKEN), 1);
         assert_eq!(Token::get_balance(&mut db, BOB, APPLES), 1);
-        assert_eq!(Token::get_balance(&mut db, BOB, USD), 0);
+        assert_eq!(Token::get_balance(&mut db, BOB, BASE_TOKEN), 0);
+    }
+
+    #[test]
+    fn test_fill_buy() {
+        let mut db = new_db();
+        Token::set_base_token_exchange_rate(&mut db, 1);
+        Token::set_base_token_exchange_rate(&mut db, 1);
+        Token::set_balance(&mut db, ALICE, BASE_TOKEN, 1);
+        Token::set_balance(&mut db, BOB, APPLES, 1);
+        OrderBook::create_order(&mut db, ALICE, OrderType::Buy, 1, APPLES, BASE_FACTOR).unwrap();
+        OrderBook::fill(&mut db, BOB, 0).unwrap();
+        assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 1);
+        assert_eq!(Token::get_balance(&mut db, ALICE, BASE_TOKEN), 0);
+        assert_eq!(Token::get_balance(&mut db, BOB, APPLES), 0);
+        assert_eq!(Token::get_balance(&mut db, BOB, BASE_TOKEN), 1);
     }
 }

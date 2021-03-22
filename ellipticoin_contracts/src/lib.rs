@@ -17,7 +17,7 @@ mod ellipticoin;
 pub mod governance;
 pub mod hash_onion;
 mod helpers;
-mod order_book;
+pub mod order_book;
 mod system;
 mod token;
 mod transaction;

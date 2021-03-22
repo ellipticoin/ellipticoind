@@ -1,9 +1,10 @@
-use crate::{governance::Vote, Bridge, Ellipticoin, Governance, System, Token, AMM};
+use crate::{governance::Vote, Bridge, OrderBook, Ellipticoin, Governance, System, Token, AMM, order_book::OrderType};
 use anyhow::{bail, Result};
 use ellipticoin_types::{
     db::{Backend, Db},
     Address,
 };
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -26,25 +27,33 @@ impl Transaction {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Action {
+    AddLiquidity(u64, Address),
+    CreateOrder(OrderType, u64, Address, u64),
+    CreatePool(u64, Address, u64),
     CreateProposal(String, String, String, Vec<Action>),
-    StartMining(String, [u8; 32]),
-    Seal([u8; 32]),
     CreateRedeemRequest(u64, Address),
-    SignRedeemRequest(u64, u64, Vec<u8>),
+    FillOrder(u64, OrderType, u64, Address, u64),
+    Harvest(),
     Migrate([u8; 32], Vec<u8>),
     Pay(Address, u64, Address),
-    CreatePool(u64, Address, u64),
-    AddLiquidity(u64, Address),
     RemoveLiquidity(u64, Address),
+    Seal([u8; 32]),
+    SignRedeemRequest(u64, u64, Vec<u8>),
+    StartMining(String, [u8; 32]),
     Trade(u64, Address, u64, Address),
-    Harvest(),
-    Redeem(u64, Address),
     Vote(u64, Vote),
 }
 impl Action {
     pub fn run<B: Backend>(&self, db: &mut Db<B>, sender: Address) -> Result<()> {
         System::increment_transaction_number(db, sender);
         let result = match &self {
+            Action::AddLiquidity(amount, token) => AMM::add_liquidity(db, sender, *amount, *token),
+            Action::CreateOrder(order_type, amount, token, price) => {
+                OrderBook::create_order(db, sender, order_type.clone(), *amount, *token, *price)
+            }
+            Action::CreatePool(amount, token, starting_price) => {
+                AMM::create_pool(db, sender, *amount, *token, *starting_price)
+            }
             Action::CreateProposal(title, subtitle, content, actions) => {
                 Governance::create_proposal(
                     db,
@@ -55,8 +64,21 @@ impl Action {
                     actions.to_vec(),
                 )
             }
-            Action::StartMining(host, onion_skin) => {
-                Ellipticoin::start_mining(db, sender, host.to_string(), *onion_skin)
+            Action::CreateRedeemRequest(amount, token) => {
+                Bridge::create_redeem_request(db, sender, *amount, *token)
+            }
+            Action::FillOrder(order_id, _order_type, _amount, _token, _price) => {
+                OrderBook::fill(db, sender, *order_id)
+            }
+            Action::Harvest() => Ellipticoin::harvest(db, sender),
+            Action::Migrate(legacy_address, legacy_signature) => {
+                Token::migrate(db, sender, *legacy_address, legacy_signature.to_vec())
+            }
+            Action::Pay(amount, token, recipient) => {
+                Token::transfer(db, sender, *amount, *token, *recipient)
+            }
+            Action::RemoveLiquidity(percentage, token) => {
+                AMM::remove_liquidity(db, sender, *percentage, *token)
             }
             Action::Seal(onion_skin) => Ellipticoin::seal(db, sender, *onion_skin),
             Action::SignRedeemRequest(redeem_id, expiration_block_number, signature) => {
@@ -67,18 +89,8 @@ impl Action {
                     signature.to_vec(),
                 )
             }
-            Action::Migrate(legacy_address, legacy_signature) => {
-                Token::migrate(db, sender, *legacy_address, legacy_signature.to_vec())
-            }
-            Action::Pay(amount, token, recipient) => {
-                Token::transfer(db, sender, *amount, *token, *recipient)
-            }
-            Action::CreatePool(amount, token, starting_price) => {
-                AMM::create_pool(db, sender, *amount, *token, *starting_price)
-            }
-            Action::AddLiquidity(amount, token) => AMM::add_liquidity(db, sender, *amount, *token),
-            Action::RemoveLiquidity(percentage, token) => {
-                AMM::remove_liquidity(db, sender, *percentage, *token)
+            Action::StartMining(host, onion_skin) => {
+                Ellipticoin::start_mining(db, sender, host.to_string(), *onion_skin)
             }
             Action::Trade(input_amount, input_token, minimum_output_token_amount, output_token) => {
                 AMM::trade(
@@ -90,14 +102,9 @@ impl Action {
                     *output_token,
                 )
             }
-            Action::Harvest() => Ellipticoin::harvest(db, sender),
             Action::Vote(proposal_id, vote) => {
                 Governance::vote(db, sender, *proposal_id, vote.clone())
             }
-            Action::CreateRedeemRequest(amount, token) => {
-                Bridge::create_redeem_request(db, sender, *amount, *token)
-            }
-            _ => bail!("Unknown transaction type"),
         };
         if result.is_ok() {
             db.commit();
