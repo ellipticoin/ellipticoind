@@ -1,5 +1,4 @@
 use anyhow::{anyhow, bail, Result};
-use core::array::TryFromSliceError;
 use ellipticoin_contracts::{
     constants::{BASE_FACTOR, BTC, ETH, LEVERAGED_BASE_TOKEN, MS},
     governance::Vote,
@@ -9,7 +8,7 @@ use ellipticoin_contracts::{
 use ellipticoin_types::{
     db::{Backend, Db},
     traits::Run,
-    Address, ADDRESS_LENGTH,
+    Address,
 };
 use k256::{
     ecdsa::{recoverable, VerifyingKey},

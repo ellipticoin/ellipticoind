@@ -117,6 +117,7 @@ if token == LEVERAGED_BASE_TOKEN {
         .iter()
         {
             let balance = Self::get_balance(db, Address(legacy_address[..20].try_into().unwrap()), *token);
+            println!("{} {}", hex::encode(token), balance);
             Self::transfer(
                 db,
                 Address(legacy_address[..20].try_into().unwrap()),

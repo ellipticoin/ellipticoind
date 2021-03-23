@@ -299,7 +299,7 @@ impl AMM {
     }
 
     pub fn liquidity_token(token: Address) -> Address {
-        Self::address() ^ token
+        token >> 1
     }
 }
 
