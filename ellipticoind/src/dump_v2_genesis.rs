@@ -64,6 +64,9 @@ pub async fn dump_v2_genesis() {
                 } else {
                     value.to_vec()
                 };
+                // println!("{}", hex::encode(convert_address_token_key(key.clone())));
+                // println!("--");
+                // println!("{:?}", serde_cbor::from_slice::<serde_cbor::Value>(&value));
                 Some((
                     V2Key(V2Contracts::Token, 0, convert_address_token_key(key)),
                     value.clone(),
@@ -241,6 +244,9 @@ fn convert_address_token_key(mut key: Vec<u8>) -> Vec<u8> {
     } else {
         panic!("unknown key")
     };
+    // if base64::encode(address) == "vQMn3JvS3ATITteQ+gOYfuVSn2Y=" {
+    //     println!("{} {}", base64::encode(address), hex::encode(token));
+    // }
     [address, token].concat()
 }
 
@@ -251,34 +257,22 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
             .unwrap()
     } else if key.starts_with(b"Exchange") {
         if sha256(["Bridge".as_bytes(), &V1_BTC[..]].concat()).to_vec() == key[8..].to_vec() {
-            bitxor(
-                    pad_left(vec![V2Contracts::AMM as u8], 20)
-                        .try_into()
-                        .unwrap(),
+            shr(
                     V2_BTC,
             ).to_vec()
         } else if sha256(["Bridge".as_bytes(), &V1_ETH[..]].concat()).to_vec() == key[8..].to_vec()
         {
-            bitxor(
-                    pad_left(vec![V2Contracts::AMM as u8], 20)
-                        .try_into()
-                        .unwrap(),
+            shr(
                     V2_ETH,
             ).to_vec()
         } else if sha256(["Bridge".as_bytes(), &V1_USD[..]].concat()).to_vec() == key[8..].to_vec()
         {
-            bitxor(
-                    pad_left(vec![V2Contracts::AMM as u8], 20)
-                        .try_into()
-                        .unwrap(),
+            shr(
                     V2_USD,
             ).to_vec()
         } else if sha256(b"EllipticoinELC".to_vec()).to_vec() == key[8..].to_vec()
         {
-            bitxor(
-                    pad_left(vec![V2Contracts::AMM as u8], 20)
-                        .try_into()
-                        .unwrap(),
+            shr(
                     V2_ELC
             ).to_vec()
         } else {
@@ -299,20 +293,15 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
 
 fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
     if sha256(["Bridge".as_bytes(), &V1_BTC[..]].concat()).to_vec() == key[..32].to_vec() {
-        bitxor(
-                pad_left(vec![V2Contracts::AMM as u8], 20)
-                    .try_into()
-                    .unwrap(),
+        shr(
                 V2_BTC,
         )
     } else if sha256(["Bridge".as_bytes(), &V1_ETH[..]].concat()).to_vec() == key[..32].to_vec() {
-        bitxor(
-                pad_left(vec![V2Contracts::AMM as u8], 20),
+        shr(
                 V2_ETH,
         )
     } else if sha256(b"EllipticoinELC".to_vec()).to_vec() == key[..32].to_vec() {
-        bitxor(
-                pad_left(vec![V2Contracts::AMM as u8], 20),
+        shr(
                 V2_ELC
         )
     } else {
@@ -353,8 +342,8 @@ pub fn pad_left(value: Vec<u8>, padding_size: usize) -> Vec<u8> {
     new_vec
 }
 
-fn bitxor(lhs: Vec<u8>, rhs: [u8; 20]) -> [u8; 20] {
-    lhs.iter().zip(
-                rhs.iter()
-                ).map(|(&a, &b)| a ^ b).collect::<Vec<u8>>().try_into().unwrap()
+fn shr(mut lhs: [u8; 20]) -> [u8; 20] {
+   println!("shr!");
+   lhs.rotate_right(1);
+   lhs.try_into().unwrap() 
 }
