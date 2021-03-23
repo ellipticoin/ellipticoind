@@ -17,8 +17,8 @@ impl BitXor for Address {
     type Output = Self;
 
     fn bitxor(self, rhs: Self) -> Self::Output {
-    Self(self.0.iter().zip(
-        rhs.0.iter()
-    ).map(|(&a, &b)| a ^ b).collect::<Vec<u8>>().try_into().unwrap())
+        Self(self.0.iter().zip(
+            rhs.0.iter()
+        ).map(|(&a, &b)| a ^ b).collect::<Vec<u8>>().try_into().unwrap())
     }
 }
