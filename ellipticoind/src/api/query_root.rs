@@ -166,10 +166,10 @@ impl QueryRoot {
         let mut db = aquire_db_read_lock!();
         let issuance_rewards = Ellipticoin::get_issuance_rewards(
             &mut db,
-            address
+            ellipticoin_types::Address(address
                 .0
                 .try_into()
-                .map_err(|_| anyhow!("Invalid address"))?,
+                .map_err(|_| anyhow!("Invalid address"))?),
         );
         Ok(U64(issuance_rewards))
     }
@@ -178,7 +178,7 @@ impl QueryRoot {
         _context: &Context,
         address: Bytes,
     ) -> Result<Vec<RedeemRequest>, FieldError> {
-        let address = <[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?;
+        let address = ellipticoin_types::Address(<[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?);
         let mut db = aquire_db_read_lock!();
         let pending_redeem_requests = Bridge::get_pending_redeem_requests(&mut db);
         Ok(pending_redeem_requests
@@ -208,7 +208,7 @@ impl QueryRoot {
         _context: &Context,
         address: Bytes,
     ) -> Result<U64, FieldError> {
-        let address = <[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?;
+        let address = ellipticoin_types::Address(<[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?);
         let mut db = aquire_db_read_lock!();
         Ok(U64(System::get_next_transaction_number(&mut db, address)))
     }

@@ -3,7 +3,6 @@ use crate::{
     charge,
     constants::{BASE_FACTOR, FEE, LEVERAGED_BASE_TOKEN},
     contract::{self, Contract},
-    crypto::sha256,
     helpers::proportion_of,
     pay, Token,
 };
@@ -13,7 +12,7 @@ use ellipticoin_types::{
     db::{Backend, Db},
     Address,
 };
-use std::{collections::HashSet, convert::TryInto};
+use std::{collections::HashSet};
 
 pub struct AMM;
 
@@ -38,7 +37,7 @@ impl AMM {
 
     pub fn create_pool<B: Backend>(
         db: &mut Db<B>,
-        sender: [u8; 20],
+        sender: Address,
         amount: u64,
         token: Address,
         underlying_starting_price: u64,
@@ -299,10 +298,8 @@ impl AMM {
         Ok(())
     }
 
-    pub fn liquidity_token(token: Address) -> [u8; 20] {
-        sha256([Self::address(), token].concat())[..20]
-            .try_into()
-            .unwrap()
+    pub fn liquidity_token(token: Address) -> Address {
+        Self::address() ^ token
     }
 }
 

@@ -57,7 +57,7 @@ pub fn new_db() -> Db<TestBackend> {
         transaction_state: Default::default(),
     }
 }
-pub fn setup<B: Backend>(db: &mut Db<B>, balances: HashMap<Address, Vec<(u64, [u8; 20])>>) {
+pub fn setup<B: Backend>(db: &mut Db<B>, balances: HashMap<Address, Vec<(u64, Address)>>) {
     Token::set_base_token_exchange_rate(db, pow(BigInt::from(10), BASE_TOKEN_MANTISSA + EXCHANGE_RATE_MANTISSA));
     for (address, balances) in balances.iter() {
         for (balance, token) in balances.iter() {

@@ -1,4 +1,4 @@
-use crate::{db::Backend, Db};
+use crate::{Address, db::Backend, Db};
 use anyhow::Result;
 
 pub trait ToKey {
@@ -17,7 +17,13 @@ impl ToKey for [u8; 20] {
     }
 }
 
+impl ToKey for Address {
+    fn to_key(&self) -> Vec<u8> {
+        self.0.to_vec()
+    }
+}
+
 pub trait Run: core::fmt::Debug {
-    fn sender(&self) -> Result<[u8; 20]>;
+    fn sender(&self) -> Result<Address>;
     fn run<B: Backend>(&self, db: &mut Db<B>) -> Result<()>;
 }

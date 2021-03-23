@@ -25,7 +25,7 @@ pub struct SignedTransaction(pub Transaction, Vec<u8>);
 const SIGNATURE_LENGTH: usize = 65;
 
 impl Run for SignedTransaction {
-    fn sender(&self) -> Result<[u8; 20]> {
+    fn sender(&self) -> Result<Address> {
         recover_signed_message(&self.0.verification_string()?, &self.1)
     }
 
@@ -189,7 +189,7 @@ pub fn address_to_string(address: Address) -> String {
 
     let _address_hash = {
         let mut hasher = Keccak256::new();
-        hasher.update(address.to_vec());
+        hasher.update(address.as_ref());
         hasher.finalize()
     };
 
@@ -240,9 +240,7 @@ pub fn ecrecover(hash: Vec<u8>, signature_bytes_slice: &[u8]) -> Result<Address>
     let public_key = signature
         .recover_verify_key(&hash)
         .map_err(|err| anyhow!(err.to_string()))?;
-    eth_address(public_key)[..ADDRESS_LENGTH]
-        .try_into()
-        .map_err(|err: TryFromSliceError| anyhow!(err.to_string()))
+    Ok(eth_address(public_key))
 }
 
 // Copied from https://github.com/gakonst/ethers-rs/blob/4c8d3c81e734c1760443b42a6c2229b68cfe9b3e/ethers-core/src/types/signature.rs#L142 ¯\_(ツ)_/¯
@@ -259,10 +257,10 @@ fn normalize_recovery_id(v: u8) -> u8 {
 }
 
 
-pub fn eth_address(verify_key: VerifyingKey) -> [u8; 20] {
-    keccak256(verify_key.to_encoded_point(false).to_bytes().to_vec()[1..].to_vec())[12..]
+pub fn eth_address(verify_key: VerifyingKey) -> Address {
+    Address(keccak256(verify_key.to_encoded_point(false).to_bytes().to_vec()[1..].to_vec())[12..]
         .try_into()
-        .unwrap()
+        .unwrap())
 }
 
 pub fn keccak256(bytes: Vec<u8>) -> Vec<u8> {

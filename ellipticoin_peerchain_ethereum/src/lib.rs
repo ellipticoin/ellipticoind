@@ -1,6 +1,7 @@
 pub mod constants;
 pub mod transaction;
 pub use transaction::*;
+use ellipticoin_types::Address;
 
 use crate::constants::{
     BASE_TOKEN_ADDRESS, BRIDGE_ADDRESS, DECIMALS, ELLIPTICOIN_DECIMALS, ETH_ADDRESS,
@@ -160,7 +161,7 @@ pub async fn get_base_token_interest_rate(block_number: u64) -> Result<u64, surf
 }
 
 pub async fn eth_call(
-    contract_address: [u8; 20],
+    contract_address: Address,
     selector: [u8; 4],
     block_number: u64,
 ) -> Result<BigInt, surf::Error> {
@@ -259,13 +260,13 @@ fn value_to_string(value: &Value) -> Option<String> {
     serde_json::from_value(value.clone()).ok()
 }
 
-fn parse_address(s: &str) -> Option<[u8; 20]> {
+fn parse_address(s: &str) -> Option<Address> {
     if s == "0x" {
         return None;
     }
 
     let bytes = hex::decode(s.trim_start_matches("0x")).unwrap();
-    Some(bytes[..][bytes.len() - 20..].try_into().unwrap())
+    Some(Address(bytes[..][bytes.len() - 20..].try_into().unwrap()))
 }
 fn parse_big_int(s: &str) -> Option<BigInt> {
     if s == "0x" {

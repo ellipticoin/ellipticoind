@@ -104,8 +104,8 @@ if token == LEVERAGED_BASE_TOKEN {
         legacy_address: [u8; 32],
         legacy_signature: Vec<u8>,
     ) -> Result<()> {
-        ed25519_verify(&sender, &legacy_address, &legacy_signature)?;
-        Ellipticoin::harvest(db, legacy_address[..20].try_into().unwrap())?;
+        ed25519_verify(sender.as_ref(), &legacy_address, &legacy_signature)?;
+        Ellipticoin::harvest(db, Address(legacy_address[..20].try_into().unwrap()))?;
         for token in [
             TOKENS.to_vec(),
             TOKENS
@@ -116,17 +116,17 @@ if token == LEVERAGED_BASE_TOKEN {
         .concat()
         .iter()
         {
-            let balance = Self::get_balance(db, legacy_address[..20].try_into().unwrap(), *token);
+            let balance = Self::get_balance(db, Address(legacy_address[..20].try_into().unwrap()), *token);
             Self::transfer(
                 db,
-                legacy_address[..20].try_into().unwrap(),
+                Address(legacy_address[..20].try_into().unwrap()),
                 sender,
                 balance,
                 *token,
             )?;
         }
         for token in TOKENS.iter() {
-            let legacy_address: [u8; 20] = legacy_address[..20].try_into().unwrap();
+            let legacy_address: Address = Address(legacy_address[..20].try_into().unwrap());
             if AMM::get_liquidity_providers(db, *token).contains(&legacy_address) {
                 let mut liquidity_providers = AMM::get_liquidity_providers(db, *token);
                 liquidity_providers.insert(sender);

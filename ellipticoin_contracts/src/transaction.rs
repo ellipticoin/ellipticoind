@@ -109,7 +109,7 @@ impl Action {
             }
             Action::Update(update) => Bridge::update(db, update.clone()),
             Action::Vote(proposal_id, vote) => {
-                Governance::vote(db, sender, *proposal_id, vote.clone())
+                Governance::vote(db, sender.clone(), *proposal_id, vote.clone())
             }
         };
         if result.is_ok() {

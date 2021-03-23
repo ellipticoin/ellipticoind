@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use ellipticoin_contracts::bridge::Update;
+use ellipticoin_types::Address;
 use ellipticoin_contracts::{Action, Bridge, System, Transaction};
 use ellipticoin_peerchain_ethereum::constants::{BRIDGE_ADDRESS, REDEEM_TIMEOUT};
 use ellipticoin_peerchain_ethereum::ecrecover;
@@ -40,7 +41,7 @@ impl SignedTransaction {
     }
 }
 impl Run for SignedTransaction {
-    fn sender(&self) -> Result<[u8; 20]> {
+    fn sender(&self) -> Result<Address> {
         match self {
             SignedTransaction::Ethereum(transaction) => transaction.sender(),
             SignedTransaction::System(transaction) => transaction.sender(),
@@ -59,7 +60,7 @@ impl Run for SignedTransaction {
 pub struct SignedSystemTransaction(pub Transaction, Vec<u8>);
 
 impl Run for SignedSystemTransaction {
-    fn sender(&self) -> Result<[u8; 20]> {
+    fn sender(&self) -> Result<Address> {
         ecrecover(serde_cbor::to_vec(&self.0)?, &self.1)
     }
 
@@ -162,12 +163,12 @@ pub async fn sign_last_redeem_request<B: Backend>(db: &mut Db<B>) -> Result<()> 
     let ethereum_block_number = Bridge::get_ethereum_block_number(db);
     let experation_block_number = ethereum_block_number + REDEEM_TIMEOUT;
     let signature = sign_eth(&(
-        serde_eth::Address(pending_redeem_request.sender),
+        serde_eth::Address(pending_redeem_request.sender.0),
         pending_redeem_request.amount,
-        serde_eth::Address(pending_redeem_request.token),
+        serde_eth::Address(pending_redeem_request.token.0),
         experation_block_number,
         pending_redeem_request.id,
-        serde_eth::Address(BRIDGE_ADDRESS),
+        serde_eth::Address(BRIDGE_ADDRESS.0),
     ));
 
     let redeem_transaction = SignedSystemTransaction::new(

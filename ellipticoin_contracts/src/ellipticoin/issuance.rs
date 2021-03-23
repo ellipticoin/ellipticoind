@@ -1,8 +1,9 @@
 use super::Ellipticoin;
 use crate::constants::{BASE_FACTOR, BTC, ETH};
+use ellipticoin_types::Address;
 
 lazy_static! {
-    pub static ref INCENTIVISED_POOLS: Vec<[u8; 20]> = vec![BTC.clone(), ETH.clone()];
+    pub static ref INCENTIVISED_POOLS: Vec<Address> = vec![BTC.clone(), ETH.clone()];
 }
 
 const BLOCKS_PER_ERA: u64 = 8_000_000;

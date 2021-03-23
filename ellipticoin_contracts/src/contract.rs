@@ -1,5 +1,6 @@
 use crate::helpers::pad_left;
 use ellipticoin_types::{
+    Address,
     db::{Backend, Db},
     ADDRESS_LENGTH,
 };
@@ -20,10 +21,10 @@ pub trait Contract {
         db.insert(Self::NAME as u16, key, value)
     }
 
-    fn address() -> [u8; ADDRESS_LENGTH] {
-        pad_left((Self::NAME as u16).to_be_bytes().to_vec(), ADDRESS_LENGTH)[..ADDRESS_LENGTH]
+    fn address() -> Address {
+        Address(pad_left((Self::NAME as u16).to_be_bytes().to_vec(), ADDRESS_LENGTH)[..ADDRESS_LENGTH]
             .try_into()
-            .unwrap()
+            .unwrap())
     }
 }
 

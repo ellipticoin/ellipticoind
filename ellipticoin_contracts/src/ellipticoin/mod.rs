@@ -29,7 +29,7 @@ db_accessors!(Ellipticoin {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Miner {
     pub host: String,
-    pub address: [u8; 20],
+    pub address: Address,
     pub hash_onion_skin: [u8; 32],
 }
 
@@ -55,7 +55,7 @@ impl Ellipticoin {
 
     pub fn seal<B: Backend>(
         db: &mut Db<B>,
-        sender: [u8; 20],
+        sender: Address,
         hash_onion_skin: [u8; 32],
     ) -> Result<()> {
         let mut miners = Self::get_miners(db);
@@ -93,7 +93,7 @@ impl Ellipticoin {
         Ok(())
     }
 
-    pub fn harvest<B: Backend>(db: &mut Db<B>, sender: [u8; 20]) -> Result<()> {
+    pub fn harvest<B: Backend>(db: &mut Db<B>, sender: Address) -> Result<()> {
         let issuance_rewards = Self::get_issuance_rewards(db, sender);
         Self::debit_issuance_rewards(db, sender, issuance_rewards);
         pay!(db, sender, Self::address(), issuance_rewards)?;
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn test_commit_and_seal() {
-        let elc: [u8; 20] = Ellipticoin::address();
+        let elc: Address = Ellipticoin::address();
         let mut db = new_db();
         setup(
             &mut db,

@@ -371,9 +371,9 @@ impl From<Vec<u8>> for Bytes {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Address(pub [u8; 20]);
+pub struct Address(pub ellipticoin_types::Address);
 
-impl From<Address> for [u8; 20] {
+impl From<Address> for ellipticoin_types::Address {
     fn from(address: Address) -> Self {
         address.0
     }
@@ -394,7 +394,7 @@ where
             .and_then(Result::ok)
             .map(|inner| inner[..20].try_into())
             .and_then(Result::ok)
-            .map(|inner| Address(inner))
+            .map(|inner| Address(ellipticoin_types::Address(inner)))
     }
 
     fn from_str<'a>(value: ScalarToken<'a>) -> ParseScalarResult<'a, S> {
@@ -402,8 +402,8 @@ where
     }
 }
 
-impl From<[u8; 20]> for Address {
-    fn from(bytes: [u8; 20]) -> Self {
+impl From<ellipticoin_types::Address> for Address {
+    fn from(bytes: ellipticoin_types::Address) -> Self {
         Self(bytes)
     }
 }

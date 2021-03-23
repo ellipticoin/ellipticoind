@@ -14,7 +14,7 @@ use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct Mint(pub u64, pub [u8; 20], pub [u8; 20]);
+pub struct Mint(pub u64, pub Address, pub Address);
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Redeem(pub u64);
 
