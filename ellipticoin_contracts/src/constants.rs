@@ -2,6 +2,8 @@ use crate::{contract::Contract, Ellipticoin};
 use ellipticoin_types::Address;
 use std::time::Duration;
 
+pub const BASE_TOKEN_MANTISSA: usize = 18;
+pub const EXCHANGE_RATE_MANTISSA: usize = 10;
 pub const BTC: Address = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
 // pub const BTC: Address = hex!("804d9Dc7363593CcFeedbF685d76EE8f0fD844cC");
 pub const ETH: Address = hex!("0000000000000000000000000000000000000000");

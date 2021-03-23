@@ -1,7 +1,7 @@
 mod validations;
 use crate::{
     charge,
-    constants::{BASE_FACTOR, LEVERAGED_BASE_TOKEN, FEE},
+    constants::{BASE_FACTOR, FEE, LEVERAGED_BASE_TOKEN},
     contract::{self, Contract},
     crypto::sha256,
     helpers::proportion_of,
@@ -28,13 +28,22 @@ db_accessors!(AMM {
 });
 
 impl AMM {
+    pub fn get_underlying_pool_supply_of_base_token<B: Backend>(
+        db: &mut Db<B>,
+        token: Address,
+    ) -> u64 {
+        let pool_supply_of_base_token = Self::get_pool_supply_of_base_token(db, token);
+        Token::amount_to_underlying(db, pool_supply_of_base_token)
+    }
+
     pub fn create_pool<B: Backend>(
         db: &mut Db<B>,
         sender: [u8; 20],
         amount: u64,
         token: Address,
-        starting_price: u64,
+        underlying_starting_price: u64,
     ) -> Result<()> {
+        let starting_price = Token::underlying_to_amount(db, underlying_starting_price);
         let base_token_amount = proportion_of(amount, starting_price, BASE_FACTOR);
         Self::validate_pool_does_not_exist(db, token)?;
         Self::charge(db, sender, token, amount)?;
@@ -725,12 +734,23 @@ mod tests {
             Token::get_balance(&mut db, BOB, LEVERAGED_BASE_TOKEN.clone(),),
             996_007
         );
-        AMM::trade(&mut db, BOB, 996_007, LEVERAGED_BASE_TOKEN.clone(), 0, APPLES.clone()).unwrap();
+        AMM::trade(
+            &mut db,
+            BOB,
+            996_007,
+            LEVERAGED_BASE_TOKEN.clone(),
+            0,
+            APPLES.clone(),
+        )
+        .unwrap();
         assert_eq!(
             Token::get_balance(&mut db, BOB, APPLES.clone(),),
             99_999_401_499
         );
-        assert_eq!(Token::get_balance(&mut db, BOB, LEVERAGED_BASE_TOKEN.clone(),), 0);
+        assert_eq!(
+            Token::get_balance(&mut db, BOB, LEVERAGED_BASE_TOKEN.clone(),),
+            0
+        );
 
         AMM::remove_liquidity(&mut db, ALICE, BASE_FACTOR, APPLES).unwrap();
         let alices_apples = Token::get_balance(&mut db, ALICE, APPLES);

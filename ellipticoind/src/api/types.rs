@@ -21,6 +21,7 @@ impl Bridge {
 #[derive(Clone, Debug)]
 pub struct Token {
     pub address: Address,
+    pub interest_rate: Option<U64>,
     pub price: U64,
     pub balance: U64,
     pub total_supply: U64,
@@ -30,6 +31,10 @@ pub struct Token {
 impl Token {
     fn address(&self) -> Address {
         self.address.clone()
+    }
+
+    fn interest_rate(&self) -> Option<U64> {
+        self.interest_rate.clone()
     }
 
     fn price(&self) -> U64 {

@@ -19,7 +19,7 @@ pub async fn main() {
     start_up::reset_state().await;
     start_up::catch_up().await;
     start_up::start_miner().await;
-    peerchains::start().await;
+    peerchains::poll().await;
     api::start(socket()).await;
     miner::run().await;
 }

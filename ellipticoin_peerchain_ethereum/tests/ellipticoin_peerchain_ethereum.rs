@@ -2,7 +2,7 @@ use async_std::{
     sync::{Arc, Mutex},
     task,
 };
-use ellipticoin_peerchain_ethereum::Update;
+use ellipticoin_contracts::bridge::Update;
 use lazy_static::lazy_static;
 use std::{task::Poll, time::Duration};
 
@@ -26,13 +26,14 @@ fn test_add() {
             {
                 Poll::Ready(Update {
                     block_number,
+                    base_token_interest_rate,
                     base_token_exchange_rate,
                     mints,
                     redeems,
                 }) => {
                     println!(
-                        "ready {} {} {:?} {:?}",
-                        block_number, base_token_exchange_rate, mints, redeems
+                        "ready {} {} {} {:?} {:?}",
+                        block_number, base_token_exchange_rate, base_token_interest_rate, mints, redeems
                     );
                     *LATEST_BLOCK.lock().await = block_number;
                 }

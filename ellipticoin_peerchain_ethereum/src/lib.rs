@@ -3,42 +3,48 @@ pub mod transaction;
 pub use transaction::*;
 
 use crate::constants::{
-    BASE_TOKEN_ADDRESS, EXCHANGE_RATE_CURRENT_SELECTOR, BRIDGE_ADDRESS, DECIMALS, ELLIPTICOIN_DECIMALS, ETH_ADDRESS, RECEIVED_ETH_TOPIC, REDEEM_TOPIC,
-    TOKENS, TRANSFER_TOPIC, WEB3_URL,
+    BASE_TOKEN_ADDRESS, BRIDGE_ADDRESS, DECIMALS, ELLIPTICOIN_DECIMALS, ETH_ADDRESS,
+    EXCHANGE_RATE_CURRENT_SELECTOR, RECEIVED_ETH_TOPIC, REDEEM_TOPIC,
+    SUPPLY_RATE_PER_BLOCK_SELECTOR, TOKENS, TRANSFER_TOPIC, WEB3_URL,
 };
-use ellipticoin_contracts::bridge::{Mint, Redeem, Update};
+use ellipticoin_contracts::{
+    bridge::{Mint, Redeem, Update},
+    constants::BASE_FACTOR,
+};
 use num_bigint::BigInt;
 use num_traits::{pow::pow, ToPrimitive};
 use serde_json::{json, Value};
 use std::{collections::HashMap, convert::TryInto, task::Poll};
 use surf;
 
-// #[derive(Clone, Debug)]
-// pub struct Mint(pub u64, pub [u8; 20], pub [u8; 20]);
-// #[derive(Clone, Debug)]
-// pub struct Redeem(pub u64);
-//
-// pub struct Update {
-//     pub block_number: u64,
-//     pub base_token_exchange_rate: u128,
-//     pub mints: Vec<Mint>,
-//     pub redeems: Vec<Redeem>,
-// }
 pub async fn poll(latest_block: u64) -> Result<Poll<Update>, surf::Error> {
     let current_block = get_current_block().await?;
     if current_block == latest_block {
         Ok(Poll::Pending)
     } else {
-        let base_token_exchange_rate = get_base_token_exchange_rate(current_block).await?;
+        let base_token_exchange_rate = eth_call(
+            BASE_TOKEN_ADDRESS,
+            EXCHANGE_RATE_CURRENT_SELECTOR,
+            current_block,
+        )
+        .await?;
+        let base_token_interest_rate = get_base_token_interest_rate(current_block).await.unwrap();
+
+        let from_block = if latest_block == 0 {
+            current_block
+        } else {
+            latest_block + 1
+        };
         Ok(Poll::Ready(Update {
             block_number: current_block,
+            base_token_interest_rate,
             base_token_exchange_rate,
             mints: [
-                get_eth_mints(latest_block + 1, current_block).await?,
-                get_token_mints(latest_block + 1, current_block).await?,
+                get_eth_mints(from_block, current_block).await?,
+                get_token_mints(from_block, current_block).await?,
             ]
             .concat(),
-            redeems: get_redeems(latest_block + 1, current_block).await?,
+            redeems: get_redeems(from_block, current_block).await?,
         }))
     }
 }
@@ -133,35 +139,55 @@ fn scale_down(amount: BigInt, decimals: usize) -> u64 {
         .unwrap()
 }
 
-pub async fn get_base_token_exchange_rate(block_number: u64) -> Result<BigInt, surf::Error> {
-    let mut res = surf::post(WEB3_URL.clone())
-        .body(json!(
-         {
-         "id": 1,
-         "jsonrpc": "2.0",
-         "method": "eth_call",
-         "params": [
-             {
-                 "to": format!("0x{}", hex::encode(BASE_TOKEN_ADDRESS)),
-                 "data": format!("0x{}", hex::encode(EXCHANGE_RATE_CURRENT_SELECTOR)),
-             },
-             format!("0x{}", BigInt::from(block_number).to_str_radix(16))
-         ]}
-        ))
-        .await?;
-    let res_hex = serde_json::from_value::<String>(
-        res.body_json::<HashMap<String, serde_json::Value>>()
-            .await?
-            .get("result")
-            .unwrap()
-            .clone(),
+pub async fn get_base_token_interest_rate(block_number: u64) -> Result<u64, surf::Error> {
+    let rate = eth_call(
+        BASE_TOKEN_ADDRESS,
+        SUPPLY_RATE_PER_BLOCK_SELECTOR,
+        block_number,
     )
+    .await
     .unwrap();
+    let mantissa = pow(10f64, 18);
+    let blocks_per_day = 4 * 60 * 24;
+    let days_per_year = 365;
+    let apy_as_percentage = ((pow(
+        (rate.to_u64().unwrap() as f64 / mantissa as f64 * blocks_per_day as f64) + 1f64,
+        days_per_year,
+    )) - 1f64)
+        * 100f64;
+    Ok((apy_as_percentage * (BASE_FACTOR as f64)) as u64)
+}
 
-    Ok(
-        BigInt::parse_bytes(res_hex.trim_start_matches("0x").as_bytes(), 16)
-            .unwrap()
-    )
+pub async fn eth_call(
+    contract_address: [u8; 20],
+    selector: [u8; 4],
+    block_number: u64,
+) -> Result<BigInt, surf::Error> {
+    let res_hex = loop {
+        let mut res = surf::post(WEB3_URL.clone())
+            .body(json!(
+             {
+             "id": 1,
+             "jsonrpc": "2.0",
+             "method": "eth_call",
+             "params": [
+                 {
+                     "to": format!("0x{}", hex::encode(contract_address)),
+                     "data": format!("0x{}", hex::encode(selector)),
+                 },
+                 format!("0x{}", BigInt::from(block_number).to_str_radix(16))
+             ]}
+            ))
+            .await?;
+        let res_hash_map = res
+            .body_json::<HashMap<String, serde_json::Value>>()
+            .await?;
+        if res_hash_map.contains_key("result") {
+            break serde_json::from_value::<String>(res_hash_map.get("result").unwrap().clone())?;
+        }
+    };
+
+    Ok(BigInt::parse_bytes(res_hex.trim_start_matches("0x").as_bytes(), 16).unwrap())
 }
 
 pub async fn get_current_block() -> Result<u64, surf::Error> {

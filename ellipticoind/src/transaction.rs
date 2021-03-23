@@ -6,6 +6,7 @@ use crate::{
     hash_onion,
 };
 use anyhow::Result;
+use ellipticoin_contracts::bridge::Update;
 use ellipticoin_contracts::{Action, Bridge, System, Transaction};
 use ellipticoin_peerchain_ethereum::constants::{BRIDGE_ADDRESS, REDEEM_TIMEOUT};
 use ellipticoin_types::{
@@ -13,7 +14,6 @@ use ellipticoin_types::{
     traits::Run,
 };
 use serde::{Deserialize, Serialize};
-use ellipticoin_contracts::bridge::Update;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum SignedTransaction {
@@ -204,7 +204,6 @@ pub async fn new_start_bridge_transaction(ethereum_block_number: u64) -> SignedT
 
 pub async fn new_update_transaction(update: Update) -> SignedTransaction {
     let mut db = aquire_db_read_lock!();
-    let update_transaction =
-        SignedSystemTransaction::new(&mut db, Action::Update(update));
+    let update_transaction = SignedSystemTransaction::new(&mut db, Action::Update(update));
     SignedTransaction::System(update_transaction)
 }

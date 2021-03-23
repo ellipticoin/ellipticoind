@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, Result};
 use core::array::TryFromSliceError;
 use ellipticoin_contracts::{
-    constants::{BASE_FACTOR, BTC, ETH, MS, LEVERAGED_BASE_TOKEN},
+    constants::{BASE_FACTOR, BTC, ETH, LEVERAGED_BASE_TOKEN, MS},
     governance::Vote,
     order_book::OrderType,
     Action, Transaction,

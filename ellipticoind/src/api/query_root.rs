@@ -9,10 +9,11 @@ use crate::{
 use anyhow::anyhow;
 use ellipticoin_contracts::{
     bridge,
-    constants::{BASE_FACTOR, MS, LEVERAGED_BASE_TOKEN},
-    governance, Bridge, Ellipticoin, Governance, System, AMM, OrderBook, order_book,
+    constants::{BASE_FACTOR, LEVERAGED_BASE_TOKEN, MS},
+    governance, order_book, Bridge, Ellipticoin, Governance, OrderBook, System, AMM,
 };
 use ellipticoin_peerchain_ethereum::constants::BRIDGE_ADDRESS;
+
 
 use juniper::FieldError;
 use std::convert::{TryFrom, TryInto};
@@ -39,35 +40,26 @@ impl QueryRoot {
             .iter()
             .cloned()
             .map(|token| {
-                let balance = ellipticoin_contracts::Token::get_balance(
+                let balance = ellipticoin_contracts::Token::get_underlying_balance(
                     &mut db,
                     address.clone().into(),
+                    token.clone().into(),
+                );
+                let interest_rate = ellipticoin_contracts::Token::get_interest_rate(
+                    &mut db,
+                    token.clone().into(),
+                );
+                let price = ellipticoin_contracts::Token::get_price(
+                    &mut db,
                     token.clone().into(),
                 );
 
                 let total_supply =
                     ellipticoin_contracts::Token::get_total_supply(&mut db, token.clone().into());
-                let price = if token.0 == LEVERAGED_BASE_TOKEN {
-                    BASE_FACTOR
-                } else {
-                    let token_supply = ellipticoin_contracts::AMM::get_pool_supply_of_token(
-                        &mut db,
-                        token.clone().into(),
-                    );
-                    let base_token_supply =
-                        ellipticoin_contracts::AMM::get_pool_supply_of_base_token(
-                            &mut db,
-                            token.clone().into(),
-                        );
-                    if token_supply == 0 {
-                        0
-                    } else {
-                        base_token_supply * BASE_FACTOR / token_supply
-                    }
-                };
 
                 Token {
                     address: token,
+                    interest_rate: interest_rate.map(|interest_rate| interest_rate.into()),
                     balance: balance.into(),
                     price: price.into(),
                     total_supply: total_supply.into(),
@@ -96,15 +88,15 @@ impl QueryRoot {
                     ellipticoin_contracts::Token::get_total_supply(&mut db, liquidity_token);
                 let pool_supply_of_token =
                     AMM::get_pool_supply_of_token(&mut db, token.clone().into());
-                let pool_supply_of_base_token =
-                    AMM::get_pool_supply_of_base_token(&mut db, token.clone().into());
+                let underlying_pool_supply_of_base_token =
+                    AMM::get_underlying_pool_supply_of_base_token(&mut db, token.clone().into());
 
                 LiquidityToken {
                     token_address: token,
                     balance: U64(balance),
                     total_supply: U64(total_supply),
                     pool_supply_of_token: U64(pool_supply_of_token),
-                    pool_supply_of_base_token: U64(pool_supply_of_base_token),
+                    pool_supply_of_base_token: U64(underlying_pool_supply_of_base_token),
                 }
             })
             .collect())

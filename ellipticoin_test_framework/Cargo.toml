@@ -12,5 +12,7 @@ ellipticoin_types = {path = "../ellipticoin_types"}
 hex = "0.3.2"
 hex-literal = "0.3.0"
 lazy_static = "1.1.0"
+num-bigint = "*"
+num-traits = "*"
 rand = "0.6.5"
 sha2 = "0.8.1"

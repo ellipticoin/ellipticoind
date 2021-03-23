@@ -7,6 +7,8 @@ extern crate lazy_static;
 extern crate ellipticoin_contracts;
 extern crate ellipticoin_types;
 extern crate hex;
+extern crate num_bigint;
+extern crate num_traits;
 extern crate rand;
 extern crate sha2;
 
@@ -15,10 +17,13 @@ pub mod test_backend;
 
 use constants::actors::ALICE;
 use ellipticoin_contracts::{Ellipticoin, Token};
+use ellipticoin_contracts::constants::{BASE_FACTOR, EXCHANGE_RATE_MANTISSA, BASE_TOKEN_MANTISSA};
+use num_bigint::BigInt;
 use ellipticoin_types::{
     db::{Backend, Db},
     Address,
 };
+use num_traits::pow;
 use rand::Rng;
 use sha2::{Digest, Sha256};
 use std::{collections::HashMap, env};
@@ -53,6 +58,7 @@ pub fn new_db() -> Db<TestBackend> {
     }
 }
 pub fn setup<B: Backend>(db: &mut Db<B>, balances: HashMap<Address, Vec<(u64, [u8; 20])>>) {
+    Token::set_base_token_exchange_rate(db, pow(BigInt::from(10), BASE_TOKEN_MANTISSA + EXCHANGE_RATE_MANTISSA));
     for (address, balances) in balances.iter() {
         for (balance, token) in balances.iter() {
             Token::set_balance(db, *address, *token, *balance);

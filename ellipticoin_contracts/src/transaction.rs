@@ -1,4 +1,7 @@
-use crate::{governance::Vote, Bridge, OrderBook, Ellipticoin, Governance, System, Token, AMM, order_book::OrderType, bridge::Update};
+use crate::{
+    bridge::Update, governance::Vote, order_book::OrderType, Bridge, Ellipticoin, Governance,
+    OrderBook, System, Token, AMM,
+};
 use anyhow::Result;
 use ellipticoin_types::{
     db::{Backend, Db},
@@ -90,9 +93,7 @@ impl Action {
                     signature.to_vec(),
                 )
             }
-            Action::StartBridge(ethereum_block_number) => {
-                Bridge::start(db, *ethereum_block_number)
-            }
+            Action::StartBridge(ethereum_block_number) => Bridge::start(db, *ethereum_block_number),
             Action::StartMining(host, onion_skin) => {
                 Ellipticoin::start_mining(db, sender, host.to_string(), *onion_skin)
             }
@@ -106,9 +107,7 @@ impl Action {
                     *output_token,
                 )
             }
-            Action::Update(update) => {
-                Bridge::update(db, update.clone())
-            }
+            Action::Update(update) => Bridge::update(db, update.clone()),
             Action::Vote(proposal_id, vote) => {
                 Governance::vote(db, sender, *proposal_id, vote.clone())
             }

@@ -4,13 +4,13 @@ use crate::{
     pay,
     token::Token,
 };
-use num_bigint::BigInt;
 use anyhow::{anyhow, Result};
 use ellipticoin_macros::db_accessors;
 use ellipticoin_types::{
     db::{Backend, Db},
     Address,
 };
+use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -22,6 +22,7 @@ pub struct Redeem(pub u64);
 pub struct Update {
     pub block_number: u64,
     pub base_token_exchange_rate: BigInt,
+    pub base_token_interest_rate: u64,
     pub mints: Vec<Mint>,
     pub redeems: Vec<Redeem>,
 }
@@ -35,7 +36,6 @@ pub struct RedeemRequest {
     pub expiration_block_number: Option<u64>,
     pub signature: Option<Vec<u8>>,
 }
-
 
 pub struct Bridge;
 
@@ -51,58 +51,36 @@ db_accessors!(Bridge {
 });
 
 impl Bridge {
-    pub fn start<B: Backend>(
-        db: &mut Db<B>,
-        ethereum_block_number: u64,
-    ) -> Result<()> {
+    pub fn start<B: Backend>(db: &mut Db<B>, ethereum_block_number: u64) -> Result<()> {
         Bridge::set_ethereum_block_number(db, ethereum_block_number);
         Ok(())
     }
-    pub fn update<B: Backend>(
-        db: &mut Db<B>,
-        update: Update,
-    ) -> Result<()> {
+    pub fn update<B: Backend>(db: &mut Db<B>, update: Update) -> Result<()> {
         match update {
-        Update{
-            block_number,
-            base_token_exchange_rate,
-            mints,
-            redeems,
-        } => {
-        // Token::set_base_token_exchange_rate(db, base_token_exchange_rate);
-        let pending_redeem_requests = Bridge::get_pending_redeem_requests(db);
-        for pending_redeem_request in pending_redeem_requests.iter() {
-            if block_number > pending_redeem_request.expiration_block_number.unwrap() {
-                println!("Redeem {} timed out", pending_redeem_request.id);
-                Bridge::cancel_redeem_request(db, pending_redeem_request.id).unwrap();
+            Update {
+                block_number,
+                base_token_exchange_rate,
+                base_token_interest_rate,
+                mints,
+                redeems,
+            } => {
+                Token::set_base_token_exchange_rate(db, base_token_exchange_rate);
+                Token::set_base_token_interest_rate(db, base_token_interest_rate);
+                let pending_redeem_requests = Bridge::get_pending_redeem_requests(db);
+                for pending_redeem_request in pending_redeem_requests.iter() {
+                    if block_number > pending_redeem_request.expiration_block_number.unwrap() {
+                        Bridge::cancel_redeem_request(db, pending_redeem_request.id).unwrap();
+                    }
+                }
+                for Mint(amount, token, address) in mints.iter() {
+                    Bridge::mint(db, *amount, *token, *address).unwrap();
+                }
+                for Redeem(redeem_id) in redeems.iter() {
+                    Bridge::redeem(db, *redeem_id).unwrap();
+                }
+                Bridge::set_ethereum_block_number(db, block_number);
+                Ok(())
             }
-        }
-        for Mint(amount, token, address) in mints.iter() {
-            println!(
-                    "minted {} {} to {}",
-                    amount,
-                    hex::encode(token),
-                    hex::encode(address)
-                    );
-            Bridge::mint(db, *amount, *token, *address).unwrap();
-        }
-        for Redeem(redeem_id) in redeems.iter() {
-            println!("redeemed id: {}", redeem_id);
-            Bridge::redeem(db, *redeem_id).unwrap();
-        }
-    let previous_block_number = Bridge::get_ethereum_block_number(db);
-            if previous_block_number + 1 == block_number {
-                println!("Processed Ethereum Block #{}", block_number);
-            } else {
-                println!(
-                    "Processed Ethereum Block #{}-#{}",
-                    previous_block_number + 1,
-                    block_number
-                );
-            }
-        Bridge::set_ethereum_block_number(db, block_number);
-        Ok(())
-        }
         }
     }
 
