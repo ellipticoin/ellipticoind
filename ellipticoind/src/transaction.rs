@@ -2,13 +2,14 @@ use crate::{
     aquire_db_read_lock, aquire_db_write_lock,
     config::{verification_key, HOST},
     constants::{DB, NETWORK_ID, TRANSACTIONS_FILE, TRANSACTION_QUEUE},
-    crypto::{recover, sign, sign_eth},
+    crypto::{sign, sign_eth},
     hash_onion,
 };
 use anyhow::Result;
 use ellipticoin_contracts::bridge::Update;
 use ellipticoin_contracts::{Action, Bridge, System, Transaction};
 use ellipticoin_peerchain_ethereum::constants::{BRIDGE_ADDRESS, REDEEM_TIMEOUT};
+use ellipticoin_peerchain_ethereum::ecrecover;
 use ellipticoin_types::{
     db::{Backend, Db},
     traits::Run,
@@ -59,7 +60,7 @@ pub struct SignedSystemTransaction(pub Transaction, Vec<u8>);
 
 impl Run for SignedSystemTransaction {
     fn sender(&self) -> Result<[u8; 20]> {
-        recover(&serde_cbor::to_vec(&self.0)?, &self.1)
+        ecrecover(serde_cbor::to_vec(&self.0)?, &self.1)
     }
 
     fn run<B: Backend>(&self, db: &mut Db<B>) -> Result<()> {

@@ -1,13 +1,9 @@
-use crate::config::SIGNER;
-use anyhow::{anyhow, Result};
-use ellipticoin_peerchain_ethereum::eth_address;
-use ellipticoin_types::{Address, ADDRESS_LENGTH};
+use crate::config::{SIGNER};
 use k256::ecdsa::{recoverable, signature::Signer};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::{
-    array::TryFromSliceError,
-    convert::{TryFrom, TryInto},
+    convert::{TryInto},
 };
 
 pub fn sign<S: Serialize>(message: &S) -> [u8; 65] {
@@ -27,19 +23,20 @@ pub fn sign_eth<S: Serialize>(message: &S) -> [u8; 65] {
     signature
 }
 
-pub fn recover(message: &[u8], signature_bytes_slice: &[u8]) -> Result<Address> {
-    let signature_bytes = signature_bytes_slice.to_vec();
-    // See: https://eips.ethereum.org/EIPS/eip-155
-    // signature_bytes[SIGNATURE_LENGTH - 1] -= 27;
-    let signature = recoverable::Signature::try_from(&signature_bytes[..])
-        .map_err(|err| anyhow!(err.to_string()))?;
-    let public_key = signature
-        .recover_verify_key(&message)
-        .map_err(|err| anyhow!(err.to_string()))?;
-    eth_address(public_key)[..ADDRESS_LENGTH]
-        .try_into()
-        .map_err(|e: TryFromSliceError| anyhow!(e.to_string()))
-}
+// pub fn recover(message: &[u8], signature_bytes_slice: &[u8]) -> Result<Address> {
+//     let mut signature_bytes = signature_bytes_slice.to_vec();
+//     let signature_bytes_len = signature_bytes.len();
+//     // See: https://eips.ethereum.org/EIPS/eip-155
+//     signature_bytes[signature_bytes_len - 1 ] -= 27;
+//     let signature = recoverable::Signature::try_from(&signature_bytes[..])
+//         .map_err(|err| anyhow!(err.to_string()))?;
+//     let public_key = signature
+//         .recover_verify_key(&message)
+//         .map_err(|err| anyhow!(err.to_string()))?;
+//     eth_address(public_key)[..ADDRESS_LENGTH]
+//         .try_into()
+//         .map_err(|err: TryFromSliceError| anyhow!(err.to_string()))
+// }
 
 pub fn sha256(message: Vec<u8>) -> [u8; 32] {
     let mut hasher = Sha256::new();

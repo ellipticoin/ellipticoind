@@ -9,8 +9,8 @@ pub fn sha256(message: Vec<u8>) -> [u8; 32] {
     hasher.finalize().into()
 }
 
-pub fn ed25519_verify(message: &[u8], verifcation_key: &[u8], signature: &[u8]) -> Result<()> {
-    VerificationKey::try_from(verifcation_key)
+pub fn ed25519_verify(message: &[u8], verification_key: &[u8], signature: &[u8]) -> Result<()> {
+    VerificationKey::try_from(verification_key)
         .and_then(|vk| vk.verify(&signature[..64].try_into()?, message))
         .map_err(|_| anyhow!("Invalid Signature"))
 }

@@ -9,7 +9,7 @@ use crate::{
 use anyhow::anyhow;
 use ellipticoin_contracts::{
     bridge,
-    constants::{BASE_FACTOR, LEVERAGED_BASE_TOKEN, MS},
+    constants::{MS},
     governance, order_book, Bridge, Ellipticoin, Governance, OrderBook, System, AMM,
 };
 use ellipticoin_peerchain_ethereum::constants::BRIDGE_ADDRESS;

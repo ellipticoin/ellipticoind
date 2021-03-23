@@ -97,7 +97,7 @@ impl VerificationString for Action {
             }
             Action::Harvest() => Ok(format!("Harvest")),
             Action::Migrate(legacy_address, legacy_signature) => Ok(format!(
-                "Migrate {} Signature: {}",
+                "Migrate\nLegacy Address: {}\nLegacy Signature: {}",
                 base64::encode_config(legacy_address, base64::URL_SAFE_NO_PAD),
                 base64::encode_config(legacy_signature, base64::URL_SAFE_NO_PAD)
             )),
@@ -234,8 +234,7 @@ pub fn recover_signed_message(message: &str, signature: &[u8]) -> Result<Address
 }
 pub fn ecrecover(hash: Vec<u8>, signature_bytes_slice: &[u8]) -> Result<Address> {
     let mut signature_bytes = signature_bytes_slice.to_vec();
-    // See: https://eips.ethereum.org/EIPS/eip-155
-    signature_bytes[SIGNATURE_LENGTH - 1] -= 27;
+    signature_bytes[SIGNATURE_LENGTH - 1] = normalize_recovery_id(signature_bytes[SIGNATURE_LENGTH - 1]);
     let signature = recoverable::Signature::try_from(&signature_bytes[..])
         .map_err(|err| anyhow!(err.to_string()))?;
     let public_key = signature
@@ -243,8 +242,22 @@ pub fn ecrecover(hash: Vec<u8>, signature_bytes_slice: &[u8]) -> Result<Address>
         .map_err(|err| anyhow!(err.to_string()))?;
     eth_address(public_key)[..ADDRESS_LENGTH]
         .try_into()
-        .map_err(|e: TryFromSliceError| anyhow!(e.to_string()))
+        .map_err(|err: TryFromSliceError| anyhow!(err.to_string()))
 }
+
+// Copied from https://github.com/gakonst/ethers-rs/blob/4c8d3c81e734c1760443b42a6c2229b68cfe9b3e/ethers-core/src/types/signature.rs#L142 ¯\_(ツ)_/¯
+// Also see: https://eips.ethereum.org/EIPS/eip-155
+fn normalize_recovery_id(v: u8) -> u8 {
+    match v {
+        0 => 0,
+        1 => 1,
+        27 => 0,
+        28 => 1,
+        v if v >= 35 => ((v - 1) % 2) as _,
+        _ => 4,
+    }
+}
+
 
 pub fn eth_address(verify_key: VerifyingKey) -> [u8; 20] {
     keccak256(verify_key.to_encoded_point(false).to_bytes().to_vec()[1..].to_vec())[12..]

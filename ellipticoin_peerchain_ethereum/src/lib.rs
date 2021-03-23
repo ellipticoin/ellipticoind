@@ -15,6 +15,7 @@ use num_bigint::BigInt;
 use num_traits::{pow::pow, ToPrimitive};
 use serde_json::{json, Value};
 use std::{collections::HashMap, convert::TryInto, task::Poll};
+pub use transaction::ecrecover;
 use surf;
 
 pub async fn poll(latest_block: u64) -> Result<Poll<Update>, surf::Error> {
