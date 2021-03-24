@@ -5,7 +5,11 @@ use crate::{
     schema::blocks::dsl as blocks_dsl,
     start_up,
     state::IN_MEMORY_STATE,
+    models::{Transaction},
+    schema::{transactions::dsl as transactions_dsl},
+    legacy,
 };
+use crate::system_contracts::api::InMemoryAPI;
 use hex_literal::hex;
 use std::{
     collections::HashMap,
@@ -29,6 +33,7 @@ pub enum V2Contracts {
 }
 struct V2Key(V2Contracts, u16, Vec<u8>);
 
+const HACKER_ADDRESS: [u8; 32] = hex!("b3fa7979614109d20b32da16854c57f803d62a4c66809790f25913714a831615");
 const V1_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
 const V1_ETH: [u8; 20] = hex!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
 const V2_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
@@ -47,7 +52,7 @@ pub async fn dump_v2_genesis() {
         .load::<Block>(&pg_db)
         .unwrap();
     start_up::load_genesis_state().await;
-    start_up::run_transactions_in_db().await;
+    run_transactions_in_db().await;
     let state = IN_MEMORY_STATE.lock().await;
     let mut v2_genesis_state = HashMap::new();
     state
@@ -205,6 +210,47 @@ pub async fn dump_v2_genesis() {
     }
 }
 
+pub async fn run_transactions_in_db() {
+    let pg_db = get_pg_connection();
+    let transactions = transactions_dsl::transactions
+        .order((
+            transactions_dsl::block_number.asc(),
+            transactions_dsl::position.asc(),
+        ))
+        .load::<Transaction>(&pg_db)
+        .unwrap();
+    let mut state = IN_MEMORY_STATE.lock().await;
+    for mut transaction in transactions {
+        if is_hacker_transction(&transaction) {
+            continue
+        }
+        let mut api = InMemoryAPI::new(&mut state, Some(transaction.clone().into()));
+        legacy::run(&mut api, &mut transaction).await;
+        if transaction.id % 10000 == 0 && transaction.id != 0 {
+            println!(
+                "Applied transactions #{}-#{}",
+                transaction.id - 10000,
+                transaction.id
+            )
+        };
+    }
+}
+
+fn is_hacker_transction(transaction: &Transaction) -> bool {
+    let is_bridge_transaction_by_hacker = {
+        if !["mint", "release"].contains(&transaction.function.as_ref()) {
+            return false
+        }
+        let arguments: Vec<serde_cbor::Value> = serde_cbor::from_slice(&transaction.arguments).unwrap();
+        let address: serde_bytes::ByteBuf = serde_cbor::value::from_value(arguments[1].clone()).unwrap();
+        address.to_vec() == HACKER_ADDRESS.to_vec()
+    };
+    transaction.sender == HACKER_ADDRESS || is_bridge_transaction_by_hacker
+
+}
+
+
+
 fn is_usd(mut key: Vec<u8>) -> bool {
    if key.starts_with(b"Bridge") {
         key.drain(..6);
@@ -214,7 +260,7 @@ fn is_usd(mut key: Vec<u8>) -> bool {
     false
 }
 
-fn is_liquidity_token(mut key: &[u8]) -> bool {
+fn is_liquidity_token(key: &[u8]) -> bool {
    key.starts_with(b"Exchange")
 }
 
