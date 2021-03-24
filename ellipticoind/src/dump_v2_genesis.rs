@@ -65,13 +65,17 @@ pub async fn dump_v2_genesis() {
                     value.to_vec()
                 };
                 if is_liquidity_token(&key) {
-                println!("1");
+               println!("1"); 
+    if base64::encode(&convert_address_token_key(key.clone())[..20]) == "vQMn3JvS3ATITteQ+gOYfuVSn2Y=" {
+               println!("2"); 
+        println!("{} {} {}", base64::encode(&convert_address_token_key(key.clone())[..20]), hex::encode(&convert_address_token_key(key.clone())[20..]), serde_cbor::from_slice::<u64>(&value).unwrap());
+    }
                 Some((
                     V2Key(V2Contracts::AMM, 0, convert_address_token_key(key)),
                     value.clone(),
                 ))
                 } else {
-                println!("2");
+               println!("3"); 
                 Some((
                     V2Key(V2Contracts::Token, 0, convert_address_token_key(key)),
                     value.clone(),
@@ -90,13 +94,11 @@ pub async fn dump_v2_genesis() {
                     value.to_vec()
                 };
                 if is_liquidity_token(&key) {
-                println!("3");
                 Some((
                     V2Key(V2Contracts::AMM, 1, convert_token_key(key)),
                     value.clone(),
                 ))
                 } else {
-                println!("4");
                 Some((
                     V2Key(V2Contracts::Token, 1, convert_token_key(key)),
                     value.clone(),
@@ -279,24 +281,16 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
             .unwrap()
     } else if key.starts_with(b"Exchange") {
         if sha256(["Bridge".as_bytes(), &V1_BTC[..]].concat()).to_vec() == key[8..].to_vec() {
-            shr(
-                    V2_BTC,
-            ).to_vec()
+                    V2_BTC.to_vec()
         } else if sha256(["Bridge".as_bytes(), &V1_ETH[..]].concat()).to_vec() == key[8..].to_vec()
         {
-            shr(
-                    V2_ETH,
-            ).to_vec()
+                    V2_ETH.to_vec()
         } else if sha256(["Bridge".as_bytes(), &V1_USD[..]].concat()).to_vec() == key[8..].to_vec()
         {
-            shr(
-                    V2_USD,
-            ).to_vec()
+                    V2_USD.to_vec()
         } else if sha256(b"EllipticoinELC".to_vec()).to_vec() == key[8..].to_vec()
         {
-            shr(
-                    V2_ELC
-            ).to_vec()
+                    V2_ELC.to_vec()
         } else {
             key[8..].to_vec()
         }
@@ -315,17 +309,11 @@ fn convert_token_key(key: Vec<u8>) -> Vec<u8> {
 
 fn convert_liquidity_token(key: &[u8]) -> [u8; 20] {
     if sha256(["Bridge".as_bytes(), &V1_BTC[..]].concat()).to_vec() == key[..32].to_vec() {
-        shr(
-                V2_BTC,
-        )
+                V2_BTC
     } else if sha256(["Bridge".as_bytes(), &V1_ETH[..]].concat()).to_vec() == key[..32].to_vec() {
-        shr(
-                V2_ETH,
-        )
+                V2_ETH
     } else if sha256(b"EllipticoinELC".to_vec()).to_vec() == key[..32].to_vec() {
-        shr(
                 V2_ELC
-        )
     } else {
         key[..20].try_into().unwrap()
     }
@@ -362,10 +350,4 @@ pub fn pad_left(value: Vec<u8>, padding_size: usize) -> Vec<u8> {
 
     new_vec.splice(new_vec.len()..new_vec.len(), value.iter().cloned());
     new_vec
-}
-
-fn shr(mut lhs: [u8; 20]) -> [u8; 20] {
-   println!("shr!");
-   lhs.rotate_right(1);
-   lhs.try_into().unwrap() 
 }
