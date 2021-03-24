@@ -78,14 +78,13 @@ impl QueryRoot {
             .iter()
             .cloned()
             .map(|token| {
-                let liquidity_token = AMM::liquidity_token(token.clone().into());
-                let balance = ellipticoin_contracts::Token::get_balance(
+                let balance = AMM::get_balance(
                     &mut db,
                     address.clone().into(),
-                    liquidity_token.clone(),
+                    token.clone().into(),
                 );
                 let total_supply =
-                    ellipticoin_contracts::Token::get_total_supply(&mut db, liquidity_token);
+                    AMM::get_total_supply(&mut db, token.clone().into());
                 let pool_supply_of_token =
                     AMM::get_pool_supply_of_token(&mut db, token.clone().into());
                 let underlying_pool_supply_of_base_token =

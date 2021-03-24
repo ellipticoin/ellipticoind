@@ -113,7 +113,7 @@ impl Ellipticoin {
                 .map(|address| {
                     (
                         address,
-                        Token::get_balance(db, address, AMM::liquidity_token(*token)),
+                        AMM::get_balance(db, address, *token),
                     )
                 })
                 .collect();

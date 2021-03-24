@@ -21,6 +21,8 @@ impl Contract for AMM {
 }
 
 db_accessors!(AMM {
+    balance(address: Address, token: Address) -> u64;
+    total_supply(token: Address) -> u64;
     pool_supply_of_base_token(token: Address) -> u64;
     pool_supply_of_token(token: Address) -> u64;
     liquidity_providers(token: Address) -> HashSet<Address>;
@@ -61,7 +63,7 @@ impl AMM {
         let pool_supply_of_token = Self::get_pool_supply_of_token(db, token);
         let pool_supply_of_base_token = Self::get_pool_supply_of_base_token(db, token);
         let total_supply_of_liquidity_token =
-            Token::get_total_supply(db, Self::liquidity_token(token));
+            Self::get_total_supply(db, token);
 
         Self::mint_liquidity(
             db,
@@ -90,9 +92,9 @@ impl AMM {
         percentage: u64,
         token: Address,
     ) -> Result<()> {
-        let liquidity_token_balance = Token::get_balance(db, sender, Self::liquidity_token(token));
+        let liquidity_token_balance = Self::get_balance(db, sender, token);
         let total_supply_of_liquidity_token =
-            Token::get_total_supply(db, Self::liquidity_token(token));
+            Self::get_total_supply(db, token);
         let pool_supply_of_token = Self::get_pool_supply_of_token(db, token);
         let pool_supply_of_base_token = Self::get_pool_supply_of_base_token(db, token);
         let amount_to_burn = proportion_of(liquidity_token_balance, percentage, BASE_FACTOR);
@@ -276,7 +278,7 @@ impl AMM {
         token: Address,
         amount: u64,
     ) -> Result<()> {
-        Token::mint(db, amount, Self::liquidity_token(token), sender);
+        Self::mint(db, amount, token, sender);
         let mut liquidity_providers = Self::get_liquidity_providers(db, token);
         liquidity_providers.insert(sender);
         Self::set_liquidity_providers(db, token, liquidity_providers);
@@ -289,8 +291,8 @@ impl AMM {
         token: Address,
         amount: u64,
     ) -> Result<()> {
-        Token::burn(db, amount, Self::liquidity_token(token), sender)?;
-        if Token::get_balance(db, sender, Self::liquidity_token(token)) == 0 {
+        Self::burn(db, amount, token, sender)?;
+        if Self::get_balance(db, sender, token) == 0 {
             let mut liquidity_providers = Self::get_liquidity_providers(db, token);
             liquidity_providers.remove(&sender);
             Self::set_liquidity_providers(db, token, liquidity_providers);
@@ -298,8 +300,48 @@ impl AMM {
         Ok(())
     }
 
-    pub fn liquidity_token(token: Address) -> Address {
-        token >> 1
+    pub fn mint<B: Backend>(db: &mut Db<B>, amount: u64, token: Address, address: Address) {
+        Self::credit(db, amount, token, address);
+        let total_supply = Self::get_total_supply(db, token);
+        Self::set_total_supply(db, token, total_supply + amount);
+    }
+
+    pub fn burn<B: Backend>(
+        db: &mut Db<B>,
+        amount: u64,
+        token: Address,
+        address: Address,
+    ) -> Result<()> {
+        Self::debit(db, amount, token, address)?;
+        let total_supply = Self::get_total_supply(db, token);
+        Self::set_total_supply(db, token, total_supply - amount);
+        Ok(())
+    }
+
+    pub fn credit<B: Backend>(db: &mut Db<B>, amount: u64, token: Address, address: Address) {
+        let balance = Self::get_balance(db, address, token);
+        Self::set_balance(db, address, token, balance + amount)
+    }
+
+    fn debit<B: Backend>(
+        db: &mut Db<B>,
+        amount: u64,
+        token: Address,
+        address: Address,
+    ) -> Result<()> {
+        let balance = Self::get_balance(db, address, token);
+
+        if amount <= balance {
+            Ok(Self::set_balance(db, address, token, balance - amount))
+        } else {
+            bail!(
+                "{} has insufficient balance of {} have {} need {}",
+                hex::encode(address),
+                hex::encode(token),
+                balance,
+                amount
+            )
+        }
     }
 }
 
@@ -332,7 +374,7 @@ mod tests {
         AMM::create_pool(&mut db, ALICE, 1, APPLES, BASE_FACTOR).unwrap();
 
         assert_eq!(
-            Token::get_balance(&mut db, ALICE, AMM::liquidity_token(APPLES)),
+            AMM::get_balance(&mut db, ALICE, APPLES),
             1
         );
         assert_eq!(
@@ -366,7 +408,7 @@ mod tests {
         );
 
         assert_eq!(
-            Token::get_balance(&mut db, ALICE, AMM::liquidity_token(APPLES)),
+            AMM::get_balance(&mut db, ALICE, APPLES),
             1
         );
         assert_eq!(
@@ -401,7 +443,7 @@ mod tests {
         db.revert();
 
         assert_eq!(
-            Token::get_balance(&mut db, ALICE, AMM::liquidity_token(APPLES)),
+            AMM::get_balance(&mut db, ALICE, APPLES),
             0
         );
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 1);
@@ -437,7 +479,7 @@ mod tests {
         db.revert();
 
         assert_eq!(
-            Token::get_balance(&mut db, AMM::liquidity_token(APPLES), ALICE),
+            AMM::get_balance(&mut db, APPLES, ALICE),
             0
         );
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 2);
@@ -468,7 +510,7 @@ mod tests {
         AMM::add_liquidity(&mut db, ALICE, 1, APPLES).unwrap();
 
         assert_eq!(
-            Token::get_balance(&mut db, ALICE, AMM::liquidity_token(APPLES)),
+            AMM::get_balance(&mut db, ALICE, APPLES),
             2
         );
         assert_eq!(
@@ -498,7 +540,7 @@ mod tests {
         AMM::add_liquidity(&mut db, ALICE, BASE_FACTOR, APPLES).unwrap();
 
         assert_eq!(
-            Token::get_balance(&mut db, ALICE, AMM::liquidity_token(APPLES)),
+            AMM::get_balance(&mut db, ALICE, APPLES),
             3 * BASE_FACTOR
         );
         assert_eq!(
@@ -533,7 +575,7 @@ mod tests {
             2 * BASE_FACTOR
         );
         assert_eq!(
-            Token::get_balance(&mut db, ALICE, AMM::liquidity_token(APPLES)),
+            AMM::get_balance(&mut db, ALICE, APPLES),
             1 * BASE_FACTOR
         );
         assert_eq!(

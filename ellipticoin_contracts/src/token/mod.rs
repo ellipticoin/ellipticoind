@@ -108,10 +108,10 @@ if token == LEVERAGED_BASE_TOKEN {
         Ellipticoin::harvest(db, Address(legacy_address[..20].try_into().unwrap()))?;
         for token in [
             TOKENS.to_vec(),
-            TOKENS
-                .iter()
-                .map(|token| AMM::liquidity_token(*token))
-                .collect::<Vec<Address>>(),
+            // TOKENS
+            //     .iter()
+            //     .map(|token| AMM::liquidity_token(*token))
+            //     .collect::<Vec<Address>>(),
         ]
         .concat()
         .iter()
