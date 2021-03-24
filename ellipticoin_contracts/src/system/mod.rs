@@ -72,6 +72,7 @@ impl System {
             let legacy_address: Address = Address(legacy_address[..20].try_into().unwrap());
             if AMM::get_liquidity_providers(db, *token).contains(&legacy_address) {
                 let balance = AMM::get_balance(db, legacy_address, *token);
+                println!("{} {} {}", hex::encode(legacy_address), hex::encode(token), balance);
                 AMM::transfer(
                     db,
                     legacy_address,
