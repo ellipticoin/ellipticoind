@@ -49,7 +49,7 @@ impl QueryRoot {
                     &mut db,
                     token.clone().into(),
                 );
-                let price = ellipticoin_contracts::Token::get_price(
+                let price = ellipticoin_contracts::Token::get_underlying_price(
                     &mut db,
                     token.clone().into(),
                 );

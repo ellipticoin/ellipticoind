@@ -58,6 +58,14 @@ impl Token {
         }
     }
 
+    pub fn get_underlying_price<B: Backend>(
+        db: &mut Db<B>,
+        token: Address,
+    ) -> u64 {
+        let balance = Self::get_price(db, token);
+        Self::amount_to_underlying(db, balance)
+    }
+
     pub fn amount_to_underlying<B: Backend>(db: &mut Db<B>, amount: u64) -> u64 {
         let base_token_exchange_rate = Token::get_base_token_exchange_rate(db);
         (base_token_exchange_rate * amount
