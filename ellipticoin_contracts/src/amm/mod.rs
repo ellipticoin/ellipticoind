@@ -318,6 +318,18 @@ impl AMM {
         Ok(())
     }
 
+    pub fn transfer<B: Backend>(
+        db: &mut Db<B>,
+        sender: Address,
+        recipient: Address,
+        amount: u64,
+        token: Address,
+    ) -> Result<()> {
+        Self::debit(db, amount, token, sender)?;
+        Self::credit(db, amount, token, recipient);
+        Ok(())
+    }
+
     pub fn credit<B: Backend>(db: &mut Db<B>, amount: u64, token: Address, address: Address) {
         let balance = Self::get_balance(db, address, token);
         Self::set_balance(db, address, token, balance + amount)

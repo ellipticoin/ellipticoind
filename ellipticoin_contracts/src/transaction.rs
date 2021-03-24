@@ -23,10 +23,6 @@ impl Transaction {
     }
 }
 
-// pub trait Run {
-//     fn run<B: Backend>(&self, db: &mut Db<B>, address: Address) -> Result<()>;
-// }
-
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum Action {
     AddLiquidity(u64, Address),
@@ -76,7 +72,7 @@ impl Action {
             }
             Action::Harvest() => Ellipticoin::harvest(db, sender),
             Action::Migrate(legacy_address, legacy_signature) => {
-                Token::migrate(db, sender, *legacy_address, legacy_signature.to_vec())
+                System::migrate(db, sender, *legacy_address, legacy_signature.to_vec())
             }
             Action::Pay(amount, token, recipient) => {
                 Token::transfer(db, sender, *amount, *token, *recipient)

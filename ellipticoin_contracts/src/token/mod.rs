@@ -98,46 +98,6 @@ if token == LEVERAGED_BASE_TOKEN {
 }
     }
 
-    pub fn migrate<B: Backend>(
-        db: &mut Db<B>,
-        sender: Address,
-        legacy_address: [u8; 32],
-        legacy_signature: Vec<u8>,
-    ) -> Result<()> {
-        ed25519_verify(sender.as_ref(), &legacy_address, &legacy_signature)?;
-        Ellipticoin::harvest(db, Address(legacy_address[..20].try_into().unwrap()))?;
-        for token in [
-            TOKENS.to_vec(),
-            // TOKENS
-            //     .iter()
-            //     .map(|token| AMM::liquidity_token(*token))
-            //     .collect::<Vec<Address>>(),
-        ]
-        .concat()
-        .iter()
-        {
-            let balance = Self::get_balance(db, Address(legacy_address[..20].try_into().unwrap()), *token);
-            println!("{} {}", hex::encode(token), balance);
-            Self::transfer(
-                db,
-                Address(legacy_address[..20].try_into().unwrap()),
-                sender,
-                balance,
-                *token,
-            )?;
-        }
-        for token in TOKENS.iter() {
-            let legacy_address: Address = Address(legacy_address[..20].try_into().unwrap());
-            if AMM::get_liquidity_providers(db, *token).contains(&legacy_address) {
-                let mut liquidity_providers = AMM::get_liquidity_providers(db, *token);
-                liquidity_providers.insert(sender);
-                AMM::set_liquidity_providers(db, *token, liquidity_providers);
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn transfer<B: Backend>(
         db: &mut Db<B>,
         sender: Address,
