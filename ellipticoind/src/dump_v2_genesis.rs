@@ -144,7 +144,7 @@ pub async fn dump_v2_genesis() {
             {
                 key.drain(..33);
                 Some((
-                    V2Key(V2Contracts::AMM, 2, convert_token_key(key)),
+                    V2Key(V2Contracts::AMM, 4, convert_token_key(key)),
                     convert_liquidity_providers(value),
                 ))
             }
