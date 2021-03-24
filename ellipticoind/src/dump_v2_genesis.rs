@@ -64,13 +64,19 @@ pub async fn dump_v2_genesis() {
                 } else {
                     value.to_vec()
                 };
-                // println!("{}", hex::encode(convert_address_token_key(key.clone())));
-                // println!("--");
-                // println!("{:?}", serde_cbor::from_slice::<serde_cbor::Value>(&value));
+                if is_liquidity_token(&key) {
+                println!("1");
+                Some((
+                    V2Key(V2Contracts::AMM, 0, convert_address_token_key(key)),
+                    value.clone(),
+                ))
+                } else {
+                println!("2");
                 Some((
                     V2Key(V2Contracts::Token, 0, convert_address_token_key(key)),
                     value.clone(),
                 ))
+                }
             }
             mut key
                 if key.starts_with(
@@ -83,7 +89,19 @@ pub async fn dump_v2_genesis() {
                 } else {
                     value.to_vec()
                 };
-                Some((V2Key(V2Contracts::Token, 1, convert_token_key(key)), value.clone()))
+                if is_liquidity_token(&key) {
+                println!("3");
+                Some((
+                    V2Key(V2Contracts::AMM, 1, convert_token_key(key)),
+                    value.clone(),
+                ))
+                } else {
+                println!("4");
+                Some((
+                    V2Key(V2Contracts::Token, 1, convert_token_key(key)),
+                    value.clone(),
+                ))
+                }
             }
             mut key
                 if key.starts_with(
@@ -96,7 +114,7 @@ pub async fn dump_v2_genesis() {
             {
                 key.drain(..33);
                 Some((
-                    V2Key(V2Contracts::AMM, 0, convert_token_key(key)),
+                    V2Key(V2Contracts::AMM, 2, convert_token_key(key)),
                     scale_usd_amount(value)
                 ))
             }
@@ -111,7 +129,7 @@ pub async fn dump_v2_genesis() {
             {
                 key.drain(..33);
                 Some((
-                    V2Key(V2Contracts::AMM, 1, convert_token_key(key)),
+                    V2Key(V2Contracts::AMM, 3, convert_token_key(key)),
                     value.clone(),
                 ))
             }
@@ -196,6 +214,10 @@ fn is_usd(mut key: Vec<u8>) -> bool {
         return token == V1_USD
     }
     false
+}
+
+fn is_liquidity_token(mut key: &[u8]) -> bool {
+   key.starts_with(b"Exchange")
 }
 
 fn scale_usd_amount(value: &[u8]) ->  Vec<u8> {
