@@ -33,7 +33,7 @@ const V1_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
 const V1_ETH: [u8; 20] = hex!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
 const V2_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
 const V2_ETH: [u8; 20] = hex!("0000000000000000000000000000000000000000");
-const V2_ELC: [u8; 20] = hex!("0000000000000000000000000000000000000001");
+const V2_ELC: [u8; 20] = hex!("0000000000000000000000000000000000000002");
 const V1_USD: [u8; 20] = hex!("6b175474e89094c44da98b954eedeac495271d0f");
 const V2_USD: [u8; 20] = hex!("5d3a536e4d6dbd6114cc1ead35777bab948e3643");
 // const V2_USD: [u8; 20] = hex!("6d7f0754ffeb405d23c51ce938289d4835be3b14");
@@ -65,17 +65,13 @@ pub async fn dump_v2_genesis() {
                     value.to_vec()
                 };
                 if is_liquidity_token(&key) {
-               println!("1"); 
     if base64::encode(&convert_address_token_key(key.clone())[..20]) == "vQMn3JvS3ATITteQ+gOYfuVSn2Y=" {
-               println!("2"); 
-        println!("{} {} {}", base64::encode(&convert_address_token_key(key.clone())[..20]), hex::encode(&convert_address_token_key(key.clone())[20..]), serde_cbor::from_slice::<u64>(&value).unwrap());
     }
                 Some((
                     V2Key(V2Contracts::AMM, 0, convert_address_token_key(key)),
                     value.clone(),
                 ))
                 } else {
-               println!("3"); 
                 Some((
                     V2Key(V2Contracts::Token, 0, convert_address_token_key(key)),
                     value.clone(),
