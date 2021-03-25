@@ -9,6 +9,7 @@ use crate::{
     schema::{transactions::dsl as transactions_dsl},
     legacy,
 };
+use std::convert::TryFrom;
 use crate::system_contracts::api::InMemoryAPI;
 use hex_literal::hex;
 use std::{
@@ -33,7 +34,10 @@ pub enum V2Contracts {
 }
 struct V2Key(V2Contracts, u16, Vec<u8>);
 
-const HACKER_ADDRESS: [u8; 32] = hex!("b3fa7979614109d20b32da16854c57f803d62a4c66809790f25913714a831615");
+const HACKER_ADDRESSES: [[u8; 32]; 2] = [
+    hex!("b3fa7979614109d20b32da16854c57f803d62a4c66809790f25913714a831615"),
+    hex!("1fb0c9ea9d1f0aa2a82afb7ccdebf0061b1aa0e05480538a777efbee77900a28"),
+];
 const V1_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
 const V1_ETH: [u8; 20] = hex!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
 const V2_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
@@ -238,14 +242,18 @@ pub async fn run_transactions_in_db() {
 
 fn is_hacker_transction(transaction: &Transaction) -> bool {
     let is_bridge_transaction_by_hacker = {
-        if !["mint", "release"].contains(&transaction.function.as_ref()) {
+        if !["mint"].contains(&transaction.function.as_ref()) {
             return false
         }
         let arguments: Vec<serde_cbor::Value> = serde_cbor::from_slice(&transaction.arguments).unwrap();
-        let address: serde_bytes::ByteBuf = serde_cbor::value::from_value(arguments[1].clone()).unwrap();
-        address.to_vec() == HACKER_ADDRESS.to_vec()
+        let address_bytes: serde_bytes::ByteBuf = serde_cbor::value::from_value(arguments[1].clone()).unwrap();
+        let address = <[u8; 32]>::try_from(address_bytes.to_vec());
+        if address.is_err() {
+            println!("invalid address {}", hex::encode(address_bytes));
+        }
+        HACKER_ADDRESSES.contains(&address.unwrap_or([0; 32]))
     };
-    transaction.sender == HACKER_ADDRESS || is_bridge_transaction_by_hacker
+    HACKER_ADDRESSES.contains(&transaction.sender.clone()[..].try_into().unwrap()) || is_bridge_transaction_by_hacker
 
 }
 
