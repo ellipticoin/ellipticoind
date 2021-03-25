@@ -9,6 +9,7 @@ use crate::{
     schema::{transactions::dsl as transactions_dsl},
     legacy,
 };
+use crate::system_contracts::token::BASE_FACTOR;
 use std::convert::TryFrom;
 use crate::system_contracts::api::InMemoryAPI;
 use hex_literal::hex;
@@ -34,23 +35,46 @@ pub enum V2Contracts {
 }
 struct V2Key(V2Contracts, u16, Vec<u8>);
 
-const HACKER_ADDRESSES: [[u8; 32]; 15] = [
+const HACKER_ADDRESSES: [[u8; 32]; 24] = [
+    hex!("39a2a6c025ab5217420ac20c37f56255cbb5b8117454cdc55b7322d73fd54cdb"),
+    hex!("bd0327dc9bd2dc04c84ed790fa03987ee5529f66eeb801fee1ef0d63f0afb700"),
+
     hex!("b3fa7979614109d20b32da16854c57f803d62a4c66809790f25913714a831615"),
     hex!("1fb0c9ea9d1f0aa2a82afb7ccdebf0061b1aa0e05480538a777efbee77900a28"),
     hex!("4288e32b510f7f204be44d4671d3284582874d5dc3bfb5a8a74154ea639f58f5"),
     hex!("e3886b6c604a20c21a3a24b509ac658f3763d04e53276bf8580ef39a426b5fdf"),
+    hex!("86b2d5e924c3a7c3e32929833219ec7eb04e93c02e9c41ccd75f51744ba0f881"),
     hex!("1a6e325901190934dab08e306938d4221b12050df83fb966b8b9f4f8877f37be"),
     hex!("7c7ca82a864a71810c27d1dc1df20af94ecef7b8d3a26b1172537d5be7584670"),
-    hex!("e9e096ec1d5d1545b0ebcb26f5ff61669eaeac6d8209f113f4a737a4fd2956a8"),
+    // hex!("e9c55c31201f51ec7cc59e0f4b5b1ec1317edf91ed73d1873a6e54e036d58bfe"),
+    // hex!("37471d396a424267b2e6b80f9eadbf8b08c84b756e4253e000222f26b0db21bc"),
+    // hex!("df0d4428443fdcacca679e754526394c3d78ceb82046b2c514fbdc26e89c3bf5"),
+    // hex!("6f0fc7010b611f9011ff354c1c8ddbda371eab1ee8ed05f85f5f449d021c51aa"),
+    // hex!("e9e096ec1d5d1545b0ebcb26f5ff61669eaeac6d8209f113f4a737a4fd2956a8"),
+    // hex!("f3ea1ab0b3bc5d1c03c42f73419a53dfa6c44efff6bd596423fba48e341bb191"),
     hex!("9838d62618f0e413fbdc199a1d0667bf9a6c0a2e17cefed6bb95f27b39643500"),
     hex!("7383559bc1749f410af5212a1b15c013d95581432f6e50574e629d7cec3dbd80"),
     hex!("1a8e4e6c86411acbeab952539139208cf9dfd14c3bcb2d70abeb2771fc94a95a"),
+    // hex!("11abc7b344f9f22ec3b0c6c6ceaf7ed63de56f50f688f57e558fd0d0294c1079"),
+    // hex!("9b56e69b4d46ab0790c16cde91a04dbef8cd14e6af442c33b2f3275ce29873b7"),
     hex!("31547fbe32bf56fce8b8a36a041e0ee77f9c0b38241bc770c9de6a72dadf6c0b"),
     hex!("31547fbe32bf56fce8b8a36a041e0ee77f9c0b38241bc770c9de6a72dadf6c0b"),
+    // hex!("a452faaae70a5e4f83bcbf8a0d6f02300480ffabf59f4860292cbf8c5ff68331"),
+    // hex!("2c6b2f424e6d15548332fa5ded59d0851a8b59488296b341bee5b41bdc52bae2"),
     hex!("08bf9c2de3a75b524f12f05341be7b20ba03dc8bcbf69e58c5d7d4508f8caf76"),
+    hex!("404ebbaec191f0d57c2226b93d4931e9d6635dd823e5abfd6324d99cfee69fba"),
     hex!("5906962a12395c34967527be23621d835e48c8c650f1ca4814acb30341d24044"),
     hex!("29d65760101bb1b8cd300cafef7346de80a4ea34fe1741c205f790697aa05506"),
+    // hex!("f55b8dcbf58f2dcb5279c8738f26043c53cede95906376649d7dc50c83d7cdec"),
+    // hex!("b9a3ff3f0ac9a83f142b43115ad148145b7821d64a35b09a34e525584dc2bc88"),
+    hex!("1dbb6765e6335abc512423ff60913e6b25b133a8b80d070e628db3f161ee6b6b"),
+    hex!("0824073c36fbeaa0f32e2ecdd94c789b55ac8e17cb0b5606e031314bcf0a4500"),
+    hex!("df0d4428443fdcacca679e754526394c3d78ceb82046b2c514fbdc26e89c3bf5"),
+    hex!("4407adb31ed24d49fea74ce1fccfc2718c6f402da7d149b12e85da09c9d58aa9"),
+    hex!("d8b5d65af4c87a05f0d713090da2718323460382620390f04ad7854f677ebbae"),
+    hex!("44cb7c96b48670dab5d7c1e7f156ab448ff95dd68ade6e779fb493af4f66079f"),
 ];
+
 const V1_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
 const V1_ETH: [u8; 20] = hex!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
 const V2_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
@@ -238,11 +262,30 @@ pub async fn run_transactions_in_db() {
         .unwrap();
     let mut state = IN_MEMORY_STATE.lock().await;
     for mut transaction in transactions {
-        if is_hacker_transction(&transaction) {
-            continue
+        if transaction.id >= 3104941 {
+            break;
         }
         let mut api = InMemoryAPI::new(&mut state, Some(transaction.clone().into()));
         legacy::run(&mut api, &mut transaction).await;
+        // if transaction.function == "exchange" {
+        //     let eth_price = crate::system_contracts::exchange::get_price(
+        //                 &mut api,
+        //                 ellipticoin::Token {
+        //                     issuer: "Bridge".into(),
+        //                     id: V1_ETH.to_vec().into(),
+        //                 },
+        //             )
+        //             .unwrap_or(0);
+        //     let btc_price = crate::system_contracts::exchange::get_price(
+        //                 &mut api,
+        //                 ellipticoin::Token {
+        //                     issuer: "Bridge".into(),
+        //                     id: V1_BTC.to_vec().into(),
+        //                 },
+        //             )
+        //             .unwrap_or(0);
+        //     println!("id: {} ETH Price {} BTC Price {}", transaction.id, eth_price as f64 / BASE_FACTOR as f64, btc_price as f64 / BASE_FACTOR as f64);
+        // }
         if transaction.id % 10000 == 0 && transaction.id != 0 {
             println!(
                 "Applied transactions #{}-#{}",
