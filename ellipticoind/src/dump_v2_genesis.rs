@@ -34,9 +34,14 @@ pub enum V2Contracts {
 }
 struct V2Key(V2Contracts, u16, Vec<u8>);
 
-const HACKER_ADDRESSES: [[u8; 32]; 2] = [
+const HACKER_ADDRESSES: [[u8; 32]; 7] = [
     hex!("b3fa7979614109d20b32da16854c57f803d62a4c66809790f25913714a831615"),
     hex!("1fb0c9ea9d1f0aa2a82afb7ccdebf0061b1aa0e05480538a777efbee77900a28"),
+    hex!("4288e32b510f7f204be44d4671d3284582874d5dc3bfb5a8a74154ea639f58f5"),
+    hex!("e3886b6c604a20c21a3a24b509ac658f3763d04e53276bf8580ef39a426b5fdf"),
+    hex!("86b2d5e924c3a7c3e32929833219ec7eb04e93c02e9c41ccd75f51744ba0f881"),
+    hex!("1a6e325901190934dab08e306938d4221b12050df83fb966b8b9f4f8877f37be"),
+    hex!("7c7ca82a864a71810c27d1dc1df20af94ecef7b8d3a26b1172537d5be7584670"),
 ];
 const V1_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
 const V1_ETH: [u8; 20] = hex!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
