@@ -267,6 +267,17 @@ pub async fn run_transactions_in_db() {
         }
         let mut api = InMemoryAPI::new(&mut state, Some(transaction.clone().into()));
         legacy::run(&mut api, &mut transaction).await;
+        if ["mint", "release"].contains(&transaction.function.as_ref()) {
+            let total_supply = crate::system_contracts::token::get_total_supply(
+                        &mut api,
+                        ellipticoin::Token {
+                            issuer: "Bridge".into(),
+                            id: V1_ETH.to_vec().into(),
+                        },
+                    );
+            println!("id: {} ETH Total Supply {}", transaction.id, total_supply as f64 / BASE_FACTOR as f64);
+            
+        }
         // if transaction.function == "exchange" {
         //     let eth_price = crate::system_contracts::exchange::get_price(
         //                 &mut api,
