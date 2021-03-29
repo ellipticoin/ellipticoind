@@ -16,14 +16,15 @@ use serde_cbor::Value;
 use system_contracts::exchange::CONTRACT_NAME;
 use wasm_rpc::error::Error;
 
-pub async fn run<API: ellipticoin::API>(api: &mut API, transaction: &mut Transaction) {
+pub async fn run<API: ellipticoin::API>(api: &mut API, transaction: &mut Transaction) -> serde_cbor::Value {
     fix_spelling_errors(transaction);
     if (0..1_718_816_i32).contains(&transaction.block_number)
         && transaction.function == "remove_liquidity"
     {
         run_remove_liquidity(api, transaction);
+        serde_cbor::value::to_value(Ok::<serde_cbor::Value, serde_cbor::Value>(serde_cbor::Value::Null)).unwrap()
     } else {
-        system_contracts::run(api, TransactionRequest::from(transaction.clone()));
+        system_contracts::run(api, TransactionRequest::from(transaction.clone()))
     }
 }
 
