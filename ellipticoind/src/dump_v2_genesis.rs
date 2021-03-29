@@ -262,6 +262,7 @@ pub async fn run_transactions_in_db() {
         .unwrap();
     let mut state = IN_MEMORY_STATE.lock().await;
     let mut expected_total_supply = 0;
+    let magic_number = serde_cbor::value::to_value(51495).unwrap();
     for mut transaction in transactions {
         if transaction.id >= 3104941 {
             break;
@@ -274,49 +275,56 @@ issuer: "Bridge".into(),
 id: V1_ETH.to_vec().into(),
 },
 );
-        let return_value = legacy::run(&mut api, &mut transaction).await;
-        let total_supply_after = crate::system_contracts::token::get_total_supply(
-                &mut api,
-                ellipticoin::Token {
-issuer: "Bridge".into(),
-id: V1_ETH.to_vec().into(),
-},
-);
-        if transaction.function == "release" {
-            // println!("{} {} {} {:?}", transaction.function, total_supply_before, total_supply_after, return_value);
-        }
-        
-        if ["mint", "release"].contains(&transaction.function.as_ref()) {
-            let token = serde_cbor::value::from_value::<serde_bytes::ByteBuf>(serde_cbor::from_slice::<Vec<serde_cbor::Value>>(&transaction.arguments).unwrap()[0].clone()).unwrap();
-        let return_value2: Result<serde_cbor::Value, serde_cbor::Value> = serde_cbor::value::from_value(return_value.clone()).unwrap();
-            // println!("is err {}", return_value2.is_err());
-            if token.to_vec() == V1_ETH && !return_value2.is_err() {
-                let amount = if transaction.function == "mint" {
-                   let amount = serde_cbor::value::from_value::<u64>(serde_cbor::from_slice::<Vec<serde_cbor::Value>>(&transaction.arguments).unwrap()[2].clone()).unwrap();
-                    expected_total_supply += amount;
-                    println!("mint {} {}", transaction.id, amount);
-                    amount
-                } else {
-                  let amount = serde_cbor::value::from_value::<u64>(serde_cbor::from_slice::<Vec<serde_cbor::Value>>(&transaction.arguments).unwrap()[2].clone()).unwrap();
-                    expected_total_supply -= amount;
-                    println!("release {} {}", transaction.id, amount);
-                    amount
-                };
-                let total_supply = crate::system_contracts::token::get_total_supply(
-                            &mut api,
-                            ellipticoin::Token {
-                                issuer: "Bridge".into(),
-                                id: V1_ETH.to_vec().into(),
-                            },
-                        );
-                // println!("id: {} ETH Total Supply {}", transaction.id, total_supply as f64 / BASE_FACTOR as f64);
-                if expected_total_supply != total_supply {
-                    println!("{}", expected_total_supply);
-                    println!("{}", total_supply);
-                    panic!();
-                }
+
+            legacy::run(&mut api, &mut transaction).await;
+            let arguments: Vec<serde_cbor::Value> = serde_cbor::from_slice(&transaction.arguments).unwrap();
+           if arguments.len() == 3 {
+            if arguments[2] == magic_number {
+            println!("{}", transaction.id);
             }
-        }
+           }
+//         let total_supply_after = crate::system_contracts::token::get_total_supply(
+//                 &mut api,
+//                 ellipticoin::Token {
+// issuer: "Bridge".into(),
+// id: V1_ETH.to_vec().into(),
+// },
+// );
+//         if transaction.function == "release" {
+            // println!("{} {} {} {:?}", transaction.function, total_supply_before, total_supply_after, return_value);
+        // }
+        
+        // if ["mint", "release"].contains(&transaction.function.as_ref()) {
+        //     let token = serde_cbor::value::from_value::<serde_bytes::ByteBuf>(serde_cbor::from_slice::<Vec<serde_cbor::Value>>(&transaction.arguments).unwrap()[0].clone()).unwrap();
+        // let return_value2: Result<serde_cbor::Value, serde_cbor::Value> = serde_cbor::value::from_value(return_value.clone()).unwrap();
+        //     // println!("is err {}", return_value2.is_err());
+        //     if token.to_vec() == V1_ETH && !return_value2.is_err() {
+        //         let amount = if transaction.function == "mint" {
+        //            let amount = serde_cbor::value::from_value::<u64>(serde_cbor::from_slice::<Vec<serde_cbor::Value>>(&transaction.arguments).unwrap()[2].clone()).unwrap();
+        //             expected_total_supply += amount;
+        //             println!("mint {} {}", transaction.id, amount);
+        //             amount
+        //         } else {
+        //           let amount = serde_cbor::value::from_value::<u64>(serde_cbor::from_slice::<Vec<serde_cbor::Value>>(&transaction.arguments).unwrap()[2].clone()).unwrap();
+        //             expected_total_supply -= amount;
+        //             println!("release {} {}", transaction.id, amount);
+        //             amount
+        //         };
+        //         let total_supply = crate::system_contracts::token::get_total_supply(
+        //                     &mut api,
+        //                     ellipticoin::Token {
+        //                         issuer: "Bridge".into(),
+        //                         id: V1_ETH.to_vec().into(),
+        //                     },
+        //                 );
+        //         // println!("id: {} ETH Total Supply {}", transaction.id, total_supply as f64 / BASE_FACTOR as f64);
+        //         if expected_total_supply != total_supply {
+        //             println!("{}", expected_total_supply);
+        //             println!("{}", total_supply);
+        //             panic!();
+        //         }
+        //     }
+        // }
         // if transaction.function == "exchange" {
         //     let eth_price = crate::system_contracts::exchange::get_price(
         //                 &mut api,
@@ -337,11 +345,11 @@ id: V1_ETH.to_vec().into(),
         //     println!("id: {} ETH Price {} BTC Price {}", transaction.id, eth_price as f64 / BASE_FACTOR as f64, btc_price as f64 / BASE_FACTOR as f64);
         // }
         if transaction.id % 10000 == 0 && transaction.id != 0 {
-            // println!(
-            //     "Applied transactions #{}-#{}",
-            //     transaction.id - 10000,
-            //     transaction.id
-            // )
+            println!(
+                "Applied transactions #{}-#{}",
+                transaction.id - 10000,
+                transaction.id
+            )
         };
     }
 }
