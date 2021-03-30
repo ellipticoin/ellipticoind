@@ -111,8 +111,6 @@ pub async fn dump_v2_genesis() {
                     value.to_vec()
                 };
                 if is_liquidity_token(&key) {
-    if base64::encode(&convert_address_token_key(key.clone())[..20]) == "vQMn3JvS3ATITteQ+gOYfuVSn2Y=" {
-    }
                 Some((
                     V2Key(V2Contracts::AMM, 0, convert_address_token_key(key)),
                     value.clone(),
