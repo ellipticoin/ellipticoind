@@ -270,15 +270,20 @@ pub async fn run_transactions_in_db() {
             break;
         }
         let mut api = InMemoryAPI::new(&mut state, Some(transaction.clone().into()));
-        let total_supply_before = crate::system_contracts::token::get_total_supply(
+
+           let return_value =  legacy::run(&mut api, &mut transaction).await;
+        let balance = crate::system_contracts::token::get_balance(
                 &mut api,
                 ellipticoin::Token {
 issuer: "Bridge".into(),
 id: V1_ETH.to_vec().into(),
 },
+                ellipticoin::Address::PublicKey(
+                    hex::decode("a79d7e37bf80d57e2f1d3c904b0d58d95c785af076a2a8e553f356977dc14f9e").unwrap().try_into().unwrap()),
 );
-
-           let return_value =  legacy::run(&mut api, &mut transaction).await;
+            if balance > 0 {
+                panic!("{}", transaction.id);
+            }
            //  let arguments: Vec<serde_cbor::Value> = serde_cbor::from_slice(&transaction.arguments).unwrap();
            // if arguments.len() == 3 {
            //  if arguments[2] == magic_number {
