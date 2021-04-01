@@ -1,7 +1,6 @@
-use crate::constants::BASE_FACTOR;
 use crate::{
     charge,
-    constants::BASE_TOKEN,
+    constants::{BASE_FACTOR, BASE_TOKEN},
     contract::{self, Contract},
     pay,
     token::Token,

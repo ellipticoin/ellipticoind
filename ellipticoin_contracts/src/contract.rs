@@ -1,8 +1,7 @@
 use crate::helpers::pad_left;
 use ellipticoin_types::{
-    Address,
     db::{Backend, Db},
-    ADDRESS_LENGTH,
+    Address, ADDRESS_LENGTH,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::convert::TryInto;
@@ -22,9 +21,11 @@ pub trait Contract {
     }
 
     fn address() -> Address {
-        Address(pad_left((Self::NAME as u16).to_be_bytes().to_vec(), ADDRESS_LENGTH)[..ADDRESS_LENGTH]
-            .try_into()
-            .unwrap())
+        Address(
+            pad_left((Self::NAME as u16).to_be_bytes().to_vec(), ADDRESS_LENGTH)[..ADDRESS_LENGTH]
+                .try_into()
+                .unwrap(),
+        )
     }
 }
 

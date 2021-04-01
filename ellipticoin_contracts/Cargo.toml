@@ -11,6 +11,7 @@ anyhow = "*"
 async-std = {version = "1.9.0", features = ["unstable", "attributes"]}
 base64 = "*"
 ed25519-zebra = "2.2.0"
+linked_hash_set = {version = "0.1.4", features = ["serde"]}
 ellipticoin_macros = {path = "../ellipticoin_macros"}
 ellipticoin_types = {path = "../ellipticoin_types"}
 hex = "*"

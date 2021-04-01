@@ -1,19 +1,16 @@
-use anyhow::{Result};
 use crate::{
     constants::TOKENS,
+    contract::{self, Contract},
     crypto::ed25519_verify,
-    Ellipticoin,
-    Token,
+    Ellipticoin, Token, AMM,
 };
-use std::convert::TryInto;
-use crate::AMM;
-use crate::contract::{self, Contract};
+use anyhow::Result;
 use ellipticoin_macros::db_accessors;
 use ellipticoin_types::{
     db::{Backend, Db},
     Address,
 };
-
+use std::convert::TryInto;
 
 pub struct System;
 
@@ -52,13 +49,12 @@ impl System {
     ) -> Result<()> {
         ed25519_verify(sender.as_ref(), &legacy_address, &legacy_signature)?;
         Ellipticoin::harvest(db, Address(legacy_address[..20].try_into().unwrap()))?;
-        for token in [
-            TOKENS.to_vec(),
-        ]
-        .concat()
-        .iter()
-        {
-            let balance = Token::get_balance(db, Address(legacy_address[..20].try_into().unwrap()), *token);
+        for token in [TOKENS.to_vec()].concat().iter() {
+            let balance = Token::get_balance(
+                db,
+                Address(legacy_address[..20].try_into().unwrap()),
+                *token,
+            );
             Token::transfer(
                 db,
                 Address(legacy_address[..20].try_into().unwrap()),
@@ -72,14 +68,8 @@ impl System {
             let legacy_address: Address = Address(legacy_address[..20].try_into().unwrap());
             if AMM::get_liquidity_providers(db, *token).contains(&legacy_address) {
                 let balance = AMM::get_balance(db, legacy_address, *token);
-                println!("{} {} {}", hex::encode(legacy_address), hex::encode(token), balance);
-                AMM::transfer(
-                    db,
-                    legacy_address,
-                    sender,
-                    balance,
-                    *token,
-                )?;
+                // println!("{} {} {}", hex::encode(legacy_address), hex::encode(token), balance);
+                AMM::transfer(db, legacy_address, sender, balance, *token)?;
                 let mut liquidity_providers = AMM::get_liquidity_providers(db, *token);
                 liquidity_providers.remove(&legacy_address);
                 liquidity_providers.insert(sender);

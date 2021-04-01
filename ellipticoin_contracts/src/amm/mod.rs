@@ -12,7 +12,7 @@ use ellipticoin_types::{
     db::{Backend, Db},
     Address,
 };
-use std::{collections::HashSet};
+use linked_hash_set::LinkedHashSet;
 
 pub struct AMM;
 
@@ -25,7 +25,7 @@ db_accessors!(AMM {
     total_supply(token: Address) -> u64;
     pool_supply_of_base_token(token: Address) -> u64;
     pool_supply_of_token(token: Address) -> u64;
-    liquidity_providers(token: Address) -> HashSet<Address>;
+    liquidity_providers(token: Address) -> LinkedHashSet<Address>;
 });
 
 impl AMM {
@@ -62,8 +62,7 @@ impl AMM {
         Self::validate_pool_exists(db, token)?;
         let pool_supply_of_token = Self::get_pool_supply_of_token(db, token);
         let pool_supply_of_base_token = Self::get_pool_supply_of_base_token(db, token);
-        let total_supply_of_liquidity_token =
-            Self::get_total_supply(db, token);
+        let total_supply_of_liquidity_token = Self::get_total_supply(db, token);
 
         Self::mint_liquidity(
             db,
@@ -93,8 +92,7 @@ impl AMM {
         token: Address,
     ) -> Result<()> {
         let liquidity_token_balance = Self::get_balance(db, sender, token);
-        let total_supply_of_liquidity_token =
-            Self::get_total_supply(db, token);
+        let total_supply_of_liquidity_token = Self::get_total_supply(db, token);
         let pool_supply_of_token = Self::get_pool_supply_of_token(db, token);
         let pool_supply_of_base_token = Self::get_pool_supply_of_base_token(db, token);
         let amount_to_burn = proportion_of(liquidity_token_balance, percentage, BASE_FACTOR);
@@ -385,10 +383,7 @@ mod tests {
 
         AMM::create_pool(&mut db, ALICE, 1, APPLES, BASE_FACTOR).unwrap();
 
-        assert_eq!(
-            AMM::get_balance(&mut db, ALICE, APPLES),
-            1
-        );
+        assert_eq!(AMM::get_balance(&mut db, ALICE, APPLES), 1);
         assert_eq!(
             AMM::get_liquidity_providers(&mut db, APPLES,)
                 .iter()
@@ -419,10 +414,7 @@ mod tests {
             "Pool already exisits: a000000000000000000000000000000000000000"
         );
 
-        assert_eq!(
-            AMM::get_balance(&mut db, ALICE, APPLES),
-            1
-        );
+        assert_eq!(AMM::get_balance(&mut db, ALICE, APPLES), 1);
         assert_eq!(
             AMM::get_liquidity_providers(&mut db, APPLES)
                 .iter()
@@ -454,10 +446,7 @@ mod tests {
         );
         db.revert();
 
-        assert_eq!(
-            AMM::get_balance(&mut db, ALICE, APPLES),
-            0
-        );
+        assert_eq!(AMM::get_balance(&mut db, ALICE, APPLES), 0);
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 1);
         assert_eq!(
             AMM::get_liquidity_providers(&mut db, APPLES)
@@ -490,10 +479,7 @@ mod tests {
         );
         db.revert();
 
-        assert_eq!(
-            AMM::get_balance(&mut db, APPLES, ALICE),
-            0
-        );
+        assert_eq!(AMM::get_balance(&mut db, APPLES, ALICE), 0);
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 2);
         assert_eq!(
             AMM::get_liquidity_providers(&mut db, APPLES)
@@ -521,10 +507,7 @@ mod tests {
         AMM::create_pool(&mut db, ALICE, 1, APPLES, BASE_FACTOR).unwrap();
         AMM::add_liquidity(&mut db, ALICE, 1, APPLES).unwrap();
 
-        assert_eq!(
-            AMM::get_balance(&mut db, ALICE, APPLES),
-            2
-        );
+        assert_eq!(AMM::get_balance(&mut db, ALICE, APPLES), 2);
         assert_eq!(
             AMM::get_liquidity_providers(&mut db, APPLES)
                 .iter()
@@ -551,10 +534,7 @@ mod tests {
         AMM::add_liquidity(&mut db, ALICE, BASE_FACTOR, APPLES).unwrap();
         AMM::add_liquidity(&mut db, ALICE, BASE_FACTOR, APPLES).unwrap();
 
-        assert_eq!(
-            AMM::get_balance(&mut db, ALICE, APPLES),
-            3 * BASE_FACTOR
-        );
+        assert_eq!(AMM::get_balance(&mut db, ALICE, APPLES), 3 * BASE_FACTOR);
         assert_eq!(
             AMM::get_liquidity_providers(&mut db, APPLES)
                 .iter()
@@ -586,10 +566,7 @@ mod tests {
             Token::get_balance(&mut db, ALICE, LEVERAGED_BASE_TOKEN),
             2 * BASE_FACTOR
         );
-        assert_eq!(
-            AMM::get_balance(&mut db, ALICE, APPLES),
-            1 * BASE_FACTOR
-        );
+        assert_eq!(AMM::get_balance(&mut db, ALICE, APPLES), 1 * BASE_FACTOR);
         assert_eq!(
             AMM::get_liquidity_providers(&mut db, APPLES)
                 .iter()
