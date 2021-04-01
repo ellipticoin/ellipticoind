@@ -1,9 +1,11 @@
 extern crate juniper;
 use crate::api::{mutations::Mutations, query_root::QueryRoot};
-use juniper::{graphql_value, EmptySubscription, Variables};
+use juniper::{graphql_value, EmptySubscription, Variables, http::graphiql};
+
+// use juniper::{, http::GraphQLRequest, RootNode};
 use serde_json::json;
 use std::fmt;
-use tide::{http::StatusCode, Body, Request, Response};
+use tide::{http::StatusCode, Body, Request, Response, http::mime};
 
 pub struct Context {}
 impl juniper::Context for Context {}
@@ -73,4 +75,10 @@ pub async fn handle_graphql(mut request: Request<()>) -> tide::Result {
         "errors": errors,
         }))?)
         .build())
+}
+
+pub async fn handle_graphiql(_: Request<()>) -> tide::Result<impl Into<Response>> {
+    Ok(Response::builder(StatusCode::Ok)
+        .body(graphiql::graphiql_source("/graphql", juniper::sa::_core::option::Option::None))
+        .content_type(mime::HTML))
 }
