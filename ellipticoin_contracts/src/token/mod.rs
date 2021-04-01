@@ -2,10 +2,8 @@ pub mod macros;
 
 use crate::constants::{LEVERAGED_BASE_TOKEN, BASE_FACTOR, BASE_TOKEN_MANTISSA, EXCHANGE_RATE_MANTISSA};
 use crate::{
-    constants::TOKENS,
     contract::{self, Contract},
-    crypto::ed25519_verify,
-    Ellipticoin, AMM,
+    AMM,
 };
 use anyhow::{bail, Result};
 use ellipticoin_macros::db_accessors;
@@ -16,7 +14,6 @@ use ellipticoin_types::{
 use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
 use num_traits::pow;
-use std::convert::TryInto;
 
 use hex;
 
