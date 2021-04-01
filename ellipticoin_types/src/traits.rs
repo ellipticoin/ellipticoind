@@ -1,4 +1,4 @@
-use crate::{Address, db::Backend, Db};
+use crate::{db::Backend, Address, Db};
 use anyhow::Result;
 
 pub trait ToKey {

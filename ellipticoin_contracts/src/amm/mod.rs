@@ -6,13 +6,14 @@ use crate::{
     helpers::proportion_of,
     pay, Token,
 };
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use ellipticoin_macros::db_accessors;
 use ellipticoin_types::{
     db::{Backend, Db},
     Address,
 };
 use linked_hash_set::LinkedHashSet;
+use std::cmp::max;
 
 pub struct AMM;
 
@@ -130,20 +131,15 @@ impl AMM {
         output_token: Address,
     ) -> Result<()> {
         charge!(db, sender, input_token, input_amount)?;
-        let base_token_amount = Self::trade_token_for_base_token(db, input_token, input_amount)?;
-        let output_token_amount =
-            Self::trade_base_token_for_token(db, output_token, base_token_amount)?;
+        let base_token_amount = Self::sell(db, input_token, input_amount)?;
+        let output_token_amount = Self::buy(db, output_token, base_token_amount)?;
         Self::validate_slippage(minimum_output_amount, output_token_amount)?;
         pay!(db, sender, output_token, output_token_amount)?;
 
         Ok(())
     }
 
-    fn trade_token_for_base_token<B: Backend>(
-        db: &mut Db<B>,
-        token: Address,
-        amount: u64,
-    ) -> Result<u64> {
+    fn sell<B: Backend>(db: &mut Db<B>, token: Address, amount: u64) -> Result<u64> {
         if token == LEVERAGED_BASE_TOKEN {
             return Ok(amount);
         };
@@ -151,18 +147,16 @@ impl AMM {
         let output_amount = Self::calculate_output_amount(
             Self::get_pool_supply_of_token(db, token),
             Self::get_pool_supply_of_base_token(db, token),
-            Self::apply_fee(amount),
+            amount
+                .checked_sub(Self::fee(amount))
+                .ok_or(anyhow!("fee was greater than amount"))?,
         );
         Self::debit_pool_supply_of_base_token(db, token, output_amount)?;
         Self::credit_pool_supply_of_token(db, token, amount);
         Ok(output_amount)
     }
 
-    fn trade_base_token_for_token<B: Backend>(
-        db: &mut Db<B>,
-        token: Address,
-        amount: u64,
-    ) -> Result<u64> {
+    fn buy<B: Backend>(db: &mut Db<B>, token: Address, amount: u64) -> Result<u64> {
         if token == LEVERAGED_BASE_TOKEN {
             return Ok(amount);
         };
@@ -170,7 +164,9 @@ impl AMM {
         let output_amount = Self::calculate_output_amount(
             Self::get_pool_supply_of_base_token(db, token),
             Self::get_pool_supply_of_token(db, token),
-            Self::apply_fee(amount),
+            amount
+                .checked_sub(Self::fee(amount))
+                .ok_or(anyhow!("fee was greater than amount"))?,
         );
         Self::debit_pool_supply_of_token(db, token, output_amount)?;
         Self::credit_pool_supply_of_base_token(db, token, amount);
@@ -184,8 +180,11 @@ impl AMM {
         output_supply - new_output_supply
     }
 
-    fn apply_fee(amount: u64) -> u64 {
-        amount - ((amount as u128 * FEE as u128) / BASE_FACTOR as u128) as u64
+    fn fee(amount: u64) -> u64 {
+        max(
+            ((amount as u128 * FEE as u128) / BASE_FACTOR as u128) as u64,
+            1u64,
+        )
     }
 
     fn charge<B: Backend>(
@@ -596,6 +595,34 @@ mod tests {
         AMM::create_pool(&mut db, ALICE, 100 * BASE_FACTOR, BANANAS, BASE_FACTOR).unwrap();
         AMM::trade(&mut db, BOB, 100 * BASE_FACTOR, BANANAS, 0, APPLES).unwrap();
         assert_eq!(Token::get_balance(&mut db, BOB, APPLES), 33233234);
+    }
+
+    #[test]
+    fn test_one_unit_trade() {
+        let mut db = new_db();
+        setup(
+            &mut db,
+            hashmap! {
+                ALICE => vec![
+                    (100 * BASE_FACTOR, APPLES),
+                    (100 * BASE_FACTOR, BANANAS),
+                    (200 * BASE_FACTOR, LEVERAGED_BASE_TOKEN),
+                ],
+                BOB => vec![
+                    (1 * BASE_FACTOR, BANANAS),
+                ],
+            },
+        );
+        AMM::create_pool(&mut db, ALICE, 100 * BASE_FACTOR, APPLES, BASE_FACTOR).unwrap();
+        AMM::create_pool(&mut db, ALICE, 100 * BASE_FACTOR, BANANAS, BASE_FACTOR).unwrap();
+        assert_eq!(
+            AMM::trade(&mut db, BOB, 1, BANANAS, 0, APPLES)
+                .err()
+                .unwrap()
+                .to_string(),
+            "fee was greater than amount"
+        );
+        assert_eq!(Token::get_balance(&mut db, BOB, APPLES), 0);
     }
 
     #[test]

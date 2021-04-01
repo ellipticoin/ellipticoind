@@ -33,7 +33,11 @@ fn test_add() {
                 }) => {
                     println!(
                         "ready {} {} {} {:?} {:?}",
-                        block_number, base_token_exchange_rate, base_token_interest_rate, mints, redeems
+                        block_number,
+                        base_token_exchange_rate,
+                        base_token_interest_rate,
+                        mints,
+                        redeems
                     );
                     *LATEST_BLOCK.lock().await = block_number;
                 }

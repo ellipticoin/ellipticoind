@@ -7,10 +7,10 @@ use crate::{
 };
 use anyhow::Result;
 use ellipticoin_contracts::bridge::Update;
-use ellipticoin_types::Address;
 use ellipticoin_contracts::{Action, Bridge, System, Transaction};
 use ellipticoin_peerchain_ethereum::constants::{BRIDGE_ADDRESS, REDEEM_TIMEOUT};
 use ellipticoin_peerchain_ethereum::ecrecover;
+use ellipticoin_types::Address;
 use ellipticoin_types::{
     db::{Backend, Db},
     traits::Run,

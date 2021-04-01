@@ -1,10 +1,8 @@
-use crate::config::{SIGNER};
+use crate::config::SIGNER;
 use k256::ecdsa::{recoverable, signature::Signer};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use std::{
-    convert::{TryInto},
-};
+use std::convert::TryInto;
 
 pub fn sign<S: Serialize>(message: &S) -> [u8; 65] {
     let signature: recoverable::Signature = SIGNER.sign(&serde_cbor::to_vec(message).unwrap());

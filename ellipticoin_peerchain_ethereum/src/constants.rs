@@ -1,5 +1,5 @@
-use ellipticoin_types::Address;
 use ellipticoin_contracts::constants::{BASE_FACTOR, BTC, ETH, LEVERAGED_BASE_TOKEN};
+use ellipticoin_types::Address;
 use hex_literal::hex;
 use lazy_static::lazy_static;
 use std::{collections::HashMap, env};

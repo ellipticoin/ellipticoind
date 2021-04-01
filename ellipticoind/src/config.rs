@@ -1,9 +1,9 @@
 use clap::Clap;
 use dotenv::dotenv;
 use ellipticoin_peerchain_ethereum::eth_address;
+use ellipticoin_types::Address;
 use k256::ecdsa::SigningKey;
 use serde::{Deserialize, Deserializer};
-use ellipticoin_types::Address;
 use std::{
     convert::TryInto,
     env,

@@ -233,7 +233,8 @@ pub fn recover_signed_message(message: &str, signature: &[u8]) -> Result<Address
 }
 pub fn ecrecover(hash: Vec<u8>, signature_bytes_slice: &[u8]) -> Result<Address> {
     let mut signature_bytes = signature_bytes_slice.to_vec();
-    signature_bytes[SIGNATURE_LENGTH - 1] = normalize_recovery_id(signature_bytes[SIGNATURE_LENGTH - 1]);
+    signature_bytes[SIGNATURE_LENGTH - 1] =
+        normalize_recovery_id(signature_bytes[SIGNATURE_LENGTH - 1]);
     let signature = recoverable::Signature::try_from(&signature_bytes[..])
         .map_err(|err| anyhow!(err.to_string()))?;
     let public_key = signature
@@ -255,11 +256,12 @@ fn normalize_recovery_id(v: u8) -> u8 {
     }
 }
 
-
 pub fn eth_address(verify_key: VerifyingKey) -> Address {
-    Address(keccak256(verify_key.to_encoded_point(false).to_bytes().to_vec()[1..].to_vec())[12..]
-        .try_into()
-        .unwrap())
+    Address(
+        keccak256(verify_key.to_encoded_point(false).to_bytes().to_vec()[1..].to_vec())[12..]
+            .try_into()
+            .unwrap(),
+    )
 }
 
 pub fn keccak256(bytes: Vec<u8>) -> Vec<u8> {

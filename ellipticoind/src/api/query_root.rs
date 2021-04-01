@@ -8,12 +8,10 @@ use crate::{
 };
 use anyhow::anyhow;
 use ellipticoin_contracts::{
-    bridge,
-    constants::{MS},
-    governance, order_book, Bridge, Ellipticoin, Governance, OrderBook, System, AMM,
+    bridge, constants::MS, governance, order_book, Bridge, Ellipticoin, Governance, OrderBook,
+    System, AMM,
 };
 use ellipticoin_peerchain_ethereum::constants::BRIDGE_ADDRESS;
-
 
 use juniper::FieldError;
 use std::convert::{TryFrom, TryInto};
@@ -45,10 +43,8 @@ impl QueryRoot {
                     address.clone().into(),
                     token.clone().into(),
                 );
-                let interest_rate = ellipticoin_contracts::Token::get_interest_rate(
-                    &mut db,
-                    token.clone().into(),
-                );
+                let interest_rate =
+                    ellipticoin_contracts::Token::get_interest_rate(&mut db, token.clone().into());
                 let price = ellipticoin_contracts::Token::get_underlying_price(
                     &mut db,
                     token.clone().into(),
@@ -78,13 +74,9 @@ impl QueryRoot {
             .iter()
             .cloned()
             .map(|token| {
-                let balance = AMM::get_balance(
-                    &mut db,
-                    address.clone().into(),
-                    token.clone().into(),
-                );
-                let total_supply =
-                    AMM::get_total_supply(&mut db, token.clone().into());
+                let balance =
+                    AMM::get_balance(&mut db, address.clone().into(), token.clone().into());
+                let total_supply = AMM::get_total_supply(&mut db, token.clone().into());
                 let pool_supply_of_token =
                     AMM::get_pool_supply_of_token(&mut db, token.clone().into());
                 let underlying_pool_supply_of_base_token =
@@ -165,10 +157,12 @@ impl QueryRoot {
         let mut db = aquire_db_read_lock!();
         let issuance_rewards = Ellipticoin::get_issuance_rewards(
             &mut db,
-            ellipticoin_types::Address(address
-                .0
-                .try_into()
-                .map_err(|_| anyhow!("Invalid address"))?),
+            ellipticoin_types::Address(
+                address
+                    .0
+                    .try_into()
+                    .map_err(|_| anyhow!("Invalid address"))?,
+            ),
         );
         Ok(U64(issuance_rewards))
     }
@@ -177,7 +171,9 @@ impl QueryRoot {
         _context: &Context,
         address: Bytes,
     ) -> Result<Vec<RedeemRequest>, FieldError> {
-        let address = ellipticoin_types::Address(<[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?);
+        let address = ellipticoin_types::Address(
+            <[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?,
+        );
         let mut db = aquire_db_read_lock!();
         let pending_redeem_requests = Bridge::get_pending_redeem_requests(&mut db);
         Ok(pending_redeem_requests
@@ -207,7 +203,9 @@ impl QueryRoot {
         _context: &Context,
         address: Bytes,
     ) -> Result<U64, FieldError> {
-        let address = ellipticoin_types::Address(<[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?);
+        let address = ellipticoin_types::Address(
+            <[u8; 20]>::try_from(address.0).map_err(|_| anyhow!("Invalid Address"))?,
+        );
         let mut db = aquire_db_read_lock!();
         Ok(U64(System::get_next_transaction_number(&mut db, address)))
     }

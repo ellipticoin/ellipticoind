@@ -1,7 +1,7 @@
 pub mod constants;
 pub mod transaction;
-pub use transaction::*;
 use ellipticoin_types::Address;
+pub use transaction::*;
 
 use crate::constants::{
     BASE_TOKEN_ADDRESS, BRIDGE_ADDRESS, DECIMALS, ELLIPTICOIN_DECIMALS, ETH_ADDRESS,
@@ -16,8 +16,8 @@ use num_bigint::BigInt;
 use num_traits::{pow::pow, ToPrimitive};
 use serde_json::{json, Value};
 use std::{collections::HashMap, convert::TryInto, task::Poll};
-pub use transaction::ecrecover;
 use surf;
+pub use transaction::ecrecover;
 
 pub async fn poll(latest_block: u64) -> Result<Poll<Update>, surf::Error> {
     let current_block = get_current_block().await?;
