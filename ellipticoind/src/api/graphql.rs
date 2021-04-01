@@ -1,8 +1,6 @@
 extern crate juniper;
 use crate::api::{mutations::Mutations, query_root::QueryRoot};
 use juniper::{graphql_value, EmptySubscription, Variables, http::graphiql};
-
-// use juniper::{, http::GraphQLRequest, RootNode};
 use serde_json::json;
 use std::fmt;
 use tide::{http::StatusCode, Body, Request, Response, http::mime};
