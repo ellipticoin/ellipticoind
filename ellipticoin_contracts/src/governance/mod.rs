@@ -1,10 +1,13 @@
 mod validations;
+
+use crate::constants::MS;
 use crate::{
+    charge,
     contract::{self, Contract},
     token::Token,
     Action, Ellipticoin,
 };
-use anyhow::{anyhow, Result};
+use anyhow::{Result};
 use ellipticoin_macros::db_accessors;
 use ellipticoin_types::{
     db::{Backend, Db},
@@ -14,20 +17,27 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum Vote {
+pub struct Vote {
+    voter: Address,
+    choice: Choice,
+    weight: u64,
+}
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum Choice {
     For,
     Against,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Proposal {
-    pub id: u64,
+    pub id: usize,
     pub proposer: Address,
     pub title: String,
     pub subtitle: String,
     pub content: String,
     pub actions: Vec<Action>,
-    pub votes: HashMap<Address, Vote>,
+    pub result: Option<Choice>,
+    pub votes: HashMap<Address, Choice>,
 }
 pub struct Governance;
 
@@ -37,7 +47,7 @@ impl Contract for Governance {
 
 db_accessors!(Governance {
     proposals() -> Vec<Proposal>;
-    proposal_id_counter() -> u64;
+    proposal_id_counter() -> usize;
 });
 
 impl Governance {
@@ -52,7 +62,7 @@ impl Governance {
         Self::validatate_minimum_proposal_theshold(db, sender)?;
         let mut proposals = Self::get_proposals(db);
         let mut votes = HashMap::new();
-        votes.insert(sender, Vote::For);
+        votes.insert(sender, Choice::For);
         let proposal = Proposal {
             id: Self::get_proposal_id_counter(db),
             proposer: sender,
@@ -61,6 +71,7 @@ impl Governance {
             subtitle,
             actions,
             votes,
+            result: None,
         };
         proposals.push(proposal);
         Self::increment_proposal_id_counter(db);
@@ -71,41 +82,46 @@ impl Governance {
     pub fn vote<B: Backend>(
         db: &mut Db<B>,
         sender: Address,
-        proposal_id: u64,
-        vote: Vote,
+        proposal_id: usize,
+        vote: Choice,
     ) -> Result<()> {
+        let balance = Token::get_balance(db, sender, MS);
+        charge!(db, sender, MS, balance)?;
         let mut proposals = Self::get_proposals(db);
-        let index = proposals
-            .iter()
-            .cloned()
-            .position(|proposal| proposal.id == proposal_id)
-            .ok_or(anyhow!("Proposal {} not found", proposal_id))?;
-        proposals[index].votes.insert(sender, vote);
-        if proposals[index]
-            .votes
-            .iter()
-            .map(|(address, vote)| {
-                if *vote == Vote::For {
-                    Token::get_balance(db, *address, Ellipticoin::address())
-                } else {
-                    0
-                }
-            })
-            .sum::<u64>()
-            * 100
-            / Token::get_total_supply(db, Ellipticoin::address())
-            > 50
-        {
-            for action in &proposals[index].actions {
+        proposals[proposal_id].votes.insert(sender, vote);
+        let votes_for = Self::tally(db, &proposals[proposal_id].votes, Choice::For);
+        let votes_against = Self::tally(db, &proposals[proposal_id].votes, Choice::Against);
+        if votes_for * 100 / Token::get_total_supply(db, Ellipticoin::address()) > 50 {
+            for action in &proposals[proposal_id].actions {
                 action.run(db, Self::address())?;
             }
-            println!("ratified!");
+            proposals[proposal_id].result = Some(Choice::For);
+        } else if votes_against * 100 / Token::get_total_supply(db, Ellipticoin::address()) > 50 {
+            proposals[proposal_id].result = Some(Choice::Against);
         }
         Self::set_proposals(db, proposals);
         Ok(())
     }
 
-    fn increment_proposal_id_counter<B: Backend>(db: &mut Db<B>) -> u64 {
+
+    pub fn tally<B: Backend>(
+        db: &mut Db<B>,
+        votes: &HashMap<Address, Choice>,
+        vote_to_tally: Choice,
+    ) -> u64 {
+        votes
+            .iter()
+            .map(|(address, vote)| {
+                if *vote == vote_to_tally {
+                    Token::get_balance(db, *address, Ellipticoin::address())
+                } else {
+                    0
+                }
+            })
+            .sum()
+    }
+
+    fn increment_proposal_id_counter<B: Backend>(db: &mut Db<B>) -> usize {
         let proposal_id_counter = Self::get_proposal_id_counter(db) + 1;
         Self::set_proposal_id_counter(db, proposal_id_counter);
         proposal_id_counter
@@ -114,7 +130,7 @@ impl Governance {
 
 #[cfg(test)]
 mod tests {
-    use super::{Governance, Proposal, Vote};
+    use super::{Governance, Proposal, Choice};
     use crate::{constants::MS, contract::Contract, Action, Token};
     use ellipticoin_test_framework::{
         constants::{
@@ -130,7 +146,7 @@ mod tests {
         let mut db = new_db();
         let actions = vec![Action::Pay(ALICE, 1, APPLES)];
         let mut votes = HashMap::new();
-        votes.insert(ALICE, Vote::For);
+        votes.insert(ALICE, Choice::For);
         Token::mint(&mut db, 1, MS, ALICE);
         Token::mint(&mut db, 1, MS, BOB);
         Token::mint(&mut db, 1, MS, CAROL);
@@ -154,6 +170,7 @@ mod tests {
                 content: "Test Content".to_string(),
                 actions,
                 votes,
+                result: None,
             }
         );
     }
@@ -163,7 +180,7 @@ mod tests {
         let mut db = new_db();
         let actions = vec![];
         let mut votes = HashMap::new();
-        votes.insert(ALICE, Vote::For);
+        votes.insert(ALICE, Choice::For);
         Token::mint(&mut db, 1, MS, ALICE);
         Token::mint(&mut db, 100, MS, BOB);
 
@@ -201,7 +218,7 @@ mod tests {
             actions.clone(),
         )
         .unwrap();
-        Governance::vote(&mut db, BOB, 0, Vote::For).unwrap();
+        Governance::vote(&mut db, BOB, 0, Choice::For).unwrap();
         assert_eq!(Token::get_balance(&mut db, ALICE, APPLES), 1);
     }
 }

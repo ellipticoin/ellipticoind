@@ -1,5 +1,5 @@
 use crate::{
-    bridge::Update, governance::Vote, order_book::OrderType, Bridge, Ellipticoin, Governance,
+    bridge::Update, governance::Choice, order_book::OrderType, Bridge, Ellipticoin, Governance,
     OrderBook, System, Token, AMM,
 };
 use anyhow::Result;
@@ -41,7 +41,7 @@ pub enum Action {
     StartMining(String, [u8; 32]),
     Trade(u64, Address, u64, Address),
     Update(Update),
-    Vote(u64, Vote),
+    Vote(usize, Choice),
 }
 impl Action {
     pub fn run<B: Backend>(&self, db: &mut Db<B>, sender: Address) -> Result<()> {
