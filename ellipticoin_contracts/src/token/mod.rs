@@ -43,7 +43,7 @@ impl Token {
         address: Address,
         token: Address,
     ) -> u64 {
-        if [LEVERAGED_BASE_TOKEN].contains(&token) {
+        if token == LEVERAGED_BASE_TOKEN {
             let balance = Self::get_balance(db, address, token);
             Self::amount_to_underlying(db, balance)
         } else {
@@ -52,8 +52,12 @@ impl Token {
     }
 
     pub fn get_underlying_price<B: Backend>(db: &mut Db<B>, token: Address) -> u64 {
-        let balance = Self::get_price(db, token);
-        Self::amount_to_underlying(db, balance)
+        if token == LEVERAGED_BASE_TOKEN {
+            BASE_FACTOR
+        } else {
+            let balance = Self::get_price(db, token);
+            Self::amount_to_underlying(db, balance)
+        }
     }
 
     pub fn amount_to_underlying<B: Backend>(db: &mut Db<B>, amount: u64) -> u64 {

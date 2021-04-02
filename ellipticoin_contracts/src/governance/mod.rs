@@ -1,3 +1,4 @@
+mod validations;
 use crate::{
     contract::{self, Contract},
     token::Token,
@@ -48,6 +49,7 @@ impl Governance {
         content: String,
         actions: Vec<Action>,
     ) -> Result<()> {
+        Self::validatate_minimum_proposal_theshold(db, sender)?;
         let mut proposals = Self::get_proposals(db);
         let mut votes = HashMap::new();
         votes.insert(sender, Vote::For);
@@ -72,7 +74,6 @@ impl Governance {
         proposal_id: u64,
         vote: Vote,
     ) -> Result<()> {
-        println!("{} voted", hex::encode(sender));
         let mut proposals = Self::get_proposals(db);
         let index = proposals
             .iter()
@@ -154,6 +155,31 @@ mod tests {
                 actions,
                 votes,
             }
+        );
+    }
+
+    #[test]
+    fn create_proposal_with_insufficient_moonshine() {
+        let mut db = new_db();
+        let actions = vec![];
+        let mut votes = HashMap::new();
+        votes.insert(ALICE, Vote::For);
+        Token::mint(&mut db, 1, MS, ALICE);
+        Token::mint(&mut db, 100, MS, BOB);
+
+        assert_eq!(
+            Governance::create_proposal(
+                &mut db,
+                ALICE,
+                "Pay Alice".to_string(),
+                "Test Subtitle".to_string(),
+                "Test Content".to_string(),
+                actions.clone(),
+            )
+            .err()
+            .unwrap()
+            .to_string(),
+            "5 % of total tokens in circulation required to create proposals"
         );
     }
 
