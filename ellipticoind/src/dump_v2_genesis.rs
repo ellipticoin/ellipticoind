@@ -171,7 +171,7 @@ pub async fn dump_v2_genesis() {
                 ))
                 } else {
                 Some((
-                    V2Key(V2Contracts::Token, 1, convert_token_key(key)),
+                    V2Key(V2Contracts::Token, 3, convert_token_key(key)),
                     value.clone(),
                 ))
                 }
@@ -299,6 +299,7 @@ fn credit(state: &mut  HashMap<Vec<u8>, Vec<u8>>, address: [u8; 20], amount: u64
 
 fn remove_stolen_funds(state: &mut HashMap<Vec<u8>, Vec<u8>>, token: [u8; 20], mut total_supply_after_hack: u64) {
     let total_supply = serde_cbor::from_slice::<u64>(state.get(&[TOTAL_SUPPLY_KEY.to_vec(), token.to_vec()].concat()).unwrap()).unwrap();
+use std::time::SystemTime;
     let eth_balance_keys = state.keys().cloned().filter(|key| key.starts_with(&TOKEN_BALANCE_KEY.to_vec()) && key[24..] == token).collect::<Vec<Vec<u8>>>();
     let mut total_hacker_balance = 0;
     for key in &eth_balance_keys {
