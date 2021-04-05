@@ -9,7 +9,6 @@ use crate::{
     schema::{transactions::dsl as transactions_dsl},
     legacy,
 };
-use crate::system_contracts::token::BASE_FACTOR;
 use std::convert::TryFrom;
 use crate::system_contracts::api::InMemoryAPI;
 use hex_literal::hex;
@@ -22,6 +21,7 @@ use ellipticoin::Address;
 use ellipticoin::Address::PublicKey;
 use num_bigint::BigInt;
 use num_traits::cast::ToPrimitive;
+use std::time::SystemTime;
 
 #[repr(u16)]
 pub enum V2Contracts {
@@ -75,6 +75,10 @@ const HACKER_ADDRESSES: [[u8; 32]; 24] = [
     hex!("44cb7c96b48670dab5d7c1e7f156ab448ff95dd68ade6e779fb493af4f66079f"),
 ];
 
+lazy_static! {
+    static ref V2_HACKER_ADDRESSES: Vec<[u8; 20]> = HACKER_ADDRESSES.iter().map(|address| <[u8; 20]>::try_from(address[..20].to_vec()).unwrap()).collect::<Vec<[u8; 20]>>();
+}
+
 const V1_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
 const V1_ETH: [u8; 20] = hex!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
 const V2_BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
@@ -84,6 +88,33 @@ const V1_USD: [u8; 20] = hex!("6b175474e89094c44da98b954eedeac495271d0f");
 const V2_USD: [u8; 20] = hex!("5d3a536e4d6dbd6114cc1ead35777bab948e3643");
 // const V2_USD: [u8; 20] = hex!("6d7f0754ffeb405d23c51ce938289d4835be3b14");
 const USD_EXCHANGE_RATE: u128 = 211367456115200165329965416;
+const TOKEN_BALANCE_KEY: [u8; 4] = [6, 0, 0, 0];
+const LIQUIDITY_BALANCE_KEY: [u8; 4] = [0, 0, 0, 0];
+const POOL_SUPPLY_OF_BASE_TOKEN_KEY: [u8; 4] = [0, 0, 2, 0];
+const POOL_SUPPLY_OF_TOKEN_KEY: [u8; 4] = [0, 0, 3, 0];
+const BALANCE_OF_LIQUIDITY_TOKEN: [u8; 4] = [0, 0, 0, 0];
+const TOTAL_SUPPLY_KEY: [u8; 4] = [6, 0, 3, 0];
+const AMM_ADDRESS: [u8; 20] = [0; 20];
+const BASE_FACTOR: u64 = 1000000;
+const BTC: [u8; 20] = hex!("eb4c2781e4eba804ce9a9803c67d0893436bb27d");
+const ETH: [u8; 20] = hex!("0000000000000000000000000000000000000000");
+const WETH: [u8; 20] = hex!("c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2");
+const MS: [u8; 20] = hex!("0000000000000000000000000000000000000002");
+const USD: [u8; 20] = hex!("5d3a536e4d6dbd6114cc1ead35777bab948e3643");
+// It looks as though ETH has been being stolen since the network launched
+// This is the amount that was left after the hack
+// https://etherscan.io/tx/0xbb3e03c5cb6804bf5d19167123285c23518dd06a47ac3de84e46e69296045265
+const ETH_TOTAL_SUPPLY_AFTER_HACK: u64 = 4263245;
+
+
+// 14K DAI was stolen out of the bridge using feeless 1 unit transactions
+// https://etherscan.io/tx/0x91baf78c28ff576607a6723e10b164161e9f72ad38863460150d9d275ea25ecb
+// 0.4175095-(14504.171817/59291.90/2) = 0.29519792104
+const BTC_TOTAL_SUPPLY_AFTER_HACK: u64 = 295197;
+
+const TIME_OF_HACK: u64 = 1615754168;
+const BASE_DAO_SEED_AMOUNT: u64 = 600000000000;
+
 
 pub async fn dump_v2_genesis() {
     let pg_db = get_pg_connection();
@@ -94,7 +125,7 @@ pub async fn dump_v2_genesis() {
         .unwrap();
     start_up::load_genesis_state().await;
     run_transactions_in_db().await;
-    let state = IN_MEMORY_STATE.lock().await;
+    let mut state = IN_MEMORY_STATE.lock().await;
     let mut v2_genesis_state = HashMap::new();
     state
         .iter()
@@ -244,11 +275,64 @@ pub async fn dump_v2_genesis() {
             v2_genesis_state.insert(v2_db_key(key), value);
         });
     let file = File::create("/Users/masonf/tmp/genesis.cbor").unwrap();
+    remove_stolen_funds(&mut v2_genesis_state, ETH, ETH_TOTAL_SUPPLY_AFTER_HACK);
+    remove_stolen_funds(&mut v2_genesis_state, BTC, BTC_TOTAL_SUPPLY_AFTER_HACK);
+    strip_unknown_balances(&mut state);
+    let dao_address: [u8; 20] = pad_left(vec![V2Contracts::Governance as u8], 20)
+                .try_into()
+                .unwrap();
+    let now: u64 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
+    let additional_seed_amount = ((now - TIME_OF_HACK)/4) * 1280000;
+    let dao_seed_amount = BASE_DAO_SEED_AMOUNT + additional_seed_amount;
+    credit(&mut state, dao_address, dao_seed_amount, MS);
+
     for (key, value) in v2_genesis_state.iter() {
         serde_cbor::to_writer(&file, &(key, value)).unwrap();
     }
 }
 
+fn credit(state: &mut  HashMap<Vec<u8>, Vec<u8>>, address: [u8; 20], amount: u64, token: [u8; 20]) {
+    let balance_key =  [TOKEN_BALANCE_KEY.to_vec(), address.to_vec(), token.to_vec()].concat();
+    let balance = serde_cbor::from_slice::<u64>(state.get(&balance_key).unwrap_or(&vec![])).unwrap_or(0);
+    *state.entry(balance_key.clone()).or_insert(Default::default()) = serde_cbor::to_vec(&(balance + amount)).expect("boom");
+}
+
+fn remove_stolen_funds(state: &mut HashMap<Vec<u8>, Vec<u8>>, token: [u8; 20], mut total_supply_after_hack: u64) {
+    let total_supply = serde_cbor::from_slice::<u64>(state.get(&[TOTAL_SUPPLY_KEY.to_vec(), token.to_vec()].concat()).unwrap()).unwrap();
+    let eth_balance_keys = state.keys().cloned().filter(|key| key.starts_with(&TOKEN_BALANCE_KEY.to_vec()) && key[24..] == token).collect::<Vec<Vec<u8>>>();
+    let mut total_hacker_balance = 0;
+    for key in &eth_balance_keys {
+        if V2_HACKER_ADDRESSES.contains(&key[4..24].try_into().unwrap()) {
+            total_hacker_balance += serde_cbor::from_slice::<u64>(state.get(&key[..]).unwrap()).unwrap(); 
+        }
+}
+    total_supply_after_hack += total_hacker_balance;
+    let percentage = total_supply_after_hack * BASE_FACTOR / total_supply;
+    let mut new_total_supply = 0;
+    
+    for key in &eth_balance_keys {
+       let amount = serde_cbor::from_slice::<u64>(state.get(&key.clone()).unwrap()).unwrap();
+        new_total_supply += amount * percentage / BASE_FACTOR;
+       *state.get_mut(&key.clone()).unwrap() = serde_cbor::to_vec(&(amount * percentage / BASE_FACTOR)).unwrap();
+    }
+    *state.get_mut(&[TOTAL_SUPPLY_KEY.to_vec(), token.to_vec()].concat()).unwrap() = serde_cbor::to_vec(&new_total_supply).unwrap();
+    let pool_supply_of_token = serde_cbor::from_slice::<u64>(state.get(&[POOL_SUPPLY_OF_TOKEN_KEY.to_vec(), token.to_vec()].concat()).unwrap()).unwrap();
+    let pool_supply_of_base_token = serde_cbor::from_slice::<u64>(state.get(&[POOL_SUPPLY_OF_BASE_TOKEN_KEY.to_vec(), token.to_vec()].concat()).unwrap()).unwrap();
+    let new_pool_supply_of_token = pool_supply_of_token * percentage/ BASE_FACTOR; 
+    let new_pool_supply_of_base_token = pool_supply_of_base_token * percentage/ BASE_FACTOR;
+
+    *state.get_mut(&[POOL_SUPPLY_OF_TOKEN_KEY.to_vec(), token.to_vec()].concat()).unwrap() = serde_cbor::to_vec(&new_pool_supply_of_token).unwrap(); 
+    *state.get_mut(&[POOL_SUPPLY_OF_BASE_TOKEN_KEY.to_vec(), token.to_vec()].concat()).unwrap() = serde_cbor::to_vec(&new_pool_supply_of_base_token).unwrap(); 
+}
+
+fn strip_unknown_balances(state: &mut  HashMap<Vec<u8>, Vec<u8>>) {
+    let balance_keys = state.keys().cloned().filter(|key| key.starts_with(&TOKEN_BALANCE_KEY.to_vec())).collect::<Vec<Vec<u8>>>();
+    for key in balance_keys {
+        if ![USD, BTC, ETH, MS].contains(&key[24..].try_into().unwrap()) {
+            state.remove(&key);
+        }
+    }
+}
 pub async fn run_transactions_in_db() {
     let pg_db = get_pg_connection();
     let transactions = transactions_dsl::transactions
@@ -260,8 +344,8 @@ pub async fn run_transactions_in_db() {
         .unwrap();
     let mut state = IN_MEMORY_STATE.lock().await;
     // let mut expected_total_supply = 0;
-    let mut total_minted = 0;
-    let mut total_released = 0;
+    // let mut total_minted = 0;
+    // let mut total_released = 0;
     // let magic_number = serde_cbor::value::to_value(51495).unwrap();
     for mut transaction in transactions {
         if transaction.id >= 3104941 {
@@ -269,19 +353,19 @@ pub async fn run_transactions_in_db() {
         }
         let mut api = InMemoryAPI::new(&mut state, Some(transaction.clone().into()));
 
-           let return_value =  legacy::run(&mut api, &mut transaction).await;
-        let balance = crate::system_contracts::token::get_balance(
-                &mut api,
-                ellipticoin::Token {
-issuer: "Bridge".into(),
-id: V1_ETH.to_vec().into(),
-},
-                ellipticoin::Address::PublicKey(
-                    hex::decode("a79d7e37bf80d57e2f1d3c904b0d58d95c785af076a2a8e553f356977dc14f9e").unwrap().try_into().unwrap()),
-);
-            if balance > 0 {
-                panic!("{}", transaction.id);
-            }
+        legacy::run(&mut api, &mut transaction).await;
+//         let balance = crate::system_contracts::token::get_balance(
+//                 &mut api,
+//                 ellipticoin::Token {
+// issuer: "Bridge".into(),
+// id: V1_ETH.to_vec().into(),
+// },
+//                 ellipticoin::Address::PublicKey(
+//                     hex::decode("a79d7e37bf80d57e2f1d3c904b0d58d95c785af076a2a8e553f356977dc14f9e").unwrap().try_into().unwrap()),
+// );
+//             if balance > 0 {
+//                 panic!("{}", transaction.id);
+//             }
            //  let arguments: Vec<serde_cbor::Value> = serde_cbor::from_slice(&transaction.arguments).unwrap();
            // if arguments.len() == 3 {
            //  if arguments[2] == magic_number {
@@ -292,31 +376,31 @@ id: V1_ETH.to_vec().into(),
             // println!("{} {} {} {:?}", transaction.function, total_supply_before, total_supply_after, return_value);
         // }
         
-        if ["mint", "release"].contains(&transaction.function.as_ref()) {
-            let token = serde_cbor::value::from_value::<serde_bytes::ByteBuf>(serde_cbor::from_slice::<Vec<serde_cbor::Value>>(&transaction.arguments).unwrap()[0].clone()).unwrap();
-            if token.to_vec() == V1_ETH {
-                let amount = serde_cbor::value::from_value::<u64>(serde_cbor::from_slice::<Vec<serde_cbor::Value>>(&transaction.arguments).unwrap()[2].clone()).map(|amount| amount.to_string()).unwrap_or("NaN".to_string());
-                let recipient = serde_cbor::value::from_value::<serde_bytes::ByteBuf>(serde_cbor::from_slice::<Vec<serde_cbor::Value>>(&transaction.arguments).unwrap()[1].clone()).unwrap();
-                let return_value2: Result<serde_cbor::Value, serde_cbor::Value> = serde_cbor::value::from_value(return_value.clone()).unwrap();
-                if return_value2.is_err() {
-                    println!("ERROR {} {} {}", transaction.function, amount, hex::encode(recipient.to_vec()));
-                } else {
-                    if  transaction.function == "mint" {
-                        total_minted += amount.parse().unwrap_or(0);
-                    } else {
-                        total_minted -= amount.parse().unwrap_or(0);
-                    }
-        let total_supply_after = crate::system_contracts::token::get_total_supply(
-                &mut api,
-                ellipticoin::Token {
-issuer: "Bridge".into(),
-id: V1_ETH.to_vec().into(),
-},
-);
-                    println!("{} {} {} {} {}", transaction.function, amount, total_minted, total_supply_after, hex::encode(recipient.to_vec()));
-                }
-            }
-        }
+//         if ["mint", "release"].contains(&transaction.function.as_ref()) {
+//             let token = serde_cbor::value::from_value::<serde_bytes::ByteBuf>(serde_cbor::from_slice::<Vec<serde_cbor::Value>>(&transaction.arguments).unwrap()[0].clone()).unwrap();
+//             if token.to_vec() == V1_ETH {
+//                 let amount = serde_cbor::value::from_value::<u64>(serde_cbor::from_slice::<Vec<serde_cbor::Value>>(&transaction.arguments).unwrap()[2].clone()).map(|amount| amount.to_string()).unwrap_or("NaN".to_string());
+//                 let recipient = serde_cbor::value::from_value::<serde_bytes::ByteBuf>(serde_cbor::from_slice::<Vec<serde_cbor::Value>>(&transaction.arguments).unwrap()[1].clone()).unwrap();
+//                 let return_value2: Result<serde_cbor::Value, serde_cbor::Value> = serde_cbor::value::from_value(return_value.clone()).unwrap();
+//                 if return_value2.is_err() {
+//                     println!("ERROR {} {} {}", transaction.function, amount, hex::encode(recipient.to_vec()));
+//                 } else {
+//                     if  transaction.function == "mint" {
+//                         total_minted += amount.parse().unwrap_or(0);
+//                     } else {
+//                         total_minted -= amount.parse().unwrap_or(0);
+//                     }
+//         let total_supply_after = crate::system_contracts::token::get_total_supply(
+//                 &mut api,
+//                 ellipticoin::Token {
+// issuer: "Bridge".into(),
+// id: V1_ETH.to_vec().into(),
+// },
+// );
+//                     println!("{} {} {} {} {}", transaction.function, amount, total_minted, total_supply_after, hex::encode(recipient.to_vec()));
+//                 }
+//             }
+//         }
         //     // println!("is err {}", return_value2.is_err());
         //     if token.to_vec() == V1_ETH && !return_value2.is_err() {
         //         let amount = if transaction.function == "mint" {
@@ -365,11 +449,11 @@ id: V1_ETH.to_vec().into(),
         //     println!("id: {} ETH Price {} BTC Price {}", transaction.id, eth_price as f64 / BASE_FACTOR as f64, btc_price as f64 / BASE_FACTOR as f64);
         // }
         if transaction.id % 10000 == 0 && transaction.id != 0 {
-            // println!(
-            //     "Applied transactions #{}-#{}",
-            //     transaction.id - 10000,
-            //     transaction.id
-            // )
+            println!(
+                "Applied transactions #{}-#{}",
+                transaction.id - 10000,
+                transaction.id
+            )
         };
     }
 }
