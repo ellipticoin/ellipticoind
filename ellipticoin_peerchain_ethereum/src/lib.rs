@@ -185,6 +185,7 @@ pub async fn eth_call(
             .body_json::<HashMap<String, serde_json::Value>>()
             .await?;
         if res_hash_map.contains_key("result") {
+            println!("{:?}", res_hash_map.get("result").unwrap().clone());
             break serde_json::from_value::<String>(res_hash_map.get("result").unwrap().clone())?;
         }
     };
