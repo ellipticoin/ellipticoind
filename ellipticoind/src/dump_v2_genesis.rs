@@ -170,10 +170,18 @@ pub async fn dump_v2_genesis() {
                     value.clone(),
                 ))
                 } else {
-                Some((
+                println!("{}", hex::encode(v2_db_key(
+
+
+                    V2Key(V2Contracts::Token, 3, convert_token_key(key.clone())),
+                
+)));
+                Some(
+(
                     V2Key(V2Contracts::Token, 3, convert_token_key(key)),
                     value.clone(),
-                ))
+                )
+)
                 }
             }
             mut key
@@ -284,7 +292,8 @@ pub async fn dump_v2_genesis() {
     let now: u64 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
     let additional_seed_amount = ((now - TIME_OF_HACK)/4) * 1280000;
     let dao_seed_amount = BASE_DAO_SEED_AMOUNT + additional_seed_amount;
-    credit(&mut state, dao_address, dao_seed_amount, MS);
+    fix_total_supply(&mut v2_genesis_state, MS);
+    credit(&mut v2_genesis_state, dao_address, dao_seed_amount, MS);
 
     for (key, value) in v2_genesis_state.iter() {
         serde_cbor::to_writer(&file, &(key, value)).unwrap();
@@ -294,12 +303,26 @@ pub async fn dump_v2_genesis() {
 fn credit(state: &mut  HashMap<Vec<u8>, Vec<u8>>, address: [u8; 20], amount: u64, token: [u8; 20]) {
     let balance_key =  [TOKEN_BALANCE_KEY.to_vec(), address.to_vec(), token.to_vec()].concat();
     let balance = serde_cbor::from_slice::<u64>(state.get(&balance_key).unwrap_or(&vec![])).unwrap_or(0);
-    *state.entry(balance_key.clone()).or_insert(Default::default()) = serde_cbor::to_vec(&(balance + amount)).expect("boom");
+    *state.entry(balance_key.clone()).or_insert(Default::default()) = serde_cbor::to_vec(&(balance + amount)).unwrap();
+    let total_supply_key =  [TOTAL_SUPPLY_KEY.to_vec(), token.to_vec()].concat();
+    let total_supply = serde_cbor::from_slice::<u64>(state.get(&total_supply_key).unwrap_or(&vec![])).unwrap_or(0);
+    *state.entry(total_supply_key.clone()).or_insert(Default::default()) = serde_cbor::to_vec(&(total_supply + amount)).unwrap();
+}
+
+fn fix_total_supply(state: &mut HashMap<Vec<u8>, Vec<u8>>, token: [u8; 20]) {
+    let token_balance_keys = state.keys().cloned().filter(|key| key.starts_with(&TOKEN_BALANCE_KEY.to_vec()) && key[24..] == token).collect::<Vec<Vec<u8>>>();
+     
+    let mut new_total_supply = 0;
+    for key in &token_balance_keys {
+       let amount = serde_cbor::from_slice::<u64>(state.get(&key.clone()).unwrap()).unwrap();
+        new_total_supply += amount;
+    }
+    println!("{}", hex::encode([TOTAL_SUPPLY_KEY.to_vec(), token.to_vec()].concat()));
+    *state.entry([TOTAL_SUPPLY_KEY.to_vec(), token.to_vec()].concat().clone()).or_insert(Default::default()) = serde_cbor::to_vec(&new_total_supply).unwrap();
 }
 
 fn remove_stolen_funds(state: &mut HashMap<Vec<u8>, Vec<u8>>, token: [u8; 20], mut total_supply_after_hack: u64) {
     let total_supply = serde_cbor::from_slice::<u64>(state.get(&[TOTAL_SUPPLY_KEY.to_vec(), token.to_vec()].concat()).unwrap()).unwrap();
-use std::time::SystemTime;
     let eth_balance_keys = state.keys().cloned().filter(|key| key.starts_with(&TOKEN_BALANCE_KEY.to_vec()) && key[24..] == token).collect::<Vec<Vec<u8>>>();
     let mut total_hacker_balance = 0;
     for key in &eth_balance_keys {
