@@ -25,7 +25,6 @@ impl AMM {
         minimum_output_token_amount: u64,
         output_token_amount: u64,
     ) -> Result<()> {
-        println!("{} >= {}", output_token_amount, minimum_output_token_amount);
         if output_token_amount >= minimum_output_token_amount {
             Ok(())
         } else {
