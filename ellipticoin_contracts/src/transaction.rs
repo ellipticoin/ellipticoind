@@ -74,8 +74,9 @@ impl Action {
             Action::Migrate(legacy_address, legacy_signature) => {
                 System::migrate(db, sender, *legacy_address, legacy_signature.to_vec())
             }
-            Action::Pay(amount, token, recipient) => {
-                Token::transfer(db, sender, *amount, *token, *recipient)
+            Action::Pay(recipient, underlying_amount, token) => {
+                let amount = Token::underlying_to_amount(db, *underlying_amount, *token);
+                Token::transfer(db, sender, *token, amount, *recipient)
             }
             Action::RemoveLiquidity(percentage, token) => {
                 AMM::remove_liquidity(db, sender, *percentage, *token)
@@ -93,13 +94,16 @@ impl Action {
             Action::StartMining(host, onion_skin) => {
                 Ellipticoin::start_mining(db, sender, host.to_string(), *onion_skin)
             }
-            Action::Trade(input_amount, input_token, minimum_output_token_amount, output_token) => {
+            Action::Trade(underlying_input_amount, input_token, minimum_underlying_output_amount, output_token) => {
+                let input_amount = Token::underlying_to_amount(db, *underlying_input_amount, *input_token);
+                let minimum_output_amount = Token::underlying_to_amount(db, *minimum_underlying_output_amount, *output_token);
+
                 AMM::trade(
                     db,
                     sender,
-                    *input_amount,
+                    input_amount,
                     *input_token,
-                    *minimum_output_token_amount,
+                    minimum_output_amount,
                     *output_token,
                 )
             }

@@ -45,7 +45,7 @@ impl AMM {
         token: Address,
         underlying_starting_price: u64,
     ) -> Result<()> {
-        let starting_price = Token::underlying_to_amount(db, underlying_starting_price);
+        let starting_price = Token::underlying_to_amount(db, underlying_starting_price, LEVERAGED_BASE_TOKEN);
         let base_token_amount = proportion_of(amount, starting_price, BASE_FACTOR);
         Self::validate_pool_does_not_exist(db, token)?;
         Self::charge(db, sender, token, amount)?;

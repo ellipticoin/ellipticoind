@@ -1,7 +1,7 @@
 use anyhow::{anyhow, bail, Result};
 use ellipticoin_contracts::{
     constants::{BASE_FACTOR, BTC, ETH, LEVERAGED_BASE_TOKEN, MS},
-    governance::Vote,
+    governance::Choice,
     order_book::OrderType,
     Action, Transaction,
 };
@@ -130,8 +130,8 @@ impl VerificationString for Action {
     }
 }
 
-fn vote_to_string(vote: Vote) -> String {
-    if matches!(vote, Vote::For) {
+fn vote_to_string(choice: Choice) -> String {
+    if matches!(choice, Choice::For) {
         "Yes".to_string()
     } else {
         "No".to_string()

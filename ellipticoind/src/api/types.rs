@@ -126,23 +126,23 @@ pub struct Proposal {
 
 #[derive(Clone, Debug)]
 pub struct Vote {
-    pub yes: bool,
-    pub address: Address,
-    pub balance: U64,
+    pub choice: String,
+    pub voter: Address,
+    pub weight: U64,
 }
 
 #[juniper::graphql_object]
 impl Vote {
-    fn yes(&self) -> bool {
-        self.yes
+    fn choice(&self) -> String {
+        self.choice.clone()
     }
 
-    fn address(&self) -> Address {
-        self.address.clone()
+    fn voter(&self) -> Address {
+        self.voter.clone()
     }
 
-    fn balance(&self) -> U64 {
-        self.balance.clone()
+    fn weight(&self) -> U64 {
+        self.weight.clone()
     }
 }
 #[juniper::graphql_object]

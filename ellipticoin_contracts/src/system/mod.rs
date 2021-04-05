@@ -55,13 +55,18 @@ impl System {
                 Address(legacy_address[..20].try_into().unwrap()),
                 *token,
             );
-            Token::transfer(
+            Token::debit(
                 db,
-                Address(legacy_address[..20].try_into().unwrap()),
-                sender,
                 balance,
                 *token,
-            )?;
+                Address(legacy_address[..20].try_into().unwrap()),
+            ).unwrap();
+            Token::credit(
+                db,
+                balance,
+                *token,
+                sender,
+            );
         }
 
         for token in TOKENS.iter() {

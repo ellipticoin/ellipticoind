@@ -71,15 +71,20 @@ impl Token {
         .unwrap()
     }
 
-    pub fn underlying_to_amount<B: Backend>(db: &mut Db<B>, underlying_amount: u64) -> u64 {
-        let base_token_exchange_rate = Token::get_base_token_exchange_rate(db);
-        (pow(
-            BigInt::from(10),
-            BASE_TOKEN_MANTISSA + EXCHANGE_RATE_MANTISSA,
-        ) * underlying_amount
-            / base_token_exchange_rate)
-            .to_u64()
-            .unwrap()
+    pub fn underlying_to_amount<B: Backend>(db: &mut Db<B>, underlying_amount: u64, token: Address) -> u64 {
+
+        if token == LEVERAGED_BASE_TOKEN {
+            let base_token_exchange_rate = Token::get_base_token_exchange_rate(db);
+            (pow(
+                BigInt::from(10),
+                BASE_TOKEN_MANTISSA + EXCHANGE_RATE_MANTISSA,
+            ) * underlying_amount
+                / base_token_exchange_rate)
+                .to_u64()
+                .unwrap()
+        } else {
+            underlying_amount
+        }
     }
 
     pub fn get_price<B: Backend>(db: &mut Db<B>, token: Address) -> u64 {
@@ -100,11 +105,11 @@ impl Token {
         db: &mut Db<B>,
         sender: Address,
         recipient: Address,
-        amount: u64,
+        underlying_amount: u64,
         token: Address,
     ) -> Result<()> {
-        Self::debit(db, amount, token, sender)?;
-        Self::credit(db, amount, token, recipient);
+        Self::debit(db, underlying_amount, token, sender)?;
+        Self::credit(db, underlying_amount, token, recipient);
         Ok(())
     }
 
@@ -131,7 +136,7 @@ impl Token {
         Self::set_balance(db, address, token, balance + amount)
     }
 
-    fn debit<B: Backend>(
+    pub fn debit<B: Backend>(
         db: &mut Db<B>,
         amount: u64,
         token: Address,
