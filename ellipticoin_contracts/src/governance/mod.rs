@@ -1,5 +1,6 @@
 mod validations;
 
+use crate::constants::RATIFICATION_THRESHOLD;
 use crate::{
     charge,
     constants::MS,
@@ -99,13 +100,17 @@ impl Governance {
         });
         let votes_for = Self::tally(&proposals[proposal_id].votes, Choice::For);
         let votes_against = Self::tally(&proposals[proposal_id].votes, Choice::Against);
-        if votes_for * 100 / Token::get_total_supply(db, Ellipticoin::address()) > 50 {
+        if votes_for * 100 / Token::get_total_supply(db, Ellipticoin::address())
+            > RATIFICATION_THRESHOLD
+        {
             for action in &proposals[proposal_id].actions {
                 action.run(db, Self::address())?;
             }
             proposals[proposal_id].result = Some(Choice::For);
             Self::return_balances(db, &proposals[proposal_id].votes);
-        } else if votes_against * 100 / Token::get_total_supply(db, Ellipticoin::address()) > 50 {
+        } else if votes_against * 100 / Token::get_total_supply(db, Ellipticoin::address())
+            > RATIFICATION_THRESHOLD
+        {
             proposals[proposal_id].result = Some(Choice::Against);
             Self::return_balances(db, &proposals[proposal_id].votes);
         }
@@ -118,6 +123,7 @@ impl Governance {
             pay!(db, vote.voter, MS, vote.weight).unwrap();
         }
     }
+
     pub fn tally(votes: &[Vote], choice: Choice) -> u64 {
         votes
             .iter()
@@ -180,7 +186,7 @@ mod tests {
                 votes: vec![Vote {
                     choice: Choice::For,
                     voter: ALICE,
-                    weight: 3,
+                    weight: 1,
                 }],
                 result: None,
             }

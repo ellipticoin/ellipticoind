@@ -122,6 +122,7 @@ pub struct Proposal {
     pub content: String,
     pub actions: Vec<Bytes>,
     pub votes: Vec<Vote>,
+    pub result: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -173,6 +174,10 @@ impl Proposal {
 
     fn votes(&self) -> Vec<Vote> {
         self.votes.clone()
+    }
+
+    fn result(&self) -> Option<String> {
+        self.result.clone()
     }
 }
 pub struct RedeemRequest {

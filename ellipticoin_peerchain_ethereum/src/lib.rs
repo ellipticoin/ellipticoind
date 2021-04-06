@@ -166,7 +166,7 @@ pub async fn eth_call(
     block_number: u64,
 ) -> Result<BigInt, surf::Error> {
     let res_hex = loop {
-        let mut res = surf::post(WEB3_URL.clone())
+        let res = surf::post(WEB3_URL.clone())
             .body(json!(
              {
              "id": 1,
@@ -180,8 +180,12 @@ pub async fn eth_call(
                  format!("0x{}", BigInt::from(block_number).to_str_radix(16))
              ]}
             ))
-            .await?;
+            .await;
+        if res.is_err() {
+            continue;
+        }
         let res_hash_map = res
+            .unwrap()
             .body_json::<HashMap<String, serde_json::Value>>()
             .await?;
         if res_hash_map.contains_key("result") {

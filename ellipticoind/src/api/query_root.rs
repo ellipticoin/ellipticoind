@@ -135,6 +135,7 @@ impl QueryRoot {
                         weight: U64(vote.weight),
                     })
                     .collect(),
+                result: proposal.result.map(|result| format!("{:?}", result)),
             })
             .collect()
     }

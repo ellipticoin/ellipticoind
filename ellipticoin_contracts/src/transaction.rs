@@ -76,7 +76,7 @@ impl Action {
             }
             Action::Pay(recipient, underlying_amount, token) => {
                 let amount = Token::underlying_to_amount(db, *underlying_amount, *token);
-                Token::transfer(db, sender, *token, amount, *recipient)
+                Token::transfer(db, sender, *recipient, amount, *token)
             }
             Action::RemoveLiquidity(percentage, token) => {
                 AMM::remove_liquidity(db, sender, *percentage, *token)

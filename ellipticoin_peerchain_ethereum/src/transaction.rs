@@ -60,13 +60,22 @@ impl VerificationString for Action {
                 address_to_string(*token),
                 amount_to_string(*intial_price),
             )),
-            Action::CreateProposal(title, subtitle, content, actions) => Ok(format!(
-                "Create Proposal\nTitle: {}\nSubtitle: {}\nContent: {}\nActions: {}",
-                title,
-                subtitle,
-                content,
-                actions_to_string(actions)?
-            )),
+            Action::CreateProposal(title, subtitle, content, actions) => {
+                println!(
+                    "Create Proposal\nTitle: {}\nSubtitle: {}\nContent: {}\nActions: {}",
+                    title,
+                    subtitle,
+                    content,
+                    actions_to_string(actions)?
+                );
+                Ok(format!(
+                    "Create Proposal\nTitle: {}\nSubtitle: {}\nContent: {}\nActions: {}",
+                    title,
+                    subtitle,
+                    content,
+                    actions_to_string(actions)?
+                ))
+            }
             Action::CreateRedeemRequest(amount, token) => Ok(format!(
                 "Redeem {} {}",
                 amount_to_string(*amount),
