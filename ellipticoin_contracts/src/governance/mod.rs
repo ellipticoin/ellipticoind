@@ -1,9 +1,10 @@
 mod validations;
 
 use crate::{
-    charge, pay,
+    charge,
     constants::MS,
     contract::{self, Contract},
+    pay,
     token::Token,
     Action, Ellipticoin,
 };
@@ -14,7 +15,6 @@ use ellipticoin_types::{
     Address,
 };
 use serde::{Deserialize, Serialize};
-
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Vote {

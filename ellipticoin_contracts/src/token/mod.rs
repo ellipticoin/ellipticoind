@@ -71,8 +71,11 @@ impl Token {
         .unwrap()
     }
 
-    pub fn underlying_to_amount<B: Backend>(db: &mut Db<B>, underlying_amount: u64, token: Address) -> u64 {
-
+    pub fn underlying_to_amount<B: Backend>(
+        db: &mut Db<B>,
+        underlying_amount: u64,
+        token: Address,
+    ) -> u64 {
         if token == LEVERAGED_BASE_TOKEN {
             let base_token_exchange_rate = Token::get_base_token_exchange_rate(db);
             (pow(

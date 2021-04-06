@@ -60,13 +60,9 @@ impl System {
                 balance,
                 *token,
                 Address(legacy_address[..20].try_into().unwrap()),
-            ).unwrap();
-            Token::credit(
-                db,
-                balance,
-                *token,
-                sender,
-            );
+            )
+            .unwrap();
+            Token::credit(db, balance, *token, sender);
         }
 
         for token in TOKENS.iter() {

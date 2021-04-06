@@ -94,9 +94,19 @@ impl Action {
             Action::StartMining(host, onion_skin) => {
                 Ellipticoin::start_mining(db, sender, host.to_string(), *onion_skin)
             }
-            Action::Trade(underlying_input_amount, input_token, minimum_underlying_output_amount, output_token) => {
-                let input_amount = Token::underlying_to_amount(db, *underlying_input_amount, *input_token);
-                let minimum_output_amount = Token::underlying_to_amount(db, *minimum_underlying_output_amount, *output_token);
+            Action::Trade(
+                underlying_input_amount,
+                input_token,
+                minimum_underlying_output_amount,
+                output_token,
+            ) => {
+                let input_amount =
+                    Token::underlying_to_amount(db, *underlying_input_amount, *input_token);
+                let minimum_output_amount = Token::underlying_to_amount(
+                    db,
+                    *minimum_underlying_output_amount,
+                    *output_token,
+                );
 
                 AMM::trade(
                     db,

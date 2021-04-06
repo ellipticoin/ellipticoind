@@ -8,8 +8,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use ellipticoin_contracts::{
-    bridge, governance, order_book, Bridge, Ellipticoin, Governance, OrderBook,
-    System, AMM,
+    bridge, governance, order_book, Bridge, Ellipticoin, Governance, OrderBook, System, AMM,
 };
 use ellipticoin_peerchain_ethereum::constants::BRIDGE_ADDRESS;
 
@@ -130,12 +129,10 @@ impl QueryRoot {
                 votes: proposal
                     .votes
                     .iter()
-                    .map(|vote| {
-                        Vote {
-                            voter: vote.voter.into(),
-                            choice: format!("{:?}", vote.choice),
-                            weight: U64(vote.weight),
-                        }
+                    .map(|vote| Vote {
+                        voter: vote.voter.into(),
+                        choice: format!("{:?}", vote.choice),
+                        weight: U64(vote.weight),
                     })
                     .collect(),
             })
