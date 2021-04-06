@@ -1,9 +1,8 @@
 mod validations;
 
-use crate::constants::RATIFICATION_THRESHOLD;
 use crate::{
     charge,
-    constants::MS,
+    constants::{MS, RATIFICATION_THRESHOLD},
     contract::{self, Contract},
     pay,
     token::Token,
@@ -60,7 +59,7 @@ impl Governance {
         content: String,
         actions: Vec<Action>,
     ) -> Result<()> {
-        Self::validatate_minimum_proposal_theshold(db, sender)?;
+        Self::validate_minimum_proposal_theshold(db, sender)?;
         let balance = Token::get_balance(db, sender, MS);
         charge!(db, sender, MS, balance)?;
         let mut proposals = Self::get_proposals(db);
@@ -90,9 +89,11 @@ impl Governance {
         proposal_id: usize,
         choice: Choice,
     ) -> Result<()> {
+        Self::validate_balance(db, sender)?;
         let balance = Token::get_balance(db, sender, MS);
         charge!(db, sender, MS, balance)?;
         let mut proposals = Self::get_proposals(db);
+        Self::validate_proposal_is_open(&proposals[proposal_id])?;
         proposals[proposal_id].votes.push(Vote {
             choice,
             voter: sender,
@@ -215,6 +216,59 @@ mod tests {
             .unwrap()
             .to_string(),
             "5 % of total tokens in circulation required to create proposals"
+        );
+    }
+
+    #[test]
+    fn vote_without_moonshine() {
+        let mut db = new_db();
+        let actions = vec![Action::Pay(ALICE, 1, APPLES)];
+        Token::mint(&mut db, 1, APPLES, Governance::address());
+        Token::mint(&mut db, 1, MS, ALICE);
+
+        Governance::create_proposal(
+            &mut db,
+            ALICE,
+            "Pay Alice".to_string(),
+            "Test Subtitle".to_string(),
+            "Test Content".to_string(),
+            actions.clone(),
+        )
+        .unwrap();
+        assert_eq!(
+            Governance::vote(&mut db, BOB, 0, Choice::For)
+                .err()
+                .unwrap()
+                .to_string(),
+            "Moonshine balance greater that zero required for voting"
+        );
+    }
+
+    #[test]
+    fn vote_after_poll_closed() {
+        let mut db = new_db();
+        let actions = vec![Action::Pay(ALICE, 1, APPLES)];
+        Token::mint(&mut db, 1, APPLES, Governance::address());
+        Token::mint(&mut db, 1, MS, ALICE);
+        Token::mint(&mut db, 1, MS, BOB);
+        Token::mint(&mut db, 1, MS, CAROL);
+
+        Governance::create_proposal(
+            &mut db,
+            ALICE,
+            "Pay Alice".to_string(),
+            "Test Subtitle".to_string(),
+            "Test Content".to_string(),
+            actions.clone(),
+        )
+        .unwrap();
+        Governance::vote(&mut db, BOB, 0, Choice::For).unwrap();
+        assert_eq!(
+            Governance::vote(&mut db, CAROL, 0, Choice::For)
+                .err()
+                .unwrap()
+                .to_string(),
+            "Voting on this proposal has closed"
         );
     }
 
