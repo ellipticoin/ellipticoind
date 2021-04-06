@@ -194,9 +194,8 @@ pub async fn eth_call(
 }
 
 pub async fn get_current_block() -> Result<u64, surf::Error> {
-    let mut res_hex;
-    loop {
-        let mut res = surf::post(WEB3_URL.clone())
+    let res_hex = loop {
+        let res = surf::post(WEB3_URL.clone())
             .body(json!(
                 {
                     "id": 1,
@@ -205,9 +204,13 @@ pub async fn get_current_block() -> Result<u64, surf::Error> {
                     "params": []
                 }
             ))
-            .await?;
-        res_hex = serde_json::from_value::<String>(
-            res.body_json::<HashMap<String, serde_json::Value>>()
+            .await;
+        if res.is_err() {
+            continue;
+        }
+        let res_hex = serde_json::from_value::<String>(
+            res.unwrap()
+                .body_json::<HashMap<String, serde_json::Value>>()
                 .await?
                 .get("result")
                 .unwrap()
@@ -215,9 +218,10 @@ pub async fn get_current_block() -> Result<u64, surf::Error> {
         )
         .unwrap();
         if !(res_hex == "0x0") {
-            break;
+            break res_hex;
         }
-    }
+    };
+
     Ok(
         BigInt::parse_bytes(res_hex.trim_start_matches("0x").as_bytes(), 16)
             .unwrap()
@@ -231,7 +235,8 @@ async fn get_logs(
     to_block: u64,
     topics: Vec<[u8; 32]>,
 ) -> Result<Vec<Value>, surf::Error> {
-    let mut res = surf::post(WEB3_URL.clone())
+    let mut res = loop {
+        let res = surf::post(WEB3_URL.clone())
         .body(json!(
             {
                 "id": 1,
@@ -244,14 +249,20 @@ async fn get_logs(
                 }]
             }
         ))
-        .await?;
+        .await;
+        if res.is_err() {
+            continue;
+        } else {
+            break res.unwrap();
+        }
+    };
     let body_json = res
         .body_json::<HashMap<String, serde_json::Value>>()
         .await?;
     Ok(serde_json::from_value(
         body_json
             .get("result")
-            .expect(&format!("{:?}", body_json))
+            .expect(&format!("json error: {:?}", body_json))
             .clone(),
     )
     .unwrap())
