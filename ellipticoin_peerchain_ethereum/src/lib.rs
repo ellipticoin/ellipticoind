@@ -166,7 +166,7 @@ pub async fn eth_call(
     block_number: u64,
 ) -> Result<BigInt, surf::Error> {
     let res_hex = loop {
-        let res = surf::post(WEB3_URL.clone())
+        let mut res = match surf::post(WEB3_URL.clone())
             .body(json!(
              {
              "id": 1,
@@ -180,16 +180,16 @@ pub async fn eth_call(
                  format!("0x{}", BigInt::from(block_number).to_str_radix(16))
              ]}
             ))
-            .await;
-        if res.is_err() {
-            continue;
-        }
-        let res_hash_map = res
-            .unwrap()
-            .body_json::<HashMap<String, serde_json::Value>>()
-            .await?;
+            .await
+        {
+            Ok(res_hex) => res_hex,
+            Err(_) => continue,
+        };
+        let res_hash_map = match res.body_json::<HashMap<String, serde_json::Value>>().await {
+            Ok(res_hash_map) => res_hash_map,
+            Err(_) => continue,
+        };
         if res_hash_map.contains_key("result") {
-            println!("{:?}", res_hash_map.get("result").unwrap().clone());
             break serde_json::from_value::<String>(res_hash_map.get("result").unwrap().clone())?;
         }
     };
@@ -199,7 +199,7 @@ pub async fn eth_call(
 
 pub async fn get_current_block() -> Result<u64, surf::Error> {
     let res_hex = loop {
-        let res = surf::post(WEB3_URL.clone())
+        let mut res = match surf::post(WEB3_URL.clone())
             .body(json!(
                 {
                     "id": 1,
@@ -208,19 +208,18 @@ pub async fn get_current_block() -> Result<u64, surf::Error> {
                     "params": []
                 }
             ))
-            .await;
-        if res.is_err() {
-            continue;
-        }
-        let res_hex = serde_json::from_value::<String>(
-            res.unwrap()
-                .body_json::<HashMap<String, serde_json::Value>>()
-                .await?
-                .get("result")
-                .unwrap()
-                .clone(),
-        )
-        .unwrap();
+            .await
+        {
+            Ok(res) => res,
+            Err(_) => continue,
+        };
+        let res_hex = match res.body_json::<HashMap<String, serde_json::Value>>().await {
+            Ok(res_hashmap) => {
+                serde_json::from_value::<String>(res_hashmap.get("result").unwrap().clone())
+                    .expect("error converting to hash")
+            }
+            Err(_) => continue,
+        };
         if !(res_hex == "0x0") {
             break res_hex;
         }
@@ -240,7 +239,7 @@ async fn get_logs(
     topics: Vec<[u8; 32]>,
 ) -> Result<Vec<Value>, surf::Error> {
     let mut res = loop {
-        let res = surf::post(WEB3_URL.clone())
+        match surf::post(WEB3_URL.clone())
         .body(json!(
             {
                 "id": 1,
@@ -253,11 +252,9 @@ async fn get_logs(
                 }]
             }
         ))
-        .await;
-        if res.is_err() {
-            continue;
-        } else {
-            break res.unwrap();
+        .await {
+            Ok(res) => break res,
+            Err(_) =>  continue
         }
     };
     let body_json = res

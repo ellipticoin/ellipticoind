@@ -47,7 +47,7 @@ impl VerificationString for Action {
             )),
             Action::CreateOrder(order_type, amount, token, price) => {
                 return Ok(format!(
-                    "Create a limit order to {} {} {} for $ {} a piece",
+                    "Create a limit order to {} {} {} for ${} each",
                     order_type_to_string(order_type.clone()),
                     amount_to_string(*amount),
                     address_to_string(*token),
