@@ -28,6 +28,22 @@ pub struct Order {
     pub price: u64,
 }
 
+impl Order {
+    pub fn get_underlying_price<B: Backend>(
+        &self,
+        db: &mut Db<B>
+    ) -> u64 {
+        Token::underlying_to_amount(db, self.price, self.token)
+    }
+
+    pub fn get_underlying_amount<B: Backend>(
+        &self,
+        db: &mut Db<B>
+    ) -> u64 {
+        Token::amount_to_underlying(db, self.amount, self.token)
+    }
+}
+
 pub struct OrderBook;
 
 impl Contract for OrderBook {
@@ -95,7 +111,7 @@ impl OrderBook {
     }
 
     pub fn fill<B: Backend>(db: &mut Db<B>, sender: Address, order_id: u64) -> Result<()> {
-        let orders = Self::get_orders(db);
+        let mut orders = Self::get_orders(db);
         let index = orders
             .iter()
             .cloned()
@@ -113,10 +129,13 @@ impl OrderBook {
                 )?;
             }
             OrderType::Sell => {
-                Token::transfer(db, sender, order.sender, order.amount, BASE_TOKEN)?;
+                Token::transfer(db, sender, order.sender, order.amount * order.price / BASE_FACTOR, BASE_TOKEN)?;
                 pay!(db, sender, order.token, order.amount)?;
             }
         }
+
+        orders.remove(index);
+        Self::set_orders(db, orders);
         Ok(())
     }
 

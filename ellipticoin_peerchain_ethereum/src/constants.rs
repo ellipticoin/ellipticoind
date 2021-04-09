@@ -27,11 +27,11 @@ pub const REDEEM_TOPIC: [u8; 32] =
 pub const RECEIVED_ETH_TOPIC: [u8; 32] =
     hex!("4103257eaac983ca79a70d28f90dfc4fa16b619bb0c17ee7cab0d4034c279624");
 
-pub const BASE_TOKEN_ADDRESS: Address = Address(hex!("5d3a536E4D6DbD6114cc1Ead35777bAB948E3643"));
-// pub const BASE_TOKEN_ADDRESS: Address = Address(hex!("6d7f0754ffeb405d23c51ce938289d4835be3b14"));
+// pub const BASE_TOKEN_ADDRESS: Address = Address(hex!("5d3a536E4D6DbD6114cc1Ead35777bAB948E3643"));
+pub const BASE_TOKEN_ADDRESS: Address = Address(hex!("6d7f0754ffeb405d23c51ce938289d4835be3b14"));
 pub const EXCHANGE_RATE_CURRENT_SELECTOR: [u8; 4] = hex!("bd6d894d");
 pub const SUPPLY_RATE_PER_BLOCK_SELECTOR: [u8; 4] = hex!("ae9d70b0");
 pub const TOKENS: [Address; 4] = [DAI, BTC, ETH, LEVERAGED_BASE_TOKEN];
-// pub const BRIDGE_ADDRESS: Address = Address(hex!("6f246D6B8C0cca9298C685D02dFDA3A666e6e067"));
-pub const BRIDGE_ADDRESS: Address = Address(hex!("E55faDE7825Ad88581507C51c9f1b33827AaE5E8"));
+pub const BRIDGE_ADDRESS: Address = Address(hex!("6f246D6B8C0cca9298C685D02dFDA3A666e6e067"));
+// pub const BRIDGE_ADDRESS: Address = Address(hex!("E55faDE7825Ad88581507C51c9f1b33827AaE5E8"));
 pub const ETH_ADDRESS: Address = Address(hex!("0000000000000000000000000000000000000000"));

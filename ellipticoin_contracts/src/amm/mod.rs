@@ -35,7 +35,7 @@ impl AMM {
         token: Address,
     ) -> u64 {
         let pool_supply_of_base_token = Self::get_pool_supply_of_base_token(db, token);
-        Token::amount_to_underlying(db, pool_supply_of_base_token)
+        Token::amount_to_underlying(db, pool_supply_of_base_token, token)
     }
 
     pub fn create_pool<B: Backend>(
@@ -43,10 +43,8 @@ impl AMM {
         sender: Address,
         amount: u64,
         token: Address,
-        underlying_starting_price: u64,
+        starting_price: u64,
     ) -> Result<()> {
-        let starting_price =
-            Token::underlying_to_amount(db, underlying_starting_price, LEVERAGED_BASE_TOKEN);
         let base_token_amount = proportion_of(amount, starting_price, BASE_FACTOR);
         Self::validate_pool_does_not_exist(db, token)?;
         Self::charge(db, sender, token, amount)?;

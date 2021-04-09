@@ -98,12 +98,17 @@ impl QueryRoot {
         orders
             .iter()
             .cloned()
-            .map(|order: order_book::Order| Order {
-                order_type: format!("{:?}", order.order_type),
-                id: U64(order.id),
-                token: order.token.into(),
-                amount: U64(order.amount),
-                price: U64(order.price),
+            .map(|order: order_book::Order| {
+                let price = order.get_underlying_price(&mut db);
+                let amount = order.get_underlying_amount(&mut db);
+
+                return Order {
+                    order_type: format!("{:?}", order.order_type),
+                    id: U64(order.id),
+                    token: order.token.into(),
+                    amount: U64(amount),
+                    price: U64(price),
+                }
             })
             .collect()
     }

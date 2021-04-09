@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail, Result};
 use ellipticoin_contracts::{
-    constants::{BASE_FACTOR, BTC, ETH, LEVERAGED_BASE_TOKEN, MS},
+    constants::{BASE_FACTOR, BTC, DAI, ETH, LEVERAGED_BASE_TOKEN, MS},
     governance::Choice,
     order_book::OrderType,
     Action, Transaction,
@@ -45,44 +45,32 @@ impl VerificationString for Action {
                 amount_to_string(*amount),
                 address_to_string(*token),
             )),
-            Action::CreateOrder(order_type, amount, token, price) => {
-                return Ok(format!(
+            Action::CreateOrder(order_type, amount, token, price) => Ok(format!(
                     "Create a limit order to {} {} {} for ${} each",
                     order_type_to_string(order_type.clone()),
                     amount_to_string(*amount),
                     address_to_string(*token),
                     amount_to_string(*price),
-                ));
-            }
+                )),
             Action::CreatePool(amount, token, intial_price) => Ok(format!(
                 "Create a pool of {} {} at an initial price of ${} USD",
                 amount_to_string(*amount),
                 address_to_string(*token),
                 amount_to_string(*intial_price),
             )),
-            Action::CreateProposal(title, subtitle, content, actions) => {
-                println!(
-                    "Create Proposal\nTitle: {}\nSubtitle: {}\nContent: {}\nActions: {}",
-                    title,
-                    subtitle,
-                    content,
-                    actions_to_string(actions)?
-                );
-                Ok(format!(
-                    "Create Proposal\nTitle: {}\nSubtitle: {}\nContent: {}\nActions: {}",
-                    title,
-                    subtitle,
-                    content,
-                    actions_to_string(actions)?
-                ))
-            }
+            Action::CreateProposal(title, subtitle, content, actions) => Ok(format!(
+                "Create Proposal\nTitle: {}\nSubtitle: {}\nContent: {}\nActions: {}",
+                title,
+                subtitle,
+                content,
+                actions_to_string(actions)?
+            )),
             Action::CreateRedeemRequest(amount, token) => Ok(format!(
                 "Redeem {} {}",
                 amount_to_string(*amount),
                 address_to_string(*token),
             )),
-            Action::FillOrder(order_id, order_type, amount, token, price) => {
-                println!(
+            Action::FillOrder(order_id, order_type, amount, token, price) => Ok(format!(
                     "{}\nOrder Id: #{}\nToken: {}\nAmount: {}\nPrice: $ {} / {}\nTotal: $ {}",
                     inverted_order_type_to_string(order_type.clone()),
                     order_id,
@@ -91,18 +79,7 @@ impl VerificationString for Action {
                     amount_to_string(*price),
                     address_to_string(*token),
                     amount_to_string(*amount * *price / BASE_FACTOR),
-                );
-                return Ok(format!(
-                    "{}\nOrder Id: #{}\nToken: {}\nAmount: {}\nPrice: $ {} / {}\nTotal: $ {}",
-                    inverted_order_type_to_string(order_type.clone()),
-                    order_id,
-                    address_to_string(*token),
-                    amount_to_string(*amount),
-                    amount_to_string(*price),
-                    address_to_string(*token),
-                    amount_to_string(*amount * *price / BASE_FACTOR),
-                ));
-            }
+                )),
             Action::Harvest() => Ok(format!("Harvest")),
             Action::Migrate(legacy_address, legacy_signature) => Ok(format!(
                 "Migrate\nLegacy Address: {}\nLegacy Signature: {}",
@@ -191,6 +168,7 @@ pub fn address_to_string(address: Address) -> String {
         BTC => return "BTC".to_string(),
         MS => return "MS".to_string(),
         ETH => return "ETH".to_string(),
+        DAI => return "DAI".to_string(),
         LEVERAGED_BASE_TOKEN => return "USD".to_string(),
         _ => (),
     };
