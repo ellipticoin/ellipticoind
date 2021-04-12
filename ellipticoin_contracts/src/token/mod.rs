@@ -58,6 +58,8 @@ impl Token {
         token: Address,
     ) -> u64 {
         if token == LEVERAGED_BASE_TOKEN {
+            amount
+        } else {
             let base_token_exchange_rate = Token::get_base_token_exchange_rate(db);
             (base_token_exchange_rate * amount
                 / pow(
@@ -66,8 +68,6 @@ impl Token {
                 ))
             .to_u64()
             .unwrap()
-        } else {
-            amount
         }
     }
 
