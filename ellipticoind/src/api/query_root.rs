@@ -50,7 +50,7 @@ impl QueryRoot {
                 );
 
                 let total_supply =
-                    ellipticoin_contracts::Token::get_total_supply(&mut db, token.clone().into());
+                    ellipticoin_contracts::Token::get_underlying_total_supply(&mut db, token.clone().into());
 
                 Token {
                     address: token,
