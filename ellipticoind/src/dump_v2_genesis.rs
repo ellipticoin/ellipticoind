@@ -266,9 +266,9 @@ pub async fn dump_v2_genesis() {
             v2_genesis_state.insert(v2_db_key(key), value);
         });
     let file = File::create("/Users/masonf/tmp/genesis.cbor").unwrap();
-    // remove_stolen_funds(&mut v2_genesis_state, ETH, ETH_TOTAL_SUPPLY_AFTER_HACK);
-    // remove_stolen_funds(&mut v2_genesis_state, BTC, BTC_TOTAL_SUPPLY_AFTER_HACK);
-    // strip_unknown_balances(&mut v2_genesis_state);
+    remove_stolen_funds(&mut v2_genesis_state, ETH, ETH_TOTAL_SUPPLY_AFTER_HACK);
+    remove_stolen_funds(&mut v2_genesis_state, BTC, BTC_TOTAL_SUPPLY_AFTER_HACK);
+    strip_unknown_balances(&mut v2_genesis_state);
     let dao_address: [u8; 20] = pad_left(vec![V2Contracts::Governance as u8], 20)
                 .try_into()
                 .unwrap();
@@ -276,12 +276,12 @@ pub async fn dump_v2_genesis() {
     let blocks_since_hack = (now - TIME_OF_HACK)/4;
     let additional_seed_amount = blocks_since_hack * 1280000;
     let dao_seed_amount = BASE_DAO_SEED_AMOUNT + additional_seed_amount;
-    // fix_price(&mut v2_genesis_state, BTC, BTC_PRICE);
-    // fix_price(&mut v2_genesis_state, ETH, ETH_PRICE);
-    // fix_total_supply(&mut v2_genesis_state, MS);
-    // fix_total_supply(&mut v2_genesis_state, USD);
-    // credit(&mut v2_genesis_state, dao_address, dao_seed_amount as i64, MS);
-    // fast_forward_block_number(&mut v2_genesis_state, blocks_since_hack);
+    fix_price(&mut v2_genesis_state, BTC, BTC_PRICE);
+    fix_price(&mut v2_genesis_state, ETH, ETH_PRICE);
+    fix_total_supply(&mut v2_genesis_state, MS);
+    fix_total_supply(&mut v2_genesis_state, USD);
+    credit(&mut v2_genesis_state, dao_address, dao_seed_amount as i64, MS);
+    fast_forward_block_number(&mut v2_genesis_state, blocks_since_hack);
 
     for (key, value) in v2_genesis_state.iter() {
         serde_cbor::to_writer(&file, &(key, value)).unwrap();
