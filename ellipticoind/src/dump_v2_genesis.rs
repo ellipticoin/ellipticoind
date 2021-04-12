@@ -63,6 +63,7 @@ const V2_USD: [u8; 20] = hex!("5d3a536e4d6dbd6114cc1ead35777bab948e3643");
 // const V2_USD: [u8; 20] = hex!("6d7f0754ffeb405d23c51ce938289d4835be3b14");
 const USD_EXCHANGE_RATE: u128 = 211367456115200165329965416;
 const TOKEN_BALANCE_KEY: [u8; 4] = [6, 0, 0, 0];
+const BLOCK_NUMBER_KEY: [u8; 4] = [5, 0, 0, 0];
 const LIQUIDITY_BALANCE_KEY: [u8; 4] = [0, 0, 0, 0];
 const POOL_SUPPLY_OF_BASE_TOKEN_KEY: [u8; 4] = [0, 0, 2, 0];
 const POOL_SUPPLY_OF_TOKEN_KEY: [u8; 4] = [0, 0, 3, 0];
@@ -272,17 +273,24 @@ pub async fn dump_v2_genesis() {
                 .try_into()
                 .unwrap();
     let now: u64 = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs();
-    let additional_seed_amount = ((now - TIME_OF_HACK)/4) * 1280000;
+    let blocks_since_hack = (now - TIME_OF_HACK)/4;
+    let additional_seed_amount = blocks_since_hack * 1280000;
     let dao_seed_amount = BASE_DAO_SEED_AMOUNT + additional_seed_amount;
     fix_price(&mut v2_genesis_state, BTC, BTC_PRICE);
     fix_price(&mut v2_genesis_state, ETH, ETH_PRICE);
     fix_total_supply(&mut v2_genesis_state, MS);
     fix_total_supply(&mut v2_genesis_state, USD);
     credit(&mut v2_genesis_state, dao_address, dao_seed_amount as i64, MS);
+    fast_forward_block_number(&mut v2_genesis_state, blocks_since_hack);
 
     for (key, value) in v2_genesis_state.iter() {
         serde_cbor::to_writer(&file, &(key, value)).unwrap();
     }
+}
+
+fn fast_forward_block_number(state: &mut  HashMap<Vec<u8>, Vec<u8>>, number_of_blocks: u64) {
+    let block_number = serde_cbor::from_slice::<u64>(&state.get(&BLOCK_NUMBER_KEY.to_vec()).unwrap()).unwrap();
+    *state.get_mut(&BLOCK_NUMBER_KEY.to_vec()).unwrap() = serde_cbor::to_vec(&(block_number +number_of_blocks)).unwrap();
 }
 
 fn fix_price(state: &mut  HashMap<Vec<u8>, Vec<u8>>, token: [u8; 20], price: u64) {
