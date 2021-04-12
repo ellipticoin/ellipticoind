@@ -266,8 +266,8 @@ pub async fn dump_v2_genesis() {
             v2_genesis_state.insert(v2_db_key(key), value);
         });
     let file = File::create("/Users/masonf/tmp/genesis.cbor").unwrap();
-    remove_stolen_funds(&mut v2_genesis_state, ETH, ETH_TOTAL_SUPPLY_AFTER_HACK);
-    remove_stolen_funds(&mut v2_genesis_state, BTC, BTC_TOTAL_SUPPLY_AFTER_HACK);
+    // remove_stolen_funds(&mut v2_genesis_state, ETH, ETH_TOTAL_SUPPLY_AFTER_HACK);
+    // remove_stolen_funds(&mut v2_genesis_state, BTC, BTC_TOTAL_SUPPLY_AFTER_HACK);
     strip_unknown_balances(&mut state);
     let dao_address: [u8; 20] = pad_left(vec![V2Contracts::Governance as u8], 20)
                 .try_into()
