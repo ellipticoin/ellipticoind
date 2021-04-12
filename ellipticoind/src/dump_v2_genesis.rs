@@ -276,8 +276,8 @@ pub async fn dump_v2_genesis() {
     let blocks_since_hack = (now - TIME_OF_HACK)/4;
     let additional_seed_amount = blocks_since_hack * 1280000;
     let dao_seed_amount = BASE_DAO_SEED_AMOUNT + additional_seed_amount;
-    fix_price(&mut v2_genesis_state, BTC, BTC_PRICE);
-    fix_price(&mut v2_genesis_state, ETH, ETH_PRICE);
+    // fix_price(&mut v2_genesis_state, BTC, BTC_PRICE);
+    // fix_price(&mut v2_genesis_state, ETH, ETH_PRICE);
     fix_total_supply(&mut v2_genesis_state, MS);
     fix_total_supply(&mut v2_genesis_state, USD);
     credit(&mut v2_genesis_state, dao_address, dao_seed_amount as i64, MS);
