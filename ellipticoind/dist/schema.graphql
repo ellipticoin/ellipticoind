@@ -12,11 +12,7 @@ type transaction {
   position: U32!
   contract: String!
   sender: Bytes!
-<<<<<<< HEAD
   transactionNumber: U32!
-=======
-  nonce: U32!
->>>>>>> master
   function: String!
   arguments: Bytes!
   returnValue: Bytes!

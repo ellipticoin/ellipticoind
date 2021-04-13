@@ -1,7 +1,6 @@
 use crate::{
-    bridge::Update, governance::Choice, order_book::OrderType, Bridge, Ellipticoin, Governance,
-    constants::{LEVERAGED_BASE_TOKEN},
-    OrderBook, System, Token, AMM,
+    bridge::Update, constants::LEVERAGED_BASE_TOKEN, governance::Choice, order_book::OrderType,
+    Bridge, Ellipticoin, Governance, OrderBook, System, Token, AMM,
 };
 use anyhow::Result;
 use ellipticoin_types::{
@@ -50,15 +49,16 @@ impl Action {
         let result = match &self {
             Action::AddLiquidity(amount, token) => AMM::add_liquidity(db, sender, *amount, *token),
             Action::CreateOrder(order_type, underlying_amount, token, underlying_price) => {
-                let amount =
-                    Token::underlying_to_amount(db, *underlying_amount, *token);
-                let price =
-                    Token::amount_to_underlying(db, *underlying_price, *token);
+                let amount = Token::underlying_to_amount(db, *underlying_amount, *token);
+                let price = Token::amount_to_underlying(db, *underlying_price, *token);
                 OrderBook::create_order(db, sender, order_type.clone(), amount, *token, price)
             }
             Action::CreatePool(amount, token, underlying_starting_price) => {
-                let starting_price =
-                    Token::underlying_to_amount(db, *underlying_starting_price, LEVERAGED_BASE_TOKEN);
+                let starting_price = Token::underlying_to_amount(
+                    db,
+                    *underlying_starting_price,
+                    LEVERAGED_BASE_TOKEN,
+                );
                 AMM::create_pool(db, sender, *amount, *token, starting_price)
             }
             Action::CreateProposal(title, subtitle, content, actions) => {

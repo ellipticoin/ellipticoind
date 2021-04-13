@@ -1,5 +1,1 @@
-<<<<<<< HEAD
 #imports_granularity = "Crate"
-=======
-#merge_imports = true
->>>>>>> master

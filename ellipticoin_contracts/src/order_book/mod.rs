@@ -29,17 +29,11 @@ pub struct Order {
 }
 
 impl Order {
-    pub fn get_underlying_price<B: Backend>(
-        &self,
-        db: &mut Db<B>
-    ) -> u64 {
+    pub fn get_underlying_price<B: Backend>(&self, db: &mut Db<B>) -> u64 {
         Token::underlying_to_amount(db, self.price, self.token)
     }
 
-    pub fn get_underlying_amount<B: Backend>(
-        &self,
-        db: &mut Db<B>
-    ) -> u64 {
+    pub fn get_underlying_amount<B: Backend>(&self, db: &mut Db<B>) -> u64 {
         Token::amount_to_underlying(db, self.amount, self.token)
     }
 }
@@ -129,7 +123,13 @@ impl OrderBook {
                 )?;
             }
             OrderType::Sell => {
-                Token::transfer(db, sender, order.sender, order.amount * order.price / BASE_FACTOR, BASE_TOKEN)?;
+                Token::transfer(
+                    db,
+                    sender,
+                    order.sender,
+                    order.amount * order.price / BASE_FACTOR,
+                    BASE_TOKEN,
+                )?;
                 pay!(db, sender, order.token, order.amount)?;
             }
         }

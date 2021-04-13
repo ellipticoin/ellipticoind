@@ -1,11 +1,11 @@
 pub mod memory_backend;
 pub mod sled_backend;
+use crate::config::address;
 use crate::constants::DB;
 use async_std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use ellipticoin_contracts::{Bridge, Ellipticoin, Miner, System};
 pub use memory_backend::MemoryBackend;
 pub use sled_backend::SledBackend;
-use crate::config::address;
 use std::path::Path;
 
 pub async fn verify() {
@@ -99,7 +99,13 @@ macro_rules! aquire_db_read_lock {
 }
 
 pub async fn get_hash_onion_layers_left() -> Option<u64> {
-    Some(get_miners().await.iter().find(|miner| miner.address == address())?.hash_onion_layers_left)
+    Some(
+        get_miners()
+            .await
+            .iter()
+            .find(|miner| miner.address == address())?
+            .hash_onion_layers_left,
+    )
 }
 
 pub async fn get_block_number() -> u64 {

@@ -1,5 +1,4 @@
 use crate::{
-<<<<<<< HEAD
     aquire_db_read_lock, aquire_db_write_lock,
     config::{verification_key, HOST},
     constants::{DB, NETWORK_ID, TRANSACTIONS_FILE, TRANSACTION_QUEUE},
@@ -53,40 +52,10 @@ impl Run for SignedTransaction {
         match self {
             SignedTransaction::Ethereum(transaction) => transaction.run(db),
             SignedTransaction::System(transaction) => transaction.run(db),
-=======
-    config::{network_id, verification_key},
-    constants::TOKEN_CONTRACT,
-    models::transaction::next_nonce,
-};
-use serde::{Deserialize, Serialize};
-use serde_cbor::{from_slice, Value};
-use std::convert::TryInto;
-
-#[derive(Deserialize, Serialize, Debug, Clone, PartialEq)]
-pub struct TransactionRequest {
-    pub nonce: u32,
-    pub sender: [u8; 32],
-    pub contract: String,
-    pub function: String,
-    pub arguments: Vec<serde_cbor::Value>,
-    pub network_id: u32,
-}
-
-impl Default for TransactionRequest {
-    fn default() -> Self {
-        Self {
-            network_id: network_id(),
-            contract: TOKEN_CONTRACT.clone(),
-            sender: verification_key(),
-            nonce: 0,
-            function: "".to_string(),
-            arguments: vec![],
->>>>>>> master
         }
     }
 }
 
-<<<<<<< HEAD
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SignedSystemTransaction(pub Transaction, Vec<u8>);
 
@@ -211,7 +180,11 @@ pub async fn new_start_mining_transaction() -> SignedTransaction {
     let mut db = aquire_db_read_lock!();
     SignedTransaction::System(SignedSystemTransaction::new(
         &mut db,
-        Action::StartMining(HOST.to_string(), hash_onion::peel().await, hash_onion::layers_left().await as u64),
+        Action::StartMining(
+            HOST.to_string(),
+            hash_onion::peel().await,
+            hash_onion::layers_left().await as u64,
+        ),
     ))
 }
 
@@ -233,30 +206,4 @@ pub async fn new_update_transaction(update: Update) -> SignedTransaction {
     let mut db = aquire_db_read_lock!();
     let update_transaction = SignedSystemTransaction::new(&mut db, Action::Update(update));
     SignedTransaction::System(update_transaction)
-=======
-impl TransactionRequest {
-    pub fn new(contract: String, function: &str, arguments: Vec<Value>) -> Self {
-        let transaction = Self {
-            contract,
-            nonce: next_nonce(verification_key().to_vec()),
-            function: function.to_string(),
-            arguments,
-            ..Default::default()
-        };
-        transaction
-    }
-}
-
-impl From<crate::models::Transaction> for TransactionRequest {
-    fn from(transaction: crate::models::Transaction) -> TransactionRequest {
-        TransactionRequest {
-            network_id: transaction.network_id as u32,
-            sender: transaction.sender[..].try_into().unwrap(),
-            arguments: from_slice(&transaction.arguments).unwrap(),
-            contract: transaction.contract,
-            function: transaction.function,
-            nonce: transaction.nonce as u32,
-        }
-    }
->>>>>>> master
 }

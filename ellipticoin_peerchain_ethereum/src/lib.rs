@@ -267,17 +267,18 @@ async fn get_logs(
             .await?;
         let result = match body_json.get("result") {
             Some(res) => res.clone(),
-            None =>  { panic!("{:?}", body_json)}
+            None => {
+                panic!("{:?}", body_json)
+            }
         };
         match serde_json::from_value(result) {
             Ok(res) => break Ok(res),
-            Err(err) =>  {
+            Err(err) => {
                 println!("{}", err);
-                continue
+                continue;
             }
         }
     }
-
 }
 
 fn value_to_string(value: &Value) -> Option<String> {

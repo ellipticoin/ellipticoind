@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 use juniper::{ParseScalarResult, ParseScalarValue, Value};
 use std::convert::TryInto;
 
@@ -23,15 +22,6 @@ impl Bridge {
 pub struct Token {
     pub address: Address,
     pub interest_rate: Option<U64>,
-=======
-use crate::models;
-use juniper::{ParseScalarResult, ParseScalarValue, Value};
-
-#[derive(Clone, Debug)]
-pub struct Token {
-    pub id: Bytes,
-    pub issuer: String,
->>>>>>> master
     pub price: U64,
     pub balance: U64,
     pub total_supply: U64,
@@ -39,21 +29,12 @@ pub struct Token {
 
 #[juniper::graphql_object]
 impl Token {
-<<<<<<< HEAD
     fn address(&self) -> Address {
         self.address.clone()
     }
 
     fn interest_rate(&self) -> Option<U64> {
         self.interest_rate.clone()
-=======
-    fn id(&self) -> Bytes {
-        self.id.clone()
-    }
-
-    fn issuer(&self) -> String {
-        self.issuer.clone()
->>>>>>> master
     }
 
     fn price(&self) -> U64 {
@@ -71,15 +52,8 @@ impl Token {
 
 #[derive(Clone, Debug)]
 pub struct LiquidityToken {
-<<<<<<< HEAD
     pub token_address: Address,
     pub balance: U64,
-=======
-    pub id: Bytes,
-    pub issuer: String,
-    pub balance: U64,
-    pub price: U64,
->>>>>>> master
     pub total_supply: U64,
     pub pool_supply_of_token: U64,
     pub pool_supply_of_base_token: U64,
@@ -87,30 +61,14 @@ pub struct LiquidityToken {
 
 #[juniper::graphql_object]
 impl LiquidityToken {
-<<<<<<< HEAD
     fn token_address(&self) -> Address {
         self.token_address.clone()
-=======
-    fn id(&self) -> Bytes {
-        self.id.clone()
-    }
-
-    fn issuer(&self) -> String {
-        self.issuer.clone()
->>>>>>> master
     }
 
     fn balance(&self) -> U64 {
         self.balance.clone()
     }
 
-<<<<<<< HEAD
-=======
-    fn price(&self) -> U64 {
-        self.price.clone()
-    }
-
->>>>>>> master
     fn total_supply(&self) -> U64 {
         self.total_supply.clone()
     }
@@ -125,7 +83,6 @@ impl LiquidityToken {
 }
 
 #[derive(Clone, Debug)]
-<<<<<<< HEAD
 pub struct Order {
     pub id: U64,
     pub order_type: String,
@@ -260,8 +217,6 @@ impl RedeemRequest {
 }
 
 #[derive(Clone, Debug)]
-=======
->>>>>>> master
 pub struct Block {
     pub number: U32,
     pub transactions: Vec<Transaction>,
@@ -301,11 +256,7 @@ pub struct Transaction {
     pub position: U32,
     pub contract: String,
     pub sender: Bytes,
-<<<<<<< HEAD
     pub transaction_number: U32,
-=======
-    pub nonce: U32,
->>>>>>> master
     pub function: String,
     pub arguments: Bytes,
     pub return_value: Bytes,
@@ -338,13 +289,8 @@ impl Transaction {
         self.sender.clone()
     }
 
-<<<<<<< HEAD
     fn transaction_number(&self) -> U32 {
         self.transaction_number.clone()
-=======
-    fn nonce(&self) -> U32 {
-        self.nonce.clone()
->>>>>>> master
     }
 
     fn function(&self) -> String {
@@ -364,42 +310,6 @@ impl Transaction {
     }
 }
 
-<<<<<<< HEAD
-=======
-impl From<models::Transaction> for Transaction {
-    fn from(transaction: models::Transaction) -> Self {
-        Self {
-            id: U32(transaction.id as u32),
-            network_id: U64(transaction.network_id as u64),
-            nonce: U32(transaction.nonce as u32),
-            position: U32(transaction.position as u32),
-            block_number: U32(transaction.block_number as u32),
-            function: transaction.function,
-            sender: Bytes(transaction.sender),
-            contract: transaction.contract,
-            arguments: transaction.arguments.into(),
-            return_value: Bytes(transaction.return_value),
-            raw: Bytes(transaction.raw),
-        }
-    }
-}
-impl From<(models::Block, Vec<models::Transaction>)> for Block {
-    fn from(block: (models::Block, Vec<models::Transaction>)) -> Block {
-        Self {
-            number: U32(block.0.number as u32),
-            sealed: block.0.sealed,
-            memory_changeset_hash: Bytes(block.0.memory_changeset_hash),
-            storage_changeset_hash: Bytes(block.0.storage_changeset_hash),
-            transactions: block
-                .1
-                .into_iter()
-                .map(Transaction::from)
-                .collect::<Vec<Transaction>>(),
-        }
-    }
-}
-
->>>>>>> master
 #[derive(Clone, Debug)]
 pub struct U64(pub u64);
 
@@ -429,24 +339,6 @@ impl From<u32> for U32 {
     }
 }
 
-<<<<<<< HEAD
-=======
-#[derive(Clone, juniper::GraphQLInputObject)]
-pub struct TokenId {
-    pub id: Bytes,
-    pub issuer: String,
-}
-
-impl From<TokenId> for ellipticoin::Token {
-    fn from(token_id: TokenId) -> Self {
-        Self {
-            id: token_id.id.0.into(),
-            issuer: ellipticoin::Address::Contract(token_id.issuer),
-        }
-    }
-}
-
->>>>>>> master
 #[derive(Clone, Debug)]
 pub struct Bytes(pub Vec<u8>);
 
@@ -483,7 +375,6 @@ impl From<Vec<u8>> for Bytes {
     }
 }
 
-<<<<<<< HEAD
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Address(pub ellipticoin_types::Address);
 
@@ -522,8 +413,6 @@ impl From<ellipticoin_types::Address> for Address {
     }
 }
 
-=======
->>>>>>> master
 #[juniper::graphql_scalar(description = "U64")]
 impl<S> GraphQLScalar for U64
 where

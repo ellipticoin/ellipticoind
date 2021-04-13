@@ -9,36 +9,20 @@ use crate::{
         },
         token,
     },
-<<<<<<< HEAD
 };
 use ellipticoin::{pay, Address, Token};
 use serde_cbor::Value;
 // use system_contracts::exchange::CONTRACT_NAME;
-=======
-    transaction::TransactionRequest,
-};
-use ellipticoin::{pay, Address, Token};
-use serde_cbor::Value;
-use system_contracts::exchange::CONTRACT_NAME;
->>>>>>> master
 use wasm_rpc::error::Error;
 
 pub async fn run<API: ellipticoin::API>(api: &mut API, transaction: &mut Transaction) {
     fix_spelling_errors(transaction);
-<<<<<<< HEAD
     if (0..1_721_122_i32).contains(&transaction.block_number)
-=======
-    if (0..1_718_816_i32).contains(&transaction.block_number)
->>>>>>> master
         && transaction.function == "remove_liquidity"
     {
         run_remove_liquidity(api, transaction);
     } else {
-<<<<<<< HEAD
         // system_contracts::run(api, TransactionRequest::from(transaction.clone()));
-=======
-        system_contracts::run(api, TransactionRequest::from(transaction.clone()));
->>>>>>> master
     }
 }
 
@@ -83,7 +67,6 @@ pub fn remove_liquidity<API: ellipticoin::API>(
         token.clone(),
         pool_supply_of_base_token * amount / pool_supply_of_token,
     )?;
-<<<<<<< HEAD
     // pay!(
     //     api,
     //     BASE_TOKEN.clone(),
@@ -93,17 +76,6 @@ pub fn remove_liquidity<API: ellipticoin::API>(
 
     debit_pool_supply_of_token(api, token.clone(), amount)?;
     // pay!(api, token, api.caller(), amount)?;
-=======
-    pay!(
-        api,
-        BASE_TOKEN.clone(),
-        api.caller(),
-        pool_supply_of_base_token * amount / pool_supply_of_token
-    )?;
-
-    debit_pool_supply_of_token(api, token.clone(), amount)?;
-    pay!(api, token, api.caller(), amount)?;
->>>>>>> master
 
     Ok(())
 }

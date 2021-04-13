@@ -8,12 +8,9 @@ mod mutations;
 mod query_root;
 mod routes;
 mod types;
-<<<<<<< HEAD
 use async_std::task::spawn;
 use std::net::SocketAddr;
 use tide::listener::Listener;
-=======
->>>>>>> master
 pub mod views;
 pub struct API {
     pub app: tide::Server<()>,
@@ -30,7 +27,6 @@ impl API {
         api
     }
 }
-<<<<<<< HEAD
 
 pub async fn start(socket: SocketAddr) {
     let api = API::new();
@@ -40,5 +36,3 @@ pub async fn start(socket: SocketAddr) {
     }
     spawn(async move { listener.accept().await.unwrap() });
 }
-=======
->>>>>>> master

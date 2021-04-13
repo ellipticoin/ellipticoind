@@ -40,7 +40,7 @@ impl Ellipticoin {
         sender: Address,
         host: String,
         hash_onion_skin: [u8; 32],
-        layer_count: u64
+        layer_count: u64,
     ) -> Result<()> {
         let mut miners = Self::get_miners(db);
         if !MINER_ALLOW_LIST.contains(&sender) {
@@ -50,7 +50,7 @@ impl Ellipticoin {
             address: sender,
             host,
             hash_onion_skin,
-            hash_onion_layers_left: layer_count
+            hash_onion_layers_left: layer_count,
         });
         Self::set_miners(db, miners);
         Ok(())

@@ -1,10 +1,10 @@
+use crate::db::get_hash_onion_layers_left;
 use crate::{
     config::{HASH_ONION_SIZE, PRIVATE_KEY},
     crypto::sha256,
 };
 use async_std::sync::{Arc, Mutex};
 use indicatif::ProgressBar;
-use crate::db::get_hash_onion_layers_left;
 
 lazy_static! {
     pub static ref ONION: async_std::sync::Arc<Mutex<Vec<[u8; 32]>>> = Arc::new(Mutex::new(vec![]));
@@ -12,7 +12,9 @@ lazy_static! {
 
 pub async fn generate() {
     println!("Generating Hash Onion");
-    let hash_onion_layers_left = get_hash_onion_layers_left().await.unwrap_or(*HASH_ONION_SIZE as u64);
+    let hash_onion_layers_left = get_hash_onion_layers_left()
+        .await
+        .unwrap_or(*HASH_ONION_SIZE as u64);
     let pb = ProgressBar::new(hash_onion_layers_left - 1);
     pb.set_style(
         indicatif::ProgressStyle::default_bar()

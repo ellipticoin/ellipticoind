@@ -51,10 +51,7 @@ impl Token {
         }
     }
 
-    pub fn get_underlying_total_supply<B: Backend>(
-        db: &mut Db<B>,
-        token: Address,
-    ) -> u64 {
+    pub fn get_underlying_total_supply<B: Backend>(db: &mut Db<B>, token: Address) -> u64 {
         if token == LEVERAGED_BASE_TOKEN {
             let balance = Self::get_total_supply(db, token);
             Self::amount_to_underlying(db, balance, token)
