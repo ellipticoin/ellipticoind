@@ -6,7 +6,11 @@ mutation PostTransaction($transaction: Bytes!) {
     position
     contract
     sender
+<<<<<<< HEAD
     transactionNumber
+=======
+    nonce
+>>>>>>> master
     function
     arguments
     returnValue

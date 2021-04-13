@@ -11,11 +11,14 @@ impl juniper::Context for Context {}
 #[derive(Debug)]
 pub struct Error(pub String);
 
+<<<<<<< HEAD
 impl From<anyhow::Error> for Error {
     fn from(error: anyhow::Error) -> Self {
         Self(error.to_string())
     }
 }
+=======
+>>>>>>> master
 impl juniper::IntoFieldError for Error {
     fn into_field_error(self) -> juniper::FieldError {
         juniper::FieldError::new(
@@ -62,10 +65,14 @@ pub async fn handle_graphql(mut request: Request<()>) -> tide::Result {
         &ctx,
     )
     .await
+<<<<<<< HEAD
     .map_err(|e| {
         println!("{}", e.to_string());
         http_types::Error::from_str(StatusCode::BadRequest, e.to_string())
     })?;
+=======
+    .map_err(|e| http_types::Error::from_str(StatusCode::BadRequest, e.to_string()))?;
+>>>>>>> master
 
     Ok(Response::builder(StatusCode::Ok)
         .body(Body::from_json(&json!({

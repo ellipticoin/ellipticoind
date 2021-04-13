@@ -9,7 +9,11 @@ query block($blockNumber: U32!) {
       position
       contract
       sender
+<<<<<<< HEAD
       transactionNumber
+=======
+      nonce
+>>>>>>> master
       function
       arguments
       returnValue
