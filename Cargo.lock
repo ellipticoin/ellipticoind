@@ -923,6 +923,7 @@ dependencies = [
  "futures",
  "graphql_client",
  "hex 0.4.2",
+ "hex-literal",
  "http-service",
  "http-types 2.6.0",
  "indicatif",

@@ -15,6 +15,7 @@ extern crate lazy_static;
 extern crate maplit;
 
 mod api;
+pub mod dump_v2_genesis;
 mod block_broadcaster;
 pub mod client;
 pub mod config;
