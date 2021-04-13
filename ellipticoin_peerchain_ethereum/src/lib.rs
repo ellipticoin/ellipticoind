@@ -242,7 +242,6 @@ async fn get_logs(
     topics: Vec<[u8; 32]>,
 ) -> Result<Vec<Value>, surf::Error> {
     loop {
-        println!("eth_getLogs");
         let mut res = match surf::post(WEB3_URL.clone())
         .body(json!(
             {
