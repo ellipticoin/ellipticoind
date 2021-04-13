@@ -31,6 +31,7 @@ pub struct Miner {
     pub host: String,
     pub address: Address,
     pub hash_onion_skin: [u8; 32],
+    pub hash_onion_skin: [u8; 32],
 }
 
 impl Ellipticoin {

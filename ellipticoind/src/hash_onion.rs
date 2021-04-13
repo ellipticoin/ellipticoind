@@ -28,5 +28,15 @@ pub async fn generate() {
     pb.finish();
 }
 pub async fn peel() -> [u8; 32] {
-    ONION.lock().await.pop().expect("No onion layers left")
+    let thing = ONION.lock().await.pop().expect("No onion layers left");
+    println!("{}", base64::encode(&thing));
+    thing
+}
+
+pub async fn fast_forward(n: u64) { 
+    println!("{}", ONION.lock().await.len());
+    println!("{}", *HASH_ONION_SIZE - n as usize);
+    ONION.lock().await.truncate((*HASH_ONION_SIZE - n as usize));
+    let thing = ONION.lock().await.last().expect("No onion layers left").clone();
+    println!("new last {}", base64::encode(thing));
 }

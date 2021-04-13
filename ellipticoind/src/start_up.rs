@@ -12,6 +12,7 @@ use crate::{
 use ellipticoin_contracts::Miner;
 use ellipticoin_peerchain_ethereum::eth_address;
 use ellipticoin_types::traits::Run;
+use ellipticoin_contracts::System;
 use std::{fs::File, path::Path};
 
 pub async fn start_miner() {
@@ -28,6 +29,8 @@ pub async fn start_miner() {
         );
     }
 }
+
+
 pub async fn catch_up() {
     println!("Syncing complete");
     if Path::new("var/transactions.cbor").exists() {
@@ -37,6 +40,7 @@ pub async fn catch_up() {
             .map(Result::unwrap)
         {
             let result = crate::transaction::apply(&transaction).await;
+            // println!("{:?} {} {} {:?}", transaction, transaction.sender().unwrap_or(Default::default()) == address(), transaction.is_seal(), result);
             if transaction.sender().unwrap_or(Default::default()) == address()
                 && transaction.is_seal()
                 && result.is_ok()
@@ -51,10 +55,11 @@ pub async fn catch_up() {
 }
 
 pub async fn reset_state() {
-    load_genesis_state().await;
     hash_onion::generate().await;
+    load_genesis_state().await;
 }
 
+const START_BLOCK_NUMBER: u64 = 3725895;
 pub async fn load_genesis_state() {
     let backend = DB.get().unwrap().write().await;
     let store_lock = crate::db::StoreLock { guard: backend };
@@ -74,4 +79,8 @@ pub async fn load_genesis_state() {
         db.insert_raw(&key, &value);
         db.flush();
     }
+    // let block_number = db::get_block_number().await;
+    let block_number = System::get_block_number(&mut db);
+    println!("{}", block_number - START_BLOCK_NUMBER); 
+    hash_onion::fast_forward(block_number - START_BLOCK_NUMBER).await;
 }

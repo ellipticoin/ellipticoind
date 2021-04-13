@@ -112,14 +112,7 @@ pub async fn dispatch(signed_transaction: SignedTransaction) -> Result<()> {
     receiver.await.unwrap()
 }
 
-// pub async fn run<R: Run + IsRedeemRequest + Serialize>(transaction: R) -> Result<()> {
 pub async fn run(transaction: SignedTransaction) -> Result<()> {
-    // let backend = DB.get().unwrap().write().await;
-    // let store_lock = crate::db::StoreLock { guard: backend };
-    // let mut db = ellipticoin_types::Db {
-    //     backend: store_lock,
-    //     transaction_state: Default::default(),
-    // };
     let mut db = aquire_db_write_lock!();
     let result = transaction.run(&mut db);
     if transaction.is_redeem_request() && result.is_ok() {
@@ -130,6 +123,7 @@ pub async fn run(transaction: SignedTransaction) -> Result<()> {
     } else {
         db.revert();
     }
+    // println!("writing to file: {:?}", transaction);
     serde_cbor::to_writer(&*TRANSACTIONS_FILE, &transaction).unwrap();
 
     result

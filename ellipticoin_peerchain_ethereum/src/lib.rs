@@ -32,7 +32,10 @@ pub async fn poll(latest_block: u64) -> Result<Poll<Update>, surf::Error> {
         .await?;
         let base_token_interest_rate = get_base_token_interest_rate(current_block).await.unwrap();
 
-        let from_block = if latest_block == 0 {
+        // Ethereum nodes only store 128 blocks of history.
+        // If we're greater than 128 blocks behind assume there was a restart
+        // and skip to the current block.
+        let from_block = if current_block - latest_block > 128 {
             current_block
         } else {
             latest_block + 1
@@ -238,8 +241,9 @@ async fn get_logs(
     to_block: u64,
     topics: Vec<[u8; 32]>,
 ) -> Result<Vec<Value>, surf::Error> {
-    let mut res = loop {
-        match surf::post(WEB3_URL.clone())
+    loop {
+        println!("eth_getLogs");
+        let mut res = match surf::post(WEB3_URL.clone())
         .body(json!(
             {
                 "id": 1,
@@ -253,20 +257,28 @@ async fn get_logs(
             }
         ))
         .await {
-            Ok(res) => break res,
-            Err(_) =>  continue
+            Ok(res) => res,
+            Err(err) =>  {
+                println!("{}", err);
+                continue
+            }
+        };
+        let body_json = res
+            .body_json::<HashMap<String, serde_json::Value>>()
+            .await?;
+        let result = match body_json.get("result") {
+            Some(res) => res.clone(),
+            None =>  { panic!("{:?}", body_json)}
+        };
+        match serde_json::from_value(result) {
+            Ok(res) => break Ok(res),
+            Err(err) =>  {
+                println!("{}", err);
+                continue
+            }
         }
-    };
-    let body_json = res
-        .body_json::<HashMap<String, serde_json::Value>>()
-        .await?;
-    Ok(serde_json::from_value(
-        body_json
-            .get("result")
-            .expect(&format!("json error: {:?}", body_json))
-            .clone(),
-    )
-    .unwrap())
+    }
+
 }
 
 fn value_to_string(value: &Value) -> Option<String> {
