@@ -19,7 +19,8 @@ use wasm_rpc::error::Error;
 pub async fn run<API: ellipticoin::API>(api: &mut API, transaction: &mut Transaction) {
     fix_spelling_errors(transaction);
     if (0..1_718_816_i32).contains(&transaction.block_number)
-        && transaction.function == "remove_liquidity" {
+        && transaction.function == "remove_liquidity"
+    {
         run_remove_liquidity(api, transaction);
     } else {
         system_contracts::run(api, TransactionRequest::from(transaction.clone()));
@@ -37,15 +38,14 @@ pub fn fix_spelling_errors(mut transaction: &mut Transaction) {
 }
 
 pub fn run_remove_liquidity<API: ellipticoin::API>(api: &mut API, transaction: &mut Transaction) {
-        let arguments = serde_cbor::from_slice::<Vec<Value>>(&transaction.arguments).unwrap();
-        let token = serde_cbor::value::from_value::<Token>(arguments[0].clone()).unwrap();
-        let amount = serde_cbor::value::from_value(arguments[1].clone()).unwrap();
-        if remove_liquidity(api, token, amount).is_ok() {
-            ellipticoin::API::commit(api);
-        } else {
-            ellipticoin::API::revert(api);
-        }
-    
+    let arguments = serde_cbor::from_slice::<Vec<Value>>(&transaction.arguments).unwrap();
+    let token = serde_cbor::value::from_value::<Token>(arguments[0].clone()).unwrap();
+    let amount = serde_cbor::value::from_value(arguments[1].clone()).unwrap();
+    if remove_liquidity(api, token, amount).is_ok() {
+        ellipticoin::API::commit(api);
+    } else {
+        ellipticoin::API::revert(api);
+    }
 }
 
 pub fn remove_liquidity<API: ellipticoin::API>(
