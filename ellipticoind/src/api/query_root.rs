@@ -107,9 +107,14 @@ impl QueryRoot {
                 let pool_supply_of_base_token =
                     exchange::get_pool_supply_of_base_token(&mut api, token.clone());
 
-                let v: Vec<u8> =  token.into();
-                let v2: Vec<u8> =  liquidity_token.into();
-                println!("{} {} {}", hex::encode(&v[..]), hex::encode(&v2[20..]), balance);
+                let v: Vec<u8> = token.into();
+                let v2: Vec<u8> = liquidity_token.into();
+                println!(
+                    "{} {} {}",
+                    hex::encode(&v[..]),
+                    hex::encode(&v2[20..]),
+                    balance
+                );
                 LiquidityToken {
                     issuer,
                     id,
