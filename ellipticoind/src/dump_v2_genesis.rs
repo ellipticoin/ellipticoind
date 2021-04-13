@@ -61,7 +61,7 @@ const V2_ELC: [u8; 20] = hex!("0000000000000000000000000000000000000002");
 const V1_USD: [u8; 20] = hex!("6b175474e89094c44da98b954eedeac495271d0f");
 const V2_USD: [u8; 20] = hex!("5d3a536e4d6dbd6114cc1ead35777bab948e3643");
 // const V2_USD: [u8; 20] = hex!("6d7f0754ffeb405d23c51ce938289d4835be3b14");
-const USD_EXCHANGE_RATE: u128 = 211367456115200165329965416;
+const USD_EXCHANGE_RATE: u128 = 213393371019770706290539363;
 const TOKEN_BALANCE_KEY: [u8; 4] = [6, 0, 0, 0];
 const BLOCK_NUMBER_KEY: [u8; 4] = [5, 0, 0, 0];
 const LIQUIDITY_BALANCE_KEY: [u8; 4] = [0, 0, 0, 0];
@@ -79,7 +79,7 @@ const USD: [u8; 20] = hex!("5d3a536e4d6dbd6114cc1ead35777bab948e3643");
 // It looks as though ETH has been being stolen since the network launched
 // This is the amount that was left after the hack
 // https://etherscan.io/tx/0xbb3e03c5cb6804bf5d19167123285c23518dd06a47ac3de84e46e69296045265
-const ETH_TOTAL_SUPPLY_AFTER_HACK: u64 = 4263245;
+const ETH_TOTAL_SUPPLY_AFTER_HACK: u64 = 4063245;
 
 
 // 14K DAI was stolen out of the bridge using feeless 1 unit transactions
