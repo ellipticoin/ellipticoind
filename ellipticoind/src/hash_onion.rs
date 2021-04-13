@@ -4,6 +4,7 @@ use crate::{
 };
 use async_std::sync::{Arc, Mutex};
 use indicatif::ProgressBar;
+use crate::db::get_hash_onion_layers_left;
 
 lazy_static! {
     pub static ref ONION: async_std::sync::Arc<Mutex<Vec<[u8; 32]>>> = Arc::new(Mutex::new(vec![]));
@@ -11,14 +12,15 @@ lazy_static! {
 
 pub async fn generate() {
     println!("Generating Hash Onion");
-    let pb = ProgressBar::new(*HASH_ONION_SIZE as u64);
+    let hash_onion_layers_left = get_hash_onion_layers_left().await.unwrap_or(*HASH_ONION_SIZE as u64);
+    let pb = ProgressBar::new(hash_onion_layers_left - 1);
     pb.set_style(
         indicatif::ProgressStyle::default_bar()
             .template("[{elapsed_precise}] [{bar}] {pos}/{len} ({percent}%)")
             .progress_chars("=> "),
     );
     let mut onion = vec![*PRIVATE_KEY];
-    for layer in 1..(*HASH_ONION_SIZE) {
+    for layer in 0..(hash_onion_layers_left) {
         if layer % 10000 == 0 {
             pb.inc(10000);
         }
@@ -27,16 +29,11 @@ pub async fn generate() {
     *ONION.lock().await = onion;
     pb.finish();
 }
-pub async fn peel() -> [u8; 32] {
-    let thing = ONION.lock().await.pop().expect("No onion layers left");
-    println!("{}", base64::encode(&thing));
-    thing
+
+pub async fn layers_left() -> usize {
+    ONION.lock().await.len()
 }
 
-pub async fn fast_forward(n: u64) { 
-    println!("{}", ONION.lock().await.len());
-    println!("{}", *HASH_ONION_SIZE - n as usize);
-    ONION.lock().await.truncate((*HASH_ONION_SIZE - n as usize));
-    let thing = ONION.lock().await.last().expect("No onion layers left").clone();
-    println!("new last {}", base64::encode(thing));
+pub async fn peel() -> [u8; 32] {
+    ONION.lock().await.pop().expect("No onion layers left")
 }

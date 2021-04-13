@@ -180,7 +180,7 @@ pub async fn new_start_mining_transaction() -> SignedTransaction {
     let mut db = aquire_db_read_lock!();
     SignedTransaction::System(SignedSystemTransaction::new(
         &mut db,
-        Action::StartMining(HOST.to_string(), hash_onion::peel().await),
+        Action::StartMining(HOST.to_string(), hash_onion::peel().await, hash_onion::layers_left().await as u64),
     ))
 }
 

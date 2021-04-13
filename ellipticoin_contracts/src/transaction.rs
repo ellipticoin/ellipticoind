@@ -39,7 +39,7 @@ pub enum Action {
     Seal([u8; 32]),
     SignRedeemRequest(u64, u64, Vec<u8>),
     StartBridge(u64),
-    StartMining(String, [u8; 32]),
+    StartMining(String, [u8; 32], u64),
     Trade(u64, Address, u64, Address),
     Update(Update),
     Vote(usize, Choice),
@@ -98,8 +98,8 @@ impl Action {
                 )
             }
             Action::StartBridge(ethereum_block_number) => Bridge::start(db, *ethereum_block_number),
-            Action::StartMining(host, onion_skin) => {
-                Ellipticoin::start_mining(db, sender, host.to_string(), *onion_skin)
+            Action::StartMining(host, onion_skin, layer_count) => {
+                Ellipticoin::start_mining(db, sender, host.to_string(), *onion_skin, *layer_count)
             }
             Action::Trade(
                 underlying_input_amount,

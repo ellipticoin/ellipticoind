@@ -31,7 +31,7 @@ pub struct Miner {
     pub host: String,
     pub address: Address,
     pub hash_onion_skin: [u8; 32],
-    pub hash_onion_skin: [u8; 32],
+    pub hash_onion_layers_left: u64,
 }
 
 impl Ellipticoin {
@@ -40,6 +40,7 @@ impl Ellipticoin {
         sender: Address,
         host: String,
         hash_onion_skin: [u8; 32],
+        layer_count: u64
     ) -> Result<()> {
         let mut miners = Self::get_miners(db);
         if !MINER_ALLOW_LIST.contains(&sender) {
@@ -49,6 +50,7 @@ impl Ellipticoin {
             address: sender,
             host,
             hash_onion_skin,
+            hash_onion_layers_left: layer_count
         });
         Self::set_miners(db, miners);
         Ok(())
@@ -86,6 +88,7 @@ impl Ellipticoin {
             );
         }
         miners.first_mut().unwrap().hash_onion_skin = hash_onion_skin.clone();
+        miners.first_mut().unwrap().hash_onion_layers_left -= 1;
         Self::settle_block_rewards(db)?;
         Self::shuffle_miners(db, &mut miners, hash_onion_skin);
         Self::issue_block_rewards(db)?;
@@ -216,11 +219,13 @@ mod tests {
                     address: ALICE,
                     host: "host1".to_string(),
                     hash_onion_skin: *alices_onion.last().unwrap(),
+                    hash_onion_layers_left: alices_onion.len() as u64,
                 },
                 Miner {
                     address: BOB,
                     host: "host2".to_string(),
                     hash_onion_skin: *bobs_onion.last().unwrap(),
+                    hash_onion_layers_left: bobs_onion.len() as u64,
                 },
             ],
         );
